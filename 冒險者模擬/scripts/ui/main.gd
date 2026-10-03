@@ -21,7 +21,7 @@ var last_enemy_id := ""
 
 # 選擇畫面
 var prep_screen: Control
-var prof_rows := {}  # move_id -> {"check": CheckBox, "spin": SpinBox, "label": Label}
+var learn_checks := {}  # move_id -> CheckBox
 
 # 戰鬥畫面
 var battle_screen: Control
@@ -114,7 +114,7 @@ func _build_prep_screen() -> Control:
 	cols.add_child(right)
 	right.add_child(_heading("測試用：你會的招式"))
 	var note := Label.new()
-	note.text = "正式版要找師傅學。這裡先自己勾要會哪些招、多熟（0～100）。\n熟練度越高越不會失敗，打仗時用了會自己漲。\n攻擊、防禦、閃避、撤退不用學。"
+	note.text = "正式版要找師傅學。這裡先自己勾要會哪些招。\n攻擊、防禦、閃避、撤退不用學。"
 	note.modulate = Color(1, 1, 1, 0.7)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(note)
@@ -126,16 +126,8 @@ func _build_prep_screen() -> Control:
 		var check := CheckBox.new()
 		check.text = m["name"]
 		check.custom_minimum_size.x = 150
-		check.tooltip_text = m["desc"]
+		check.toggled.connect(func(on): hero.learn(id) if on else hero.forget(id))
 		row.add_child(check)
-		var spin := SpinBox.new()
-		spin.min_value = 0
-		spin.max_value = 100
-		spin.step = 5
-		row.add_child(spin)
-		var label := Label.new()
-		label.custom_minimum_size.x = 80
-		row.add_child(label)
 		var desc := Label.new()
 		desc.text = m["desc"]
 		desc.modulate = Color(1, 1, 1, 0.6)
@@ -144,40 +136,13 @@ func _build_prep_screen() -> Control:
 		desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(desc)
 		right.add_child(row)
-		prof_rows[id] = {"check": check, "spin": spin, "label": label}
-		check.toggled.connect(func(_on): _on_prof_changed(id))
-		spin.value_changed.connect(func(_v): _on_prof_changed(id))
+		learn_checks[id] = check
 	return root
 
 
-func _on_prof_changed(id: String) -> void:
-	var r: Dictionary = prof_rows[id]
-	if r["check"].button_pressed:
-		hero.learn(id, int(r["spin"].value))
-	else:
-		hero.forget(id)
-	_refresh_prof_row(id)
-
-
-func _refresh_prof_rows() -> void:
-	for id in prof_rows:
-		var r: Dictionary = prof_rows[id]
-		r["check"].set_pressed_no_signal(hero.knows(id))
-		if hero.knows(id):
-			r["spin"].set_value_no_signal(hero.proficiency[id])
-		_refresh_prof_row(id)
-
-
-func _refresh_prof_row(id: String) -> void:
-	var r: Dictionary = prof_rows[id]
-	var known := hero.knows(id)
-	r["spin"].editable = known
-	r["label"].text = MoveData.proficiency_label(hero.proficiency[id]) if known else "未學會"
-	r["label"].modulate = Color.WHITE if known else Color(1, 1, 1, 0.4)
-
-
 func _show_prep() -> void:
-	_refresh_prof_rows()
+	for id in learn_checks:
+		learn_checks[id].set_pressed_no_signal(hero.knows(id))
 	prep_screen.visible = true
 	battle_screen.visible = false
 
@@ -279,8 +244,6 @@ func _on_move(id: String) -> void:
 	if battle == null or battle.is_over():
 		return
 	_append(battle.play_round({hero_c: {"move": id, "target": foe_c}}))
-	if battle.is_over():
-		_append_result()
 	_refresh_battle()
 
 
@@ -300,22 +263,11 @@ func _append(events: Array) -> void:
 				log_label.append_text("[color=%s]%s[/color]\n" % [COLOR.get(e["kind"], "#ffffff"), text])
 
 
-func _append_result() -> void:
-	var r := battle.result()
-	var lines := []
-	for id in r["gains"]:
-		var p: int = hero.proficiency[id]
-		lines.append("%s 熟練度 +%d（現在 %d，%s）" % [MoveData.MOVES[id]["name"], r["gains"][id], p, MoveData.proficiency_label(p)])
-	if lines.is_empty():
-		lines.append("這場沒有用到要練的招式。")
-	log_label.append_text("[color=%s]%s[/color]\n" % [COLOR["info"], "\n".join(lines)])
-
-
 func _refresh_battle() -> void:
 	hero_bar.max_value = hero_c.max_hp
 	hero_bar.value = hero_c.hp
 	hero_hp_label.text = "%d / %d" % [hero_c.hp, hero_c.max_hp]
-	hero_status.text = "位置不好：這回合攻擊減半，也躲不乾淨" if hero_c.bad_position and not battle.is_over() else ""
+	hero_status.text = "位置不好：這回合攻擊減半、挨打更痛，也躲不乾淨" if hero_c.bad_position and not battle.is_over() else ""
 	foe_bar.max_value = foe_c.max_hp
 	foe_bar.value = foe_c.hp
 	foe_hp_label.text = "%d / %d" % [foe_c.hp, foe_c.max_hp]
@@ -331,22 +283,15 @@ func _refresh_battle() -> void:
 		var b: Button = move_buttons[opt["id"]]
 		b.disabled = not opt["known"]
 		b.tooltip_text = opt["desc"]
-		if opt["basic"]:
+		if opt["known"]:
 			b.text = opt["name"]
-		elif opt["known"]:
-			b.text = "%s（%s %d）" % [opt["name"], MoveData.proficiency_label(opt["proficiency"]), opt["proficiency"]]
 		else:
 			b.text = "%s（未學會）" % opt["name"]
 
 
 func _show_hint(id: String) -> void:
 	var m: Dictionary = MoveData.MOVES[id]
-	var extra := ""
-	if not m["basic"]:
-		if hero.knows(id):
-			extra = "　成功率約 %d%%" % roundi(MoveData.success_chance(hero.proficiency[id]) * 100)
-		else:
-			extra = "　（還沒學會）"
+	var extra := "" if hero.knows(id) else "　（還沒學會）"
 	hint_label.text = "%s：%s%s" % [m["name"], m["desc"], extra]
 
 

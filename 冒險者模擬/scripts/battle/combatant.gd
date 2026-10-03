@@ -27,6 +27,12 @@ var intent := {}
 ## 下回合被逼出來的破綻原因（例如 tripped），空字串 = 沒有
 var forced_next := ""
 var recent_intents: Array[String] = []
+## 對手上回合用的招（敵人的習慣會看這個）
+var last_player_move := ""
+## 發狂了（敵人）
+var raging := false
+## 蓄力中，下一次攻擊特別重（敵人）
+var charged := false
 ## 閃避後位置不好
 var bad_position := false
 
