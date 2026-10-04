@@ -9,19 +9,22 @@ func _init() -> void:
 	var main: Control = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await _frames(5)
-	main.hero.learn("sweep_kick")
-	main.hero.learn("vital")
+	for m in ["sweep_kick", "parry", "vital", "break_free", "shout"]:
+		main.hero.learn(m)
 	main._show_prep()
 	await _frames(3)
 	root.get_texture().get_image().save_png(out + "/prep.png")
-	main._start_battle("bandit_leader")
+	main._start_battle("bear")
 	for i in 3:
-		main._on_move(["sweep_kick", "vital", "dodge"][i])
+		main._on_move(main.hero_c.hand[0])
 	await _frames(3)
 	root.get_texture().get_image().save_png(out + "/battle.png")
-	main._start_battle("bear")
-	while not main.battle.is_over():
-		main._on_move({"opening": "vital", "smash": "dodge"}.get(main.foe_c.intent["type"], "defend"))
+	# 隨便亂按，確認不會壞掉
+	for enemy in EnemyData.ORDER:
+		main._start_battle(enemy)
+		while not main.battle.is_over():
+			var hand: Array = main.hero_c.hand
+			main._on_move(hand[randi() % hand.size()])
 	await _frames(3)
 	root.get_texture().get_image().save_png(out + "/end.png")
 	quit()
