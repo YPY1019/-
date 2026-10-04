@@ -33,8 +33,6 @@ var enemies: Array[Combatant] = []
 var round_no := 0
 ## "" = 還在打；win / lose / flee
 var outcome := ""
-## true = 對手先擺招（你看得到牠要做什麼）；false = 雙方同時出手，出手後才知道
-var telegraph := true
 var rng := RandomNumberGenerator.new()
 
 
@@ -76,12 +74,6 @@ func can_flee(actor: Combatant) -> bool:
 func play_round(choices: Dictionary) -> Array:
 	var ev := []
 	ev.append(_ev("round", "第 %d 回合" % round_no))
-
-	# 不擺招時，對手的動作在這時候才揭曉
-	if not telegraph:
-		for enemy in enemies:
-			if enemy.is_alive():
-				ev.append(_ev("action", enemy.intent["text"]))
 
 	# 1. 我方先出手
 	var done := {}
@@ -194,21 +186,11 @@ func _weighted_pick(candidates: Array, foe: Combatant) -> String:
 	for id in candidates:
 		var w := 1.0
 		if foe != null and not MoveData.is_basic(id):
-			# 擺招時看對手這一招；不擺招時看對手會的所有招（你只知道牠的路數）
-			var types := [foe.intent["type"]]
-			if not telegraph:
-				types = _action_types(foe)
-			var good := false
-			var wasted := true
-			for t in types:
-				var e := MoveData.entry(id, t, foe.traits)
-				good = good or e.get("good", false)
-				var useless: bool = (e.get("deal", 0.0) <= 0.0 and not e.has("effect")) \
-						or (MoveData.DEFENSE.has(id) and e.get("take", 0.0) >= 1.0)  # 防守招卻擋不住
-				wasted = wasted and useless
-			if good:
+			var e := MoveData.entry(id, foe.intent["type"], foe.traits)
+			if e.get("good", false):
 				w = GOOD_WEIGHT
-			elif wasted:
+			elif (e.get("deal", 0.0) <= 0.0 and not e.has("effect")) \
+					or (MoveData.DEFENSE.has(id) and e.get("take", 0.0) >= 1.0):  # 防守招卻擋不住
 				w = WASTED_WEIGHT
 		weights.append(w)
 		total += w
@@ -218,18 +200,6 @@ func _weighted_pick(candidates: Array, foe: Combatant) -> String:
 		if roll <= 0.0:
 			return candidates[i]
 	return candidates[-1]
-
-
-func _action_types(foe: Combatant) -> Array:
-	var types := []
-	for id in foe.enemy_def["actions"]:
-		var a: Dictionary = foe.enemy_def["actions"][id]
-		var t: String = "windup" if a.get("windup", false) else a["type"]
-		if not types.has(t):
-			types.append(t)
-		if a.get("windup", false) and not types.has(a["type"]):
-			types.append(a["type"])
-	return types
 
 
 # ---- 玩家出手 ----
@@ -393,8 +363,7 @@ func _choose_intents(ev: Array) -> void:
 				intent.merge({"action": id, "type": a["type"], "phase": "do", "text": enemy.fill(text)})
 				_remember(enemy, id)
 		enemy.intent = intent
-		if telegraph:
-			ev.append(_ev("tell", intent["text"]))
+		ev.append(_ev("tell", intent["text"]))
 
 
 func _remember(enemy: Combatant, id: String) -> void:

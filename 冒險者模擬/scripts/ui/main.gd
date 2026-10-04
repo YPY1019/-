@@ -26,7 +26,6 @@ var last_enemy_id := ""
 # 選擇畫面
 var prep_screen: Control
 var learn_checks := {}  # move_id -> CheckBox
-var telegraph_check: CheckBox
 
 # 戰鬥畫面
 var battle_screen: Control
@@ -112,17 +111,6 @@ func _build_prep_screen() -> Control:
 		row.add_child(l)
 		left.add_child(row)
 
-	left.add_child(_heading("測試用：戰鬥方式"))
-	telegraph_check = CheckBox.new()
-	telegraph_check.text = "對手先擺招（出手前看得到對手要做什麼）"
-	telegraph_check.button_pressed = true
-	left.add_child(telegraph_check)
-	var tnote := Label.new()
-	tnote.text = "不勾的話，雙方同時出手，出手後才知道對手做了什麼。"
-	tnote.modulate = Color(1, 1, 1, 0.6)
-	tnote.add_theme_font_size_override("font_size", 16)
-	tnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	left.add_child(tnote)
 
 	# 右：測試用的招式設定
 	var right := VBoxContainer.new()
@@ -240,7 +228,6 @@ func _start_battle(enemy_id: String) -> void:
 	hero_c = hero.to_combatant()
 	foe_c = Combatant.from_enemy(enemy_id)
 	battle = Battle.new([hero_c], [foe_c])
-	battle.telegraph = telegraph_check.button_pressed
 	log_label.clear()
 	foe_name_label.text = foe_c.display_name
 	prep_screen.visible = false
@@ -311,10 +298,7 @@ func _refresh_battle() -> void:
 	if over:
 		tell_label.text = ""
 		return
-	if battle.telegraph:
-		tell_label.text = "▶ " + foe_c.intent["text"]
-	else:
-		tell_label.text = foe_c.fill("▶ 你緊盯著{name}，猜不透{pron}下一步要做什麼。")
+	tell_label.text = "▶ " + foe_c.intent["text"]
 
 	# 選項每回合都不同，重新排按鈕
 	for child in move_row.get_children():

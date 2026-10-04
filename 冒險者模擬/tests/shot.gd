@@ -19,13 +19,6 @@ func _init() -> void:
 		main._on_move(main.hero_c.hand[0])
 	await _frames(3)
 	root.get_texture().get_image().save_png(out + "/battle.png")
-	# 不擺招也打一場截圖
-	main.telegraph_check.button_pressed = false
-	main._start_battle("bandit_leader")
-	for i in 3:
-		main._on_move(main.hero_c.hand[0])
-	await _frames(3)
-	root.get_texture().get_image().save_png(out + "/hidden.png")
 	# 隨便亂按，確認不會壞掉
 	for enemy in EnemyData.ORDER:
 		main._start_battle(enemy)
