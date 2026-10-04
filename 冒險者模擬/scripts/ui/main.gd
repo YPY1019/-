@@ -314,7 +314,7 @@ func _refresh_battle() -> void:
 	if battle.telegraph:
 		tell_label.text = "▶ " + foe_c.intent["text"]
 	else:
-		tell_label.text = foe_c.fill("▶ 你緊盯著{name}，猜不透牠下一步要做什麼。")
+		tell_label.text = foe_c.fill("▶ 你緊盯著{name}，猜不透{pron}下一步要做什麼。")
 
 	# 選項每回合都不同，重新排按鈕
 	for child in move_row.get_children():

@@ -44,7 +44,7 @@ const ENEMIES := {
 	"wolf": {
 		"name": "野狼",
 		"blurb": "森林裡常見的野獸。會撲、會咬住不放。",
-		"hp": 45, "atk": 12, "armor": "none", "traits": ["beast"],
+		"hp": 45, "atk": 12, "armor": "none", "traits": ["beast"], "pron": "牠",
 		"weapon": "利牙", "guard": "架勢",
 		"scene": ["黃昏的林間小路，落葉被風吹得沙沙作響。", "清晨的霧還沒散，樹林裡安靜得只聽得到你自己的呼吸。"],
 		"start": ["一頭灰毛野狼從樹叢裡鑽出來，壓低身子，黃色的眼睛死盯著你。", "樹叢一陣晃動，一頭瘦骨嶙峋的野狼走了出來，嘴角滴著口水。"],
@@ -73,7 +73,7 @@ const ENEMIES := {
 	"bandit_leader": {
 		"name": "盜匪頭子",
 		"blurb": "在路上攔人搶劫的盜匪頭目，大刀使得很兇，手段也很髒。",
-		"hp": 90, "atk": 30, "armor": "light", "traits": ["disarmable"],
+		"hp": 90, "atk": 30, "armor": "light", "traits": ["disarmable"], "pron": "他",
 		"weapon": "大刀", "guard": "架勢",
 		"scene": ["荒涼的山道上，兩邊都是陡峭的岩壁，退無可退。", "官道旁的破廟前，地上還散落著被搶過的行李。"],
 		"start": ["盜匪頭子扛著大刀擋在路中間，咧嘴笑著：「把錢留下，人可以走。」", "盜匪頭子從岩石後面跳出來，大刀在手裡轉了一圈：「識相的就把錢袋扔過來。」"],
@@ -116,7 +116,7 @@ const ENEMIES := {
 	"deserter": {
 		"name": "逃兵騎士",
 		"blurb": "從戰場逃出來的騎士，一身鐵甲，盾牌很難打穿。",
-		"hp": 70, "atk": 20, "armor": "heavy", "traits": ["disarmable"],
+		"hp": 70, "atk": 20, "armor": "heavy", "traits": ["disarmable"], "pron": "他",
 		"weapon": "長劍", "guard": "盾牌",
 		"scene": ["戰場邊緣的焦土上，烏鴉在遠處的屍堆上盤旋。", "下著細雨的石橋上，雨水順著橋面往下流。"],
 		"start": ["一個穿著破舊鐵甲的騎士舉起盾牌，一言不發地朝你走來。頭盔的縫隙後面，看不見他的眼睛。"],
@@ -149,7 +149,7 @@ const ENEMIES := {
 	"bear": {
 		"name": "熊",
 		"blurb": "比人還高的大熊，皮又厚又硬。被牠抱住就麻煩了。",
-		"hp": 120, "atk": 24, "armor": "light", "traits": ["beast", "big"],
+		"hp": 120, "atk": 24, "armor": "light", "traits": ["beast", "big"], "pron": "牠",
 		"weapon": "熊掌", "guard": "架勢",
 		"scene": ["山洞口的空地，地上散落著動物的骨頭，空氣裡一股腥臭味。", "溪邊的碎石灘，水聲嘩嘩，地上還有被撕碎的魚。"],
 		"start": ["一頭大熊從洞裡鑽了出來，嗅了嗅空氣，轉頭看向你，喉嚨裡發出低沉的呼嚕聲。"],
@@ -194,7 +194,7 @@ const ENEMIES := {
 	"ogre": {
 		"name": "食人魔",
 		"blurb": "兩個人高的怪物，拖著一根大木棍。力氣大得能把人抓起來摔。",
-		"hp": 160, "atk": 28, "armor": "none", "traits": ["big"],
+		"hp": 160, "atk": 28, "armor": "none", "traits": ["big"], "pron": "牠",
 		"weapon": "木棍", "guard": "架勢",
 		"scene": ["倒塌的城牆下，到處都是被砸爛的木箱和碎石。", "暴雨中的沼澤邊，泥水沒過了你的腳踝。"],
 		"start": ["地面一陣震動。食人魔拖著一根大木棍從遠處走來，咧開滿是爛牙的嘴，好像看到了晚餐。"],

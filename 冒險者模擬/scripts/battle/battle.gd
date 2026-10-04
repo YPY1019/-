@@ -154,7 +154,7 @@ func _deal_hands() -> void:
 			if ally.next_status.has("off_balance"):
 				n -= 1
 				pool.erase("dodge")
-				notes.append("你腳步還沒站穩。")
+				notes.append("你腳步還沒站穩，架勢也還沒收回來。")
 			if ally.next_status.has("blind"):
 				n = mini(n, 1)
 				notes.append("你眼睛進了沙，什麼都看不清楚。")

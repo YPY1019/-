@@ -16,6 +16,8 @@ var armor := "none"
 var traits: Array = []
 var weapon := ""
 var guard_item := ""
+## 他／牠
+var pron := "牠"
 
 ## 敵人資料（敵人才有）
 var enemy_def := {}
@@ -62,6 +64,7 @@ static func from_enemy(id: String) -> Combatant:
 	c.traits = d["traits"]
 	c.weapon = d["weapon"]
 	c.guard_item = d["guard"]
+	c.pron = d.get("pron", "牠")
 	c.enemy_def = d
 	return c
 
@@ -75,4 +78,4 @@ func action_def(id: String) -> Dictionary:
 
 
 func fill(text: String) -> String:
-	return text.format({"name": display_name, "weapon": weapon, "guard": guard_item})
+	return text.format({"name": display_name, "pron": pron, "weapon": weapon, "guard": guard_item})
