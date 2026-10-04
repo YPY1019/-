@@ -11,6 +11,9 @@ var side := Side.ENEMY
 var controlled := false
 var max_hp := 1
 var hp := 1
+## 血量掉到這裡（含）就算倒下。木劍過招時不是 0
+var yield_hp := 0
+## 敵人的攻擊力。玩家方看基礎數值，見 power_of()
 var atk := 0
 var armor := "none"
 var traits: Array = []
@@ -33,6 +36,10 @@ var hand_note := ""
 var next_status: Array[String] = []
 ## 被抱住了
 var held := false
+## 這場用過的招（算基礎數值成長用）
+var used: Array[String] = []
+## 這場被敵人招牌招打中幾次：你偷學的招 id -> 次數
+var sig_hits := {}
 
 ## ---- 敵人 ----
 ## 這回合要做的事：{"action", "type", "phase": windup/strike/do/forced/hold, "text", "target"}
@@ -70,7 +77,14 @@ static func from_enemy(id: String) -> Combatant:
 
 
 func is_alive() -> bool:
-	return hp > 0
+	return hp > yield_hp
+
+
+## 用這招打出去的攻擊力。玩家方看這招靠的基礎數值，敵人用 atk
+func power_of(move_id: String) -> float:
+	if adventurer == null:
+		return atk
+	return adventurer.power(MoveData.MOVES[move_id].get("stat", "str"))
 
 
 func action_def(id: String) -> Dictionary:

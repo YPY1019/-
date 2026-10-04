@@ -4,7 +4,8 @@ extends RefCounted
 ## 一場戰鬥的規則。不碰畫面：收指令，吐出「事件清單」給畫面顯示。
 ##
 ## 進口：Battle.new(我方, 敵方)，我方是從 Adventurer.to_combatant() 來的。
-## 出口：result() —— 勝負或撤退、剩多少血、打了幾回合。
+## 出口：result() —— 勝負或撤退、剩多少血、打了幾回合、用了哪些招、被招牌招打中幾次。
+## 戰鬥本身不改 Adventurer，打完由 Town 結算。
 ##
 ## 每回合：
 ##   1. 對手擺出招（描述）
@@ -27,11 +28,14 @@ const STRUGGLE_CHANCE := 0.5
 const HOLD_MAX := 2
 
 const ATTACK_TYPES := ["sweep", "thrust", "smash", "grab", "trick", "roar", "hold"]
+const END_TEXT := {"win": "你贏了！", "lose": "你眼前一黑，倒了下去。", "flee": "你逃掉了。", "survive": "你撐過去了。"}
 
 var allies: Array[Combatant] = []
 var enemies: Array[Combatant] = []
 var round_no := 0
-## "" = 還在打；win / lose / flee
+## 打滿幾回合就停（木劍過招用）。0 = 不限
+var round_limit := 0
+## "" = 還在打；win / lose / flee / survive（撐滿 round_limit）
 var outcome := ""
 var rng := RandomNumberGenerator.new()
 
@@ -101,16 +105,17 @@ func play_round(choices: Dictionary) -> Array:
 	# 3. 結束了沒
 	if _all_dead(enemies):
 		outcome = "win"
-		ev.append(_ev("end", "你贏了！"))
 	elif _all_dead(allies):
 		outcome = "lose"
-		ev.append(_ev("end", "你眼前一黑，倒了下去。"))
 	else:
 		for ally in done:
 			if done[ally]["move"] == "flee" and not ally.held:
 				outcome = "flee"
-				ev.append(_ev("end", "你逃掉了。"))
-	if outcome == "":
+		if outcome == "" and round_limit > 0 and round_no >= round_limit:
+			outcome = "survive"
+	if outcome != "":
+		ev.append(_ev("end", _end_text()))
+	else:
 		round_no += 1
 		_choose_intents(ev)
 		_deal_hands()
@@ -123,7 +128,14 @@ func is_over() -> bool:
 
 func result() -> Dictionary:
 	var hero := allies[0]
-	return {"outcome": outcome, "rounds": round_no, "hp": hero.hp, "max_hp": hero.max_hp}
+	return {"outcome": outcome, "rounds": round_no, "hp": hero.hp, "max_hp": hero.max_hp,
+		"used": hero.used, "sig_hits": hero.sig_hits}
+
+
+## 結束的句子，敵人資料裡有寫就用敵人的
+func _end_text() -> String:
+	var d: Dictionary = enemies[0].enemy_def
+	return d.get(outcome + "_text", END_TEXT[outcome])
 
 
 # ---- 抽招 ----
@@ -216,8 +228,10 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 	var m: Dictionary = MoveData.MOVES[move_id]
 	ev.append(_ev("action", target.fill(_pick(e["text"]))))
 
+	if move_id != MoveData.FLEE:
+		ally.used.append(move_id)
 	if e.get("deal", 0.0) > 0.0:
-		_damage_enemy(target, ally.atk * e["deal"], m.get("pierce", false), ev)
+		_damage_enemy(target, ally.power_of(move_id) * e["deal"], m.get("pierce", false), ev)
 
 	if target.is_alive():
 		match e.get("effect", ""):
@@ -296,6 +310,18 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, hit
 			enemy.hold_rounds = 0
 		_:
 			target.next_status.append(on_hit)
+	_watch_signature(enemy, target, ev)
+
+
+## 偷學：被對手的招牌招打中，記一次
+func _watch_signature(enemy: Combatant, target: Combatant, ev: Array) -> void:
+	var sig: Dictionary = enemy.enemy_def.get("signature", {})
+	if sig.is_empty() or enemy.intent.get("action", "") != sig["action"]:
+		return
+	if target.adventurer == null or target.adventurer.knows(sig["learn"]):
+		return
+	target.sig_hits[sig["learn"]] = target.sig_hits.get(sig["learn"], 0) + 1
+	ev.append(_ev("info", _pick(sig["seen"])))
 
 
 func _damage_enemy(enemy: Combatant, raw: float, pierce: bool, ev: Array) -> void:
@@ -466,7 +492,7 @@ func _ev(kind: String, text: String) -> Dictionary:
 
 ## 你受傷後的反應：快撐不住、重傷、或偶爾一句輕傷
 func _hurt_line(target: Combatant, dmg: int) -> String:
-	if target.hp <= 0:
+	if not target.is_alive():
 		return ""
 	if target.hp <= target.max_hp * 0.25:
 		return _pick(MoveData.HURT["critical"])
