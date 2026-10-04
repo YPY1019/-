@@ -120,7 +120,7 @@ func _build_prep_screen() -> Control:
 	cols.add_child(scroll)
 	right.add_child(_heading("測試用：你會的招式"))
 	var note := Label.new()
-	note.text = "正式版要找師傅學。建議一開始什麼都不勾，打輸了再勾一招，體驗「學到新招」。\n戰鬥時，每回合會想到 3 招（從攻擊、防禦、閃避、撤退這些人人都會的招，加上你學會的招裡抽），學會的招每多 4 招就多想到 1 招。剋制對手那招的比較容易想到。"
+	note.text = "正式版要找師傅學。建議一開始什麼都不勾，打輸了再勾一招，體驗「學到新招」。\n戰鬥時，每回合會出現 3 個選項，從攻擊、防禦、閃避、撤退這些人人都會的招，加上你學會的招裡抽。學會的招每多 4 招，選項就多 1 個。剋制對手那招的比較容易出現。"
 	note.modulate = Color(1, 1, 1, 0.7)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(note)
@@ -284,10 +284,6 @@ func _refresh_battle() -> void:
 			child.queue_free()
 	# 所有選項都是抽出來的，排成一排
 	basic_row.visible = false
-	var tech_label := Label.new()
-	tech_label.text = "這回合想到："
-	tech_label.custom_minimum_size.x = 140
-	tech_row.add_child(tech_label)
 	for opt in battle.hand_options(hero_c):
 		var b := Button.new()
 		b.text = opt["name"]

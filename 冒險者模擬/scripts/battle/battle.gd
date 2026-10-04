@@ -131,7 +131,7 @@ func _deal_hands() -> void:
 			for id in MoveData.HELD:
 				if MoveData.is_basic(id) or ally.adventurer.knows(id):
 					ally.hand.append(id)
-			notes.append("你被抱住了，只能想辦法脫身。")
+			notes.append("你被抱住了。")
 		else:
 			# 一般招和學來的招放在同一個池子裡抽，沒有永遠都在的招
 			var pool: Array = MoveData.BASIC + ally.adventurer.learned
@@ -139,14 +139,14 @@ func _deal_hands() -> void:
 			if ally.next_status.has("off_balance"):
 				n -= 1
 				pool.erase("dodge")
-				notes.append("腳步還沒站穩：不能閃避，也少想到一招。")
+				notes.append("你腳步還沒站穩。")
 			if ally.next_status.has("blind"):
 				n = mini(n, 1)
-				notes.append("眼睛進了沙，只想得到一招。")
+				notes.append("你眼睛進了沙，什麼都看不清楚。")
 			if ally.next_status.has("shaken"):
 				n = 1
 				pool = pool.filter(func(id): return MoveData.is_basic(id))
-				notes.append("被嚇得腦中一片空白，只想得到最普通的一招。")
+				notes.append("你被嚇得腦中一片空白。")
 			ally.hand.assign(_draw(pool, maxi(n, 1), _first_alive(enemies)))
 		ally.next_status.clear()
 		ally.hand_note = "　".join(notes)
