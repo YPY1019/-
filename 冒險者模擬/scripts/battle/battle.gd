@@ -13,11 +13,12 @@ extends RefCounted
 ## 對手的招可能讓你下回合想到的招變少（眼睛進沙、被嚇到、被抱住）。
 ## 程式寫成可以多人參戰；文字目前都用「你」寫，加同伴時要改。
 
-## 每回合想到幾招；會的招每多 HAND_GROWTH 招，就多想到一招（會越多招越強，不會被沒用的招擠掉）
-const HAND_SIZE := 3
-const HAND_GROWTH := 4
+## 每回合最多出現幾個選項。會的招不超過這個數，就全部出現（學了新招只會多一個選項，不會變弱）
+const HAND_MAX := 5
 ## 剋制對手這招的，抽到的機會是一般的幾倍
-const GOOD_WEIGHT := 3
+const GOOD_WEIGHT := 3.0
+## 用了等於白費的招，抽到的機會是一般的幾倍
+const WASTED_WEIGHT := 0.2
 ## 對手眼睛進沙時，下一次攻擊打偏的機率
 const BLIND_MISS_CHANCE := 0.6
 ## 被抱住時「掙扎」成功的機率
@@ -63,6 +64,11 @@ func hand_options(actor: Combatant) -> Array:
 	return list
 
 
+## 撤退不是招式，永遠可以選，除非被抱住
+func can_flee(actor: Combatant) -> bool:
+	return not actor.held
+
+
 ## choices：我方 Combatant -> {"move": 招式 id, "target": 敵方 Combatant}
 func play_round(choices: Dictionary) -> Array:
 	var ev := []
@@ -77,8 +83,8 @@ func play_round(choices: Dictionary) -> Array:
 		if target == null or not target.is_alive():
 			target = _first_alive(enemies)
 		var move_id: String = choices[ally]["move"]
-		if not ally.hand.has(move_id):
-			push_error("招式 %s 不在手上" % move_id)
+		if not ally.hand.has(move_id) and not (move_id == MoveData.FLEE and can_flee(ally)):
+			push_error("招式 %s 不能用" % move_id)
 			move_id = ally.hand[0]
 		done[ally] = _player_act(ally, move_id, target, ev)
 
@@ -135,7 +141,7 @@ func _deal_hands() -> void:
 		else:
 			# 一般招和學來的招放在同一個池子裡抽，沒有永遠都在的招
 			var pool: Array = MoveData.BASIC + ally.adventurer.learned
-			var n := HAND_SIZE + ally.adventurer.learned.size() / HAND_GROWTH
+			var n := mini(pool.size(), HAND_MAX)
 			if ally.next_status.has("off_balance"):
 				n -= 1
 				pool.erase("dodge")
@@ -152,27 +158,49 @@ func _deal_hands() -> void:
 		ally.hand_note = "　".join(notes)
 
 
-## 從會的招裡抽 n 招。剋制對手這招的權重比較高。
+## 從會的招裡抽 n 招。至少一個攻擊類、一個防守類（抽得到的話），剩下的隨機。
 func _draw(pool: Array, n: int, foe: Combatant) -> Array:
 	var left := pool.duplicate()
 	var out := []
+	if n >= 2:
+		for group in [MoveData.OFFENSE, MoveData.DEFENSE]:
+			var id := _weighted_pick(left.filter(func(m): return group.has(m)), foe)
+			if id != "":
+				out.append(id)
+				left.erase(id)
 	while out.size() < n and not left.is_empty():
-		var weights := []
-		var total := 0
-		for id in left:
-			var w := 1
-			if foe != null and MoveData.entry(id, foe.intent["type"], foe.traits).get("good", false):
-				w = GOOD_WEIGHT
-			weights.append(w)
-			total += w
-		var roll := rng.randi_range(1, total)
-		for i in left.size():
-			roll -= weights[i]
-			if roll <= 0:
-				out.append(left[i])
-				left.remove_at(i)
-				break
+		var id := _weighted_pick(left, foe)
+		out.append(id)
+		left.erase(id)
 	return out
+
+
+## 剋制對手這招的比較容易出現；用了等於白費的（沒傷害、沒效果、又照樣挨打）很少出現。
+## 這樣學了新招不會把有用的招擠掉。
+func _weighted_pick(candidates: Array, foe: Combatant) -> String:
+	if candidates.is_empty():
+		return ""
+	var weights := []
+	var total := 0.0
+	for id in candidates:
+		var w := 1.0
+		if foe != null and not MoveData.is_basic(id):
+			var e := MoveData.entry(id, foe.intent["type"], foe.traits)
+			if e.get("good", false):
+				w = GOOD_WEIGHT
+			elif e.get("deal", 0.0) <= 0.0 and not e.has("effect"):
+				w = WASTED_WEIGHT
+			elif MoveData.DEFENSE.has(id) and e.get("take", 0.0) >= 1.0:
+				w = WASTED_WEIGHT  # 防守招卻擋不住
+
+		weights.append(w)
+		total += w
+	var roll := rng.randf() * total
+	for i in candidates.size():
+		roll -= weights[i]
+		if roll <= 0.0:
+			return candidates[i]
+	return candidates[-1]
 
 
 # ---- 玩家出手 ----

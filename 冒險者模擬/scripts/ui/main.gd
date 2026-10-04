@@ -120,7 +120,7 @@ func _build_prep_screen() -> Control:
 	cols.add_child(scroll)
 	right.add_child(_heading("測試用：你會的招式"))
 	var note := Label.new()
-	note.text = "正式版要找師傅學。建議一開始什麼都不勾，打輸了再勾一招，體驗「學到新招」。\n戰鬥時，每回合會出現 3 個選項，從攻擊、防禦、閃避、撤退這些人人都會的招，加上你學會的招裡抽。學會的招每多 4 招，選項就多 1 個。剋制對手那招的比較容易出現。"
+	note.text = "正式版要找師傅學。建議一開始什麼都不勾，打輸了再勾一招，體驗「學到新招」。\n戰鬥時，攻擊、防禦、閃避人人都會。會的招總共 5 招以內就全部出現；超過的話每回合挑 5 個，剋制對手那招的比較容易出現，用了也白費的很少出現，而且至少一個攻擊類、一個防守類。撤退永遠可以選。"
 	note.modulate = Color(1, 1, 1, 0.7)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(note)
@@ -292,6 +292,17 @@ func _refresh_battle() -> void:
 		b.pressed.connect(_on_move.bind(opt["id"]))
 		b.mouse_entered.connect(_show_hint.bind(opt["id"]))
 		tech_row.add_child(b)
+	# 撤退跟招式分開，放在最右邊
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tech_row.add_child(spacer)
+	var flee := Button.new()
+	flee.text = "撤退"
+	flee.custom_minimum_size = Vector2(120, 52)
+	flee.disabled = not battle.can_flee(hero_c)
+	flee.pressed.connect(_on_move.bind(MoveData.FLEE))
+	flee.mouse_entered.connect(_show_hint.bind(MoveData.FLEE))
+	tech_row.add_child(flee)
 	hint_label.text = ""
 
 

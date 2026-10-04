@@ -18,7 +18,12 @@ extends RefCounted
 ## self：用完之後自己的狀態（off_balance：下回合少想到一招）。
 
 ## 人人都會的一般招。跟學來的招放在同一個池子裡抽，不是永遠都在
-const BASIC := ["attack", "defend", "dodge", "flee"]
+const BASIC := ["attack", "defend", "dodge"]
+## 每回合的選項至少有一個攻擊類、一個防守類（擲沙、怒喝不算這兩類）
+const OFFENSE := ["attack", "heavy", "vital", "combo"]
+const DEFENSE := ["defend", "dodge", "sweep_kick", "parry", "redirect", "disarm", "break_free"]
+## 撤退不是招式，永遠可以選（被抱住時不行）
+const FLEE := "flee"
 ## 被抱住時能用的招（沒學的不會出現）
 const HELD := ["struggle", "attack", "break_free", "vital"]
 const LEARNABLE := ["sweep_kick", "parry", "redirect", "heavy", "vital", "disarm", "break_free", "sand", "shout", "combo"]
@@ -48,7 +53,7 @@ const MOVES := {
 		},
 	},
 	"dodge": {
-		"name": "閃避", "desc": "躲開攻擊，不會受傷。但躲完腳步亂了：下回合不能再閃避，也少想到一招。躲不掉吼聲。",
+		"name": "閃避", "desc": "躲開攻擊，不會受傷。但躲完腳步亂了：下回合不能再閃避，選項也少一個。躲不掉吼聲。",
 		"self": "off_balance",
 		"default": {"take": 0.0, "text": ["你往後一跳，躲開了{name}的攻擊。", "你側身一閃，{name}撲了個空。"]},
 		"vs": {

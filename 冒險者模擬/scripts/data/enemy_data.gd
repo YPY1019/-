@@ -70,7 +70,7 @@ const ENEMIES := {
 	"bandit_leader": {
 		"name": "盜匪頭子",
 		"blurb": "在路上攔人搶劫的盜匪頭目，大刀使得很兇，手段也很髒。",
-		"hp": 90, "atk": 24, "armor": "light", "traits": ["disarmable"],
+		"hp": 90, "atk": 30, "armor": "light", "traits": ["disarmable"],
 		"weapon": "大刀", "guard": "架勢",
 		"start": ["盜匪頭子扛著大刀擋在路中間，咧嘴笑著：「把錢留下。」"],
 		"actions": {
