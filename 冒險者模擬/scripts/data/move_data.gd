@@ -13,11 +13,12 @@ extends RefCounted
 ##   hit   true = 再接對手自己「打中你」的描述
 ##   effect 對對手的效果：trip 掃倒、break 破防、interrupt 打斷蓄勢、stagger 踉蹌、disarm 繳械、blind 撒沙、scare 嚇退、escape 掙脫
 ##   requires 對手要有這個特性才成立（beast 野獸、disarmable 繳得掉），不成立時改用 else
-##   good  true = 這招剋這種類型。抽招時比較容易抽到（高手見招拆招）
+##   good  true = 這招剋這種類型。比較容易出現在選項裡（高手見招拆招）
 ## vs_big：對體型大的對手用的版本。
-## self：用完之後自己的狀態（off_balance：下回合少想到一招）。
+## self：用完之後自己的狀態（off_balance：下回合不能閃避、選項少一個）。
+## text 每次隨機挑一句。{name} 對手、{weapon} 對手的武器、{guard} 對手的防具。
 
-## 人人都會的一般招。跟學來的招放在同一個池子裡抽，不是永遠都在
+## 人人都會的一般招。跟學來的招放在同一個池子裡，不是永遠都在
 const BASIC := ["attack", "defend", "dodge"]
 ## 每回合的選項至少有一個攻擊類、一個防守類（擲沙、怒喝不算這兩類）
 const OFFENSE := ["attack", "heavy", "vital", "combo"]
@@ -28,46 +29,89 @@ const FLEE := "flee"
 const HELD := ["struggle", "attack", "break_free", "vital"]
 const LEARNABLE := ["sweep_kick", "parry", "redirect", "heavy", "vital", "disarm", "break_free", "sand", "shout", "combo"]
 
+## 你受傷後的反應（依傷勢挑一句）
+const HURT := {
+	"light": ["你咬緊牙關，沒有退。", "你悶哼一聲，把劍握得更緊。", "傷口火辣辣地痛，你甩了甩頭。"],
+	"heavy": ["你眼前一陣發黑，差點站不穩。", "痛楚像火一樣燒遍全身，你踉蹌著退了一步。", "你吐出一口血沫，硬是撐住了。"],
+	"critical": ["你的視線開始模糊，手裡的劍越來越重。", "你感覺力氣正從傷口一點一點流走。", "你的腿在發抖，每一次呼吸都帶著血腥味。"],
+}
+
 const MOVES := {
-	# ---------- 基本招（不用學） ----------
+	# ---------- 一般招（不用學） ----------
 	"attack": {
 		"name": "攻擊", "desc": "普通的一劍。對方防守時砍不進去，對方露出破綻時特別痛。",
-		"default": {"deal": 1.0, "take": 1.0, "hit": true, "text": ["你揮劍砍向{name}。", "你一劍劈向{name}的肩膀。", "你橫劍掃過{name}的身側。"]},
+		"default": {"deal": 1.0, "take": 1.0, "hit": true, "text": [
+			"你不躲不閃，迎上去一劍砍向{name}。",
+			"你踏前一步，一劍劈向{name}的肩膀，同時也把自己送進了對方的攻擊裡。",
+			"你咬牙橫劍一掃，劍鋒從{name}身側劃過。",
+		]},
 		"vs": {
-			"guard": {"deal": 0.2, "text": ["你一劍砍在{guard}上，砍不進去。", "劍砍在{guard}上，震得你手發麻。"]},
-			"opening": {"deal": 1.5, "text": ["你抓住空檔，狠狠砍了一劍。", "你趁機一劍砍中{name}。"]},
-			"windup": {"deal": 1.2, "text": ["趁{name}還在蓄勢，你一劍砍了進去！"]},
-			"hold": {"deal": 0.5, "take": 1.0, "hit": true, "text": ["你被緊緊勒住，只能用劍柄胡亂往{name}身上砸。"]},
+			"guard": {"deal": 0.2, "text": [
+				"你一劍砍在{guard}上，「鏘」的一聲，震得你虎口發麻。",
+				"你連砍兩劍，全被{guard}擋了下來，連個缺口都沒砍出來。",
+			]},
+			"opening": {"deal": 1.5, "text": [
+				"你抓住空檔撲上去，一劍狠狠砍在{name}身上。",
+				"{name}還沒回過神，你的劍已經砍進了牠的肩頭。",
+			]},
+			"windup": {"deal": 1.2, "text": [
+				"趁{name}還在蓄勢，你搶上前去，一劍砍進牠露出來的空門！",
+			]},
+			"hold": {"deal": 0.5, "take": 1.0, "hit": true, "text": [
+				"你被緊緊勒住，只能用劍柄胡亂往{name}身上砸。",
+				"你的手臂被箍住，只能反手用劍尖往{name}身上亂戳。",
+			]},
 		},
 	},
 	"defend": {
 		"name": "防禦", "desc": "用劍擋住攻擊，會受一點傷，擋住後能順手回砍。擋不住擒抱、撒沙和吼聲。",
-		"default": {"text": ["你擺好架勢等著，{name}沒有出手。", "你舉劍護住身前，什麼也沒擋到。"]},
+		"default": {"text": [
+			"你擺好架勢等著，{name}卻沒有出手，你們隔著幾步互相瞪視。",
+			"你舉劍護住身前，劍尖微微發抖，什麼也沒擋到。",
+		]},
 		"vs": {
-			"sweep": {"deal": 0.4, "take": 0.6, "text": ["你舉劍擋住{weapon}，手臂被震得發麻，順手回砍一劍。", "{weapon}重重撞在你的劍上，你咬牙撐住，回手就是一劍。"]},
-			"thrust": {"deal": 0.4, "take": 0.5, "text": ["你用劍身擋偏{weapon}，只被擦到一下，順手回砍一劍。", "你把{weapon}擋到一邊，趁機回了一劍。"]},
-			"smash": {"take": 0.8, "text": ["你舉劍硬接，整個人被{weapon}砸得跪了下去。", "你架劍去擋，{weapon}壓得你雙腿發抖。"]},
-			"grab": {"take": 1.0, "hit": true, "text": ["你舉劍去擋，{name}卻直接撲上來。"]},
-			"trick": {"take": 1.0, "hit": true, "text": ["你舉劍護身，可是那不是衝著劍來的。"]},
-			"roar": {"take": 1.0, "hit": true, "text": ["你舉劍護身，可是吼聲擋不住。"]},
+			"sweep": {"deal": 0.4, "take": 0.6, "text": [
+				"你舉劍硬擋，{weapon}重重撞在劍身上，震得你手臂發麻；你借著反震的力道，順手回砍一劍。",
+				"「鏘」的一聲，{weapon}撞在你的劍上，你腳下滑了半步，咬牙撐住，回手就是一劍。",
+			]},
+			"thrust": {"deal": 0.4, "take": 0.5, "text": [
+				"你用劍身一格，{weapon}偏了開去，只在你身上擦出一道血痕；你趁勢回了一劍。",
+				"你及時把{weapon}擋到一邊，衣服被劃破了，你順手往{name}身上削了一劍。",
+			]},
+			"smash": {"take": 0.8, "text": [
+				"你舉劍硬接，{weapon}砸下來的力道大得嚇人，你整個人被壓得跪了下去，雙臂快要斷了。",
+				"你架劍去擋，{weapon}壓得你雙腿發抖，劍身被砸得彎了一下。",
+			]},
+			"grab": {"take": 1.0, "hit": true, "text": ["你舉劍去擋，{name}卻根本不理你的劍，直接撲了上來。"]},
+			"trick": {"take": 1.0, "hit": true, "text": ["你舉劍護身，可是對方根本不是衝著你的劍來的。"]},
+			"roar": {"take": 1.0, "hit": true, "text": ["你舉劍護在身前，可是聲音是擋不住的。"]},
 		},
 	},
 	"dodge": {
 		"name": "閃避", "desc": "躲開攻擊，不會受傷。但躲完腳步亂了：下回合不能再閃避，選項也少一個。躲不掉吼聲。",
 		"self": "off_balance",
-		"default": {"take": 0.0, "text": ["你往後一跳，躲開了{name}的攻擊。", "你側身一閃，{name}撲了個空。"]},
+		"default": {"take": 0.0, "text": [
+			"你往後一跳，險險躲開了{name}，落地時腳下一滑。",
+			"你側身一閃，{name}撲了個空，你自己也差點摔倒。",
+		]},
 		"vs": {
-			"sweep": {"take": 0.0, "text": ["你往後一跳，{weapon}從你胸前掃過。", "你縮身後躍，{weapon}只掃到空氣。"]},
-			"smash": {"take": 0.0, "text": ["你往旁邊一滾，{weapon}砸在你剛剛站的地方。", "你撲到一邊，背後傳來{weapon}砸地的巨響。"]},
-			"roar": {"take": 1.0, "hit": true, "text": ["你往後跳開，可是吼聲躲不掉。"]},
-			"guard": {"text": ["你往後跳開，什麼也沒躲到。"]},
-			"opening": {"text": ["你往後跳開，白白錯過了機會。"]},
-			"windup": {"text": ["你往後跳開，什麼也沒躲到。"]},
+			"sweep": {"take": 0.0, "text": [
+				"你猛地往後一仰，{weapon}貼著你的胸口掃過去，帶起的風颳得你臉頰發痛。",
+				"你縮身後躍，{weapon}只掃到空氣，你踉蹌了好幾步才站穩。",
+			]},
+			"smash": {"take": 0.0, "text": [
+				"你往旁邊一滾，{weapon}砸在你剛剛站的地方，碎石濺了你一身。",
+				"你撲到一邊，背後傳來{weapon}砸地的巨響，震得你耳朵嗡嗡作響。",
+			]},
+			"roar": {"take": 1.0, "hit": true, "text": ["你往後跳開，可是吼聲追著你灌進耳朵裡。"]},
+			"guard": {"text": ["你往後跳開，{name}只是穩穩地逼近，什麼也沒躲到。"]},
+			"opening": {"text": ["你往後跳開，白白錯過了大好的機會。"]},
+			"windup": {"text": ["你往後跳開拉開距離，{name}還在蓄勢，什麼也沒躲到。"]},
 		},
 	},
 	"flee": {
 		"name": "撤退", "desc": "轉身逃走。這回合對方攻擊的話會挨打。",
-		"default": {"take": 1.0, "hit": true, "text": ["你轉身就跑。"]},
+		"default": {"take": 1.0, "hit": true, "text": ["你轉身就跑。", "你虛晃一劍，轉身拔腿就跑。"]},
 		"vs": {},
 	},
 	"struggle": {
@@ -79,87 +123,128 @@ const MOVES := {
 	# ---------- 要學的招 ----------
 	"sweep_kick": {
 		"name": "掃腿", "desc": "對付橫掃：蹲低從底下鑽過，順勢把對方掃倒。體型大的掃不倒。",
-		"default": {"deal": 0.5, "take": 1.0, "hit": true, "text": ["你蹲低身子去掃腿，可是{name}不是橫掃過來的。"]},
+		"default": {"deal": 0.5, "take": 1.0, "hit": true, "text": [
+			"你蹲低身子去掃{name}的腳，可是對方根本不是橫掃過來的，你整個人暴露在攻擊底下。",
+		]},
 		"vs": {
-			"sweep": {"deal": 0.5, "take": 0.0, "effect": "trip", "good": true, "text": ["你蹲低身子，{weapon}從你頭頂掃過。你一腳掃向{name}的腳！", "你矮身鑽過{weapon}，一腳狠狠掃在{name}的腳踝上！"]},
-			"smash": {"deal": 0.5, "take": 1.2, "text": ["你蹲低身子去掃腿，正好迎上從頭頂落下的{weapon}。"]},
-			"guard": {"deal": 0.3, "text": ["你一腳掃向{name}的腳，{name}站得很穩。"]},
-			"opening": {"deal": 0.8, "text": ["你一腳踢在{name}的腳上。"]},
-			"windup": {"deal": 0.5, "text": ["你一腳踢在{name}的腳上，{name}晃了晃，還是穩住了。"]},
+			"sweep": {"deal": 0.5, "take": 0.0, "effect": "trip", "good": true, "text": [
+				"你猛地矮身，{weapon}從你頭頂呼地掃過，削斷了幾根頭髮；你順勢一個掃堂腿，狠狠踢在{name}的腳踝上！",
+				"你蹲得幾乎貼地，{weapon}從上方掠過。你一腿掃出去，{name}整個人被掃得騰空。",
+			]},
+			"smash": {"deal": 0.5, "take": 1.2, "text": ["你蹲低身子去掃腿，正好把頭頂送到落下的{weapon}底下。"]},
+			"guard": {"deal": 0.3, "text": ["你一腳掃向{name}的腳，{name}站得穩如磐石，紋風不動。"]},
+			"opening": {"deal": 0.8, "text": ["你一腳踢在{name}的腳上，牠哼了一聲。"]},
+			"windup": {"deal": 0.5, "text": ["你一腳踢在{name}的腳上，{name}晃了晃，還是穩住了架勢。"]},
 		},
 		"vs_big": {
-			"sweep": {"deal": 0.3, "take": 0.5, "text": ["你蹲低身子，{weapon}還是擦過你的背。你一腳掃向{name}的腳——像踢到樹幹，晃都沒晃。"]},
+			"sweep": {"deal": 0.3, "take": 0.5, "text": [
+				"你蹲低身子，{weapon}還是擦過你的背，火辣辣地痛。你一腳掃向{name}的腳——像踢到一棵老樹，牠晃都沒晃。",
+			]},
 		},
 	},
 	"parry": {
 		"name": "撥擋反擊", "desc": "對付直刺和撲咬：把攻擊撥開，同時刺回去。還是會被擦到一下。",
-		"default": {"text": ["{name}沒有衝過來，你沒東西可撥。"]},
+		"default": {"text": ["你擺好撥擋的架勢，{name}卻沒有衝過來，你的劍撥了個空。"]},
 		"vs": {
-			"thrust": {"deal": 1.2, "take": 0.3, "good": true, "text": ["你看準{weapon}，用劍一撥，順勢刺了回去！", "你的劍貼著{weapon}一轉，把它帶偏，劍尖直接送了回去！"]},
-			"sweep": {"take": 0.8, "text": ["你想撥開{weapon}，可是力道太大，撥不動。"]},
-			"smash": {"take": 1.0, "text": ["你想撥開從頭頂落下的{weapon}，被硬生生壓了下來。"]},
-			"grab": {"take": 1.0, "hit": true, "text": ["你想撥開{name}，可是牠是整個撲上來的。"]},
-			"trick": {"take": 1.0, "hit": true, "text": ["你出劍去撥，可是那不是刀。"]},
-			"roar": {"take": 1.0, "hit": true, "text": ["你架好劍，可是吼聲撥不開。"]},
+			"thrust": {"deal": 1.2, "take": 0.3, "good": true, "text": [
+				"你看準{weapon}，劍身貼上去輕輕一撥，對方的力道全落了空；你手腕一翻，劍尖順勢送進了{name}的身體！",
+				"{weapon}衝到眼前的一瞬間，你的劍貼著它一轉，把它帶偏，劍尖直接刺了回去。你的手臂被擦破了，但{name}傷得更重。",
+			]},
+			"sweep": {"take": 0.8, "text": ["你想撥開{weapon}，可是橫掃的力道太大，你的劍被整個盪開，攻擊還是落在你身上。"]},
+			"smash": {"take": 1.0, "text": ["你想撥開從頭頂落下的{weapon}，劍一碰上就被硬生生壓了下來。"]},
+			"grab": {"take": 1.0, "hit": true, "text": ["你想撥開{name}，可是牠是整個身體撲上來的，根本撥不動。"]},
+			"trick": {"take": 1.0, "hit": true, "text": ["你出劍去撥，可是來的根本不是兵器。"]},
+			"roar": {"take": 1.0, "hit": true, "text": ["你架好劍準備撥擋，可是聲音撥不開。"]},
 		},
 	},
 	"redirect": {
 		"name": "卸力", "desc": "對付重砸：順著力道把攻擊引開，讓對方收勢不住、往前踉蹌。",
-		"default": {"text": ["你擺出卸力的架勢，{name}卻沒有砸下來。"]},
+		"default": {"text": ["你擺出卸力的架勢，雙手虛握著劍，{name}卻沒有砸下來。"]},
 		"vs": {
-			"smash": {"take": 0.2, "effect": "stagger", "good": true, "text": ["你順著{weapon}的力道一帶，把它引到一旁，{name}收勢不住，往前踉蹌。", "你用劍身輕輕一引，{weapon}擦著你砸進地裡，{name}整個人跟著撲了過來。"]},
-			"sweep": {"take": 0.5, "text": ["你順著{weapon}的力道一帶，卸掉了一半力道。"]},
-			"thrust": {"take": 0.6, "text": ["你想卸開{weapon}，可是它太快了，只卸掉一點。"]},
+			"smash": {"take": 0.2, "effect": "stagger", "good": true, "text": [
+				"你不硬接，劍身斜斜一引，順著{weapon}的力道把它帶到一旁。{weapon}擦著你的肩膀砸進地裡，{name}收勢不住，整個人往前撲了過來。",
+				"你像推開一扇門一樣，輕輕一帶就把{weapon}引歪了。地面被砸出一個坑，{name}踉蹌著衝過你身邊，背後全空了。",
+			]},
+			"sweep": {"take": 0.5, "text": ["你順著{weapon}的力道一帶，卸掉了一半力道，剩下的還是打在你身上。"]},
+			"thrust": {"take": 0.6, "text": ["你想卸開{weapon}，可是它來得太快太直，只卸掉一點。"]},
 			"grab": {"take": 1.0, "hit": true, "text": ["你想卸開{name}的力道，可是牠是整個撲上來的。"]},
-			"trick": {"take": 1.0, "hit": true, "text": ["你擺出卸力的架勢，可是那不是攻擊。"]},
+			"trick": {"take": 1.0, "hit": true, "text": ["你擺出卸力的架勢，可是對方根本沒出力。"]},
 			"roar": {"take": 1.0, "hit": true, "text": ["你擺出卸力的架勢，可是吼聲卸不掉。"]},
 		},
 	},
 	"heavy": {
 		"name": "重擊", "desc": "雙手全力一擊，盔甲盾牌都擋不住，能打破防守、打斷蓄勢。出手時破綻大，這回合被打會更痛。",
 		"pierce": true,
-		"default": {"deal": 2.0, "take": 1.5, "hit": true, "text": ["你雙手舉劍，全力劈向{name}！", "你大喝一聲，一劍重重劈下！"]},
+		"default": {"deal": 2.0, "take": 1.5, "hit": true, "text": [
+			"你雙手舉劍，把全身的力氣都壓了上去，一劍重重劈向{name}——同時也把自己的胸口完全敞開。",
+			"你大喝一聲，一劍劈下，劍鋒深深砍進{name}的身體，可是對方的攻擊也結結實實落在你身上。",
+		]},
 		"vs": {
-			"guard": {"deal": 1.5, "effect": "break", "good": true, "text": ["你雙手舉劍全力劈下，連人帶{guard}打得{name}退了好幾步！"]},
-			"windup": {"deal": 2.0, "effect": "interrupt", "good": true, "text": ["趁{name}還在蓄勢，你全力一劍劈了上去，硬是把牠的動作打斷！"]},
-			"opening": {"deal": 2.5, "good": true, "text": ["你雙手舉劍，全力劈在{name}身上！"]},
+			"guard": {"deal": 1.5, "effect": "break", "good": true, "text": [
+				"你雙手舉劍全力劈下，「轟」的一聲，連人帶{guard}把{name}劈得倒退好幾步，{guard}被震到一邊。",
+			]},
+			"windup": {"deal": 2.0, "effect": "interrupt", "good": true, "text": [
+				"趁{name}還在蓄勢，你搶先一步全力劈了上去，硬是把牠的動作打斷了！",
+			]},
+			"opening": {"deal": 2.5, "good": true, "text": [
+				"你雙手舉劍，把全身的重量都壓在這一劍上，狠狠劈在{name}身上！",
+				"你看準空檔，高高舉起劍，一劍劈下，{name}的慘叫聲在四周迴盪。",
+			]},
 		},
 		"vs_big": {
-			"windup": {"deal": 2.0, "text": ["你全力一劍劈在{name}身上，可是牠的動作連停都沒停！"]},
+			"windup": {"deal": 2.0, "text": ["你全力一劍劈在{name}身上，砍出一道深口子——可是牠的動作連停都沒停！"]},
 		},
 	},
 	"vital": {
 		"name": "要害刺", "desc": "刺向要害或盔甲縫隙，盔甲擋不住。對方露出破綻、蓄勢、或抱住你時威力最大。",
 		"pierce": true,
-		"default": {"deal": 0.7, "take": 1.0, "hit": true, "text": ["你刺向{name}的要害，可是對方一直在動，只刺到邊。"]},
+		"default": {"deal": 0.7, "take": 1.0, "hit": true, "text": [
+			"你刺向{name}的要害，可是對方一直在動，劍尖只刺到邊，反而讓自己吃了一記。",
+		]},
 		"vs": {
-			"opening": {"deal": 3.0, "good": true, "text": ["你看準破綻，一劍刺進{name}的要害！", "你貼上去，劍尖從縫隙裡深深刺了進去！"]},
-			"windup": {"deal": 2.0, "good": true, "text": ["{name}舉起雙手，腋下全空了。你一劍刺了進去！"]},
-			"smash": {"deal": 1.5, "take": 1.0, "hit": true, "text": ["{name}高舉雙手砸下來的瞬間，你一劍刺向牠的腋下！"]},
-			"guard": {"deal": 0.0, "text": ["你刺向{name}的要害，被{guard}擋住了。"]},
-			"hold": {"deal": 2.0, "take": 0.5, "effect": "escape", "good": true, "text": ["被抱住時你們貼得最近。你一劍刺進{name}的要害，{name}吃痛鬆開了你！"]},
+			"opening": {"deal": 3.0, "good": true, "text": [
+				"你看準破綻，整個人貼上去，一劍刺進{name}的要害，劍身沒入了一半！",
+				"你的劍尖從縫隙裡鑽了進去，深深刺入{name}的身體。你拔出劍時，帶出一道血箭。",
+			]},
+			"windup": {"deal": 2.0, "good": true, "text": [
+				"{name}高舉雙手蓄勢，腋下全空了。你一步搶進去，劍尖狠狠刺進了那個空門！",
+			]},
+			"smash": {"deal": 1.5, "take": 1.0, "hit": true, "text": [
+				"{name}高舉雙手砸下來的瞬間，你一劍刺向牠的腋下——你們同時擊中了對方。",
+			]},
+			"guard": {"deal": 0.0, "text": ["你刺向{name}的要害，劍尖「叮」的一聲撞在{guard}上，滑了開去。"]},
+			"hold": {"deal": 2.0, "take": 0.5, "effect": "escape", "good": true, "text": [
+				"被抱住時你們貼得最近。你反手握劍，一劍刺進{name}的要害，牠痛得大叫，鬆開了你！",
+			]},
 		},
 	},
 	"disarm": {
 		"name": "繳械", "desc": "對付拿武器的對手：在對方揮過來的瞬間把武器打飛。對野獸沒用，太重的武器也絞不動。",
-		"default": {"text": ["你盯著{weapon}，可是{name}沒有揮過來。"]},
+		"default": {"text": ["你盯著{weapon}準備出手，可是{name}沒有揮過來。"]},
 		"vs": {
-			"sweep": {"take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": ["你看準{weapon}揮來的瞬間，劍身一絞，把{weapon}打飛了出去！"],
-				"else": {"take": 1.0, "hit": true, "text": ["你想打掉{name}的武器，可是根本絞不動。"]}},
-			"thrust": {"take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": ["你一劍壓住刺來的{weapon}，順勢一挑，{weapon}脫手飛了出去！"],
-				"else": {"take": 1.0, "hit": true, "text": ["你想打掉{name}的武器，可是根本絞不動。"]}},
-			"smash": {"take": 1.0, "hit": true, "text": ["從頭頂砸下來的力道太大，你絞不動。"]},
-			"grab": {"take": 1.0, "hit": true, "text": ["你想打掉{name}的武器，牠卻直接撲上來抱住你。"]},
-			"trick": {"take": 1.0, "hit": true, "text": ["你盯著{name}的武器，沒注意牠的另一隻手。"]},
+			"sweep": {"take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": [
+				"你看準{weapon}揮來的瞬間，劍身貼上去一絞，{name}的手腕一扭，{weapon}脫手飛了出去，「噹啷」一聲落在遠處！",
+			], "else": {"take": 1.0, "hit": true, "text": ["你想打掉{name}的武器，可是根本絞不動。"]}},
+			"thrust": {"take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": [
+				"你一劍壓住刺來的{weapon}，順勢往上一挑，{weapon}從{name}手裡飛了出去，在空中轉了好幾圈！",
+			], "else": {"take": 1.0, "hit": true, "text": ["你想打掉{name}的武器，可是根本絞不動。"]}},
+			"smash": {"take": 1.0, "hit": true, "text": ["從頭頂砸下來的力道太大，你的劍一碰上就被壓了下去，根本絞不動。"]},
+			"grab": {"take": 1.0, "hit": true, "text": ["你盯著{name}的武器，牠卻直接撲上來抓你。"]},
+			"trick": {"take": 1.0, "hit": true, "text": ["你盯著{name}的武器，沒注意到牠的腳。"]},
 			"roar": {"take": 1.0, "hit": true, "text": ["你盯著{name}，吼聲震得你耳朵發疼。"]},
 		},
 	},
 	"break_free": {
 		"name": "掙脫", "desc": "對付擒抱：在被抱住前鑽出去，或被抱住時掙開，順手回一劍。",
-		"default": {"take": 1.0, "hit": true, "text": ["你擺出掙脫的架勢，可是{name}沒有要抓你。"]},
+		"default": {"take": 1.0, "hit": true, "text": ["你擺出掙脫的架勢，可是{name}根本沒有要抓你。"]},
 		"vs": {
-			"grab": {"deal": 0.5, "take": 0.0, "good": true, "text": ["{name}撲上來的瞬間，你一矮身從牠手臂下鑽了出去，順手一劍。"]},
-			"hold": {"deal": 0.5, "take": 0.3, "effect": "escape", "good": true, "text": ["你手肘往後一撞，扭身掙開了{name}，順手一劍。"]},
+			"grab": {"deal": 0.5, "take": 0.0, "good": true, "text": [
+				"{name}撲上來的瞬間，你一矮身從牠的手臂底下鑽了出去，轉身就是一劍砍在牠背上。",
+			]},
+			"hold": {"deal": 0.5, "take": 0.3, "effect": "escape", "good": true, "text": [
+				"你深吸一口氣，手肘狠狠往後一撞，趁對方吃痛的一瞬間扭身掙開，順手一劍。",
+				"你用頭往後一頂，正中{name}的臉，牠手一鬆，你滾了出來，劍順勢劃過牠的身體。",
+			]},
 			"guard": {"text": ["你擺出掙脫的架勢，{name}只是步步逼近。"]},
 			"opening": {"text": ["你擺出掙脫的架勢，白白錯過了機會。"]},
 			"windup": {"text": ["你擺出掙脫的架勢，{name}還在蓄勢。"]},
@@ -167,24 +252,30 @@ const MOVES := {
 	},
 	"sand": {
 		"name": "擲沙", "desc": "抓一把沙撒向對方的眼睛。對方下一次攻擊很可能打偏。這回合自己不會躲。",
-		"default": {"effect": "blind", "take": 1.0, "hit": true, "text": ["你抓起一把沙，往{name}臉上撒去！"]},
+		"default": {"effect": "blind", "take": 1.0, "hit": true, "text": [
+			"你彎腰抓起一把沙土，往{name}臉上狠狠撒去！可是你也沒空躲對方的攻擊。",
+		]},
 		"vs": {
-			"guard": {"effect": "blind", "text": ["你抓起一把沙，從{guard}旁邊撒進{name}的眼睛！"]},
+			"guard": {"effect": "blind", "text": ["你抓起一把沙，從{guard}旁邊撒進了{name}的眼睛，牠罵了一聲，拼命眨眼。"]},
 			"opening": {"effect": "blind", "text": ["你趁機抓起一把沙，撒進{name}的眼睛。"]},
-			"windup": {"effect": "blind", "good": true, "text": ["趁{name}還在蓄勢，你抓起一把沙撒進牠的眼睛！"]},
+			"windup": {"effect": "blind", "good": true, "text": ["趁{name}還在蓄勢，你抓起一把沙撒進牠的眼睛，牠一下子什麼都看不見了！"]},
 		},
 	},
 	"shout": {
 		"name": "怒喝", "desc": "對野獸大喝一聲，把牠嚇得退縮。也能壓過對方的吼聲。對人沒什麼用。",
-		"default": {"take": 1.0, "hit": true, "effect": "scare", "requires": "beast", "text": ["你大喝一聲！{name}嚇得一縮。"],
-			"else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}根本不吃這一套。"]}},
+		"default": {"take": 1.0, "hit": true, "effect": "scare", "requires": "beast", "text": [
+			"你張開雙臂，用盡全身力氣大喝一聲！{name}嚇得一縮。",
+		], "else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}冷笑一聲，根本不吃這一套。"]}},
 		"vs": {
-			"roar": {"take": 0.0, "effect": "scare", "good": true, "requires": "beast", "text": ["你一聲大喝，硬是蓋過了{name}的吼聲！{name}愣了一下。"],
-				"else": {"take": 0.0, "text": ["你一聲大喝，蓋過了{name}的吼聲。"]}},
-			"sweep": {"take": 0.6, "effect": "scare", "good": true, "requires": "beast", "text": ["你迎著{name}大喝一聲，{name}嚇得收了一半力。"],
-				"else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}根本不吃這一套。"]}},
-			"thrust": {"take": 0.6, "effect": "scare", "good": true, "requires": "beast", "text": ["你迎著{name}大喝一聲，{name}撲到一半縮了回去。"],
-				"else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}根本不吃這一套。"]}},
+			"roar": {"take": 0.0, "effect": "scare", "good": true, "requires": "beast", "text": [
+				"你迎著吼聲，一聲大喝硬是蓋了過去！{name}愣住了，耳朵往後一貼。",
+			], "else": {"take": 0.0, "text": ["你一聲大喝，蓋過了{name}的吼聲。"]}},
+			"sweep": {"take": 0.6, "effect": "scare", "good": true, "requires": "beast", "text": [
+				"你迎著{name}大喝一聲，{name}嚇得一縮，攻擊只用了一半的力。",
+			], "else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}根本不吃這一套。"]}},
+			"thrust": {"take": 0.6, "effect": "scare", "good": true, "requires": "beast", "text": [
+				"你迎著{name}大喝一聲，牠撲到一半縮了回去，只碰到你一下。",
+			], "else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}根本不吃這一套。"]}},
 			"guard": {"text": ["你大喝一聲，{name}躲在{guard}後面不為所動。"]},
 			# 只有對方出手時嚇得到，不能一直喝住牠
 			"opening": {"text": ["你大喝一聲，{name}瞪著你，沒有退。"]},
@@ -193,9 +284,14 @@ const MOVES := {
 	},
 	"combo": {
 		"name": "連環斬", "desc": "一口氣連砍三劍。對方露出破綻時最痛，但砍不穿厚甲。",
-		"default": {"deal": 1.2, "take": 1.0, "hit": true, "text": ["你一連砍出三劍，{name}也同時出手。"]},
+		"default": {"deal": 1.2, "take": 1.0, "hit": true, "text": [
+			"你一連砍出三劍，劍光連成一片，可是{name}也同時出手了。",
+		]},
 		"vs": {
-			"opening": {"deal": 2.2, "good": true, "text": ["你抓住空檔，一連三劍砍在{name}身上！", "你的劍連成一片，一劍接一劍砍了下去！"]},
+			"opening": {"deal": 2.2, "good": true, "text": [
+				"你抓住空檔，劍一劍接一劍落下，三道血口幾乎同時出現在{name}身上！",
+				"你的劍快得只剩一片影子，{name}還沒反應過來，已經連中三劍。",
+			]},
 			"windup": {"deal": 1.8, "text": ["趁{name}還在蓄勢，你一連砍出三劍！"]},
 			"guard": {"deal": 0.3, "text": ["你一連三劍砍在{guard}上，叮叮噹噹，一劍也沒砍進去。"]},
 		},
