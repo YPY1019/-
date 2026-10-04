@@ -12,7 +12,7 @@ var learned: Array[String] = []
 
 
 func knows(move_id: String) -> bool:
-	return MoveData.MOVES[move_id]["basic"] or learned.has(move_id)
+	return MoveData.is_basic(move_id) or learned.has(move_id)
 
 
 func learn(move_id: String) -> void:

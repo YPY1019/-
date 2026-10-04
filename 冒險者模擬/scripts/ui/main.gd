@@ -10,6 +10,7 @@ const COLOR := {
 	"damage_out": "#9be39b",
 	"damage_in": "#ff8a8a",
 	"info": "#a0c4ff",
+	"pain": "#c9b8a6",
 	"end": "#ffffff",
 }
 
@@ -35,7 +36,8 @@ var log_label: RichTextLabel
 var tell_label: Label
 var hint_label: Label
 var move_box: VBoxContainer
-var move_buttons := {}  # move_id -> Button
+var basic_row: HBoxContainer
+var tech_row: HBoxContainer
 var end_box: HBoxContainer
 
 
@@ -111,15 +113,19 @@ func _build_prep_screen() -> Control:
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 10)
-	cols.add_child(right)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.add_child(right)
+	cols.add_child(scroll)
 	right.add_child(_heading("測試用：你會的招式"))
 	var note := Label.new()
-	note.text = "正式版要找師傅學。這裡先自己勾要會哪些招。\n攻擊、防禦、閃避、撤退不用學。"
+	note.text = "正式版要找師傅學。建議一開始什麼都不勾，打輸了再勾一招，體驗「學到新招」。\n戰鬥時，每回合會從你會的招裡想到 3 招，會的招每多 4 招就多想到 1 招（攻擊、防禦、閃避、撤退永遠都在）。剋制對手那招的比較容易想到。"
 	note.modulate = Color(1, 1, 1, 0.7)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(note)
 
-	for id in MoveData.learnable_ids():
+	for id in MoveData.LEARNABLE:
 		var m: Dictionary = MoveData.MOVES[id]
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
@@ -192,18 +198,11 @@ func _build_battle_screen() -> Control:
 	move_box = VBoxContainer.new()
 	move_box.add_theme_constant_override("separation", 8)
 	root.add_child(move_box)
-	var row1 := HBoxContainer.new()
-	var row2 := HBoxContainer.new()
-	for row in [row1, row2]:
+	tech_row = HBoxContainer.new()
+	basic_row = HBoxContainer.new()
+	for row in [tech_row, basic_row]:
 		row.add_theme_constant_override("separation", 10)
 		move_box.add_child(row)
-	for id in MoveData.ORDER:
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(170, 52)
-		b.pressed.connect(_on_move.bind(id))
-		b.mouse_entered.connect(_show_hint.bind(id))
-		(row1 if MoveData.MOVES[id]["basic"] else row2).add_child(b)
-		move_buttons[id] = b
 
 	hint_label = Label.new()
 	hint_label.modulate = Color(1, 1, 1, 0.6)
@@ -267,7 +266,7 @@ func _refresh_battle() -> void:
 	hero_bar.max_value = hero_c.max_hp
 	hero_bar.value = hero_c.hp
 	hero_hp_label.text = "%d / %d" % [hero_c.hp, hero_c.max_hp]
-	hero_status.text = "位置不好：這回合攻擊減半、挨打更痛，也躲不乾淨" if hero_c.bad_position and not battle.is_over() else ""
+	hero_status.text = "" if battle.is_over() else hero_c.hand_note
 	foe_bar.max_value = foe_c.max_hp
 	foe_bar.value = foe_c.hp
 	foe_hp_label.text = "%d / %d" % [foe_c.hp, foe_c.max_hp]
@@ -279,20 +278,42 @@ func _refresh_battle() -> void:
 	tell_label.text = "" if over else "▶ " + foe_c.intent["text"]
 	if over:
 		return
-	for opt in battle.move_options(hero_c):
-		var b: Button = move_buttons[opt["id"]]
-		b.disabled = not opt["known"]
+	# 手上的招每回合都不同，重新排按鈕
+	for row in [tech_row, basic_row]:
+		for child in row.get_children():
+			child.queue_free()
+	var tech_label := Label.new()
+	tech_label.text = "想到的招："
+	tech_label.custom_minimum_size.x = 120
+	tech_row.add_child(tech_label)
+	var basic_label := Label.new()
+	basic_label.text = "基本："
+	basic_label.custom_minimum_size.x = 120
+	basic_row.add_child(basic_label)
+	var any_tech := false
+	for opt in battle.hand_options(hero_c):
+		var b := Button.new()
+		b.text = opt["name"]
 		b.tooltip_text = opt["desc"]
-		if opt["known"]:
-			b.text = opt["name"]
+		b.custom_minimum_size = Vector2(150, 52)
+		b.pressed.connect(_on_move.bind(opt["id"]))
+		b.mouse_entered.connect(_show_hint.bind(opt["id"]))
+		if opt["basic"]:
+			basic_row.add_child(b)
 		else:
-			b.text = "%s（未學會）" % opt["name"]
+			tech_row.add_child(b)
+			any_tech = true
+	if not any_tech:
+		var none := Label.new()
+		none.text = "（這回合什麼招都沒想到）" if hero.learned.size() > 0 else "（你還沒學會任何招）"
+		none.modulate = Color(1, 1, 1, 0.5)
+		tech_row.add_child(none)
+	hint_label.text = ""
 
 
 func _show_hint(id: String) -> void:
 	var m: Dictionary = MoveData.MOVES[id]
-	var extra := "" if hero.knows(id) else "　（還沒學會）"
-	hint_label.text = "%s：%s%s" % [m["name"], m["desc"], extra]
+	hint_label.text = "%s：%s" % [m["name"], m["desc"]]
 
 
 # ---------- 小工具 ----------
