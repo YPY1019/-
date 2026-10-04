@@ -17,6 +17,7 @@ extends RefCounted
 ## vs_big：對體型大的對手用的版本。
 ## self：用完之後自己的狀態（off_balance：下回合少想到一招）。
 
+## 人人都會的一般招。跟學來的招放在同一個池子裡抽，不是永遠都在
 const BASIC := ["attack", "defend", "dodge", "flee"]
 ## 被抱住時能用的招（沒學的不會出現）
 const HELD := ["struggle", "attack", "break_free", "vital"]

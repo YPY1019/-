@@ -44,7 +44,7 @@ const ENEMIES := {
 	"wolf": {
 		"name": "野狼",
 		"blurb": "森林裡常見的野獸。會撲、會咬住不放。",
-		"hp": 45, "atk": 14, "armor": "none", "traits": ["beast"],
+		"hp": 45, "atk": 12, "armor": "none", "traits": ["beast"],
 		"weapon": "利牙", "guard": "架勢",
 		"start": ["一頭野狼從樹叢裡鑽出來，壓低身子盯著你。"],
 		"actions": {
@@ -70,7 +70,7 @@ const ENEMIES := {
 	"bandit_leader": {
 		"name": "盜匪頭子",
 		"blurb": "在路上攔人搶劫的盜匪頭目，大刀使得很兇，手段也很髒。",
-		"hp": 90, "atk": 30, "armor": "light", "traits": ["disarmable"],
+		"hp": 90, "atk": 24, "armor": "light", "traits": ["disarmable"],
 		"weapon": "大刀", "guard": "架勢",
 		"start": ["盜匪頭子扛著大刀擋在路中間，咧嘴笑著：「把錢留下。」"],
 		"actions": {
@@ -112,7 +112,7 @@ const ENEMIES := {
 	"deserter": {
 		"name": "逃兵騎士",
 		"blurb": "從戰場逃出來的騎士，一身鐵甲，盾牌很難打穿。",
-		"hp": 70, "atk": 24, "armor": "heavy", "traits": ["disarmable"],
+		"hp": 70, "atk": 20, "armor": "heavy", "traits": ["disarmable"],
 		"weapon": "長劍", "guard": "盾牌",
 		"start": ["一個穿著破舊鐵甲的騎士舉起盾牌，一言不發地朝你走來。"],
 		"actions": {
@@ -144,7 +144,7 @@ const ENEMIES := {
 	"bear": {
 		"name": "熊",
 		"blurb": "比人還高的大熊，皮又厚又硬。被牠抱住就麻煩了。",
-		"hp": 120, "atk": 30, "armor": "light", "traits": ["beast", "big"],
+		"hp": 120, "atk": 24, "armor": "light", "traits": ["beast", "big"],
 		"weapon": "熊掌", "guard": "架勢",
 		"start": ["一頭大熊從洞裡鑽了出來，嗅了嗅空氣，轉頭看向你。"],
 		"actions": {
@@ -186,7 +186,7 @@ const ENEMIES := {
 	"ogre": {
 		"name": "食人魔",
 		"blurb": "兩個人高的怪物，拖著一根大木棍。力氣大得能把人抓起來摔。",
-		"hp": 160, "atk": 34, "armor": "none", "traits": ["big"],
+		"hp": 160, "atk": 28, "armor": "none", "traits": ["big"],
 		"weapon": "木棍", "guard": "架勢",
 		"start": ["地面一陣震動。食人魔拖著一根大木棍，從遠處朝你走來。"],
 		"actions": {

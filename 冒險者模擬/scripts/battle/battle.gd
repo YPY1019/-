@@ -133,21 +133,21 @@ func _deal_hands() -> void:
 					ally.hand.append(id)
 			notes.append("你被抱住了，只能想辦法脫身。")
 		else:
+			# 一般招和學來的招放在同一個池子裡抽，沒有永遠都在的招
+			var pool: Array = MoveData.BASIC + ally.adventurer.learned
 			var n := HAND_SIZE + ally.adventurer.learned.size() / HAND_GROWTH
-			var basics: Array = MoveData.BASIC.duplicate()
 			if ally.next_status.has("off_balance"):
 				n -= 1
-				basics.erase("dodge")
+				pool.erase("dodge")
 				notes.append("腳步還沒站穩：不能閃避，也少想到一招。")
 			if ally.next_status.has("blind"):
 				n = mini(n, 1)
 				notes.append("眼睛進了沙，只想得到一招。")
 			if ally.next_status.has("shaken"):
-				n = 0
-				notes.append("被嚇得腦中一片空白，一招都想不起來。")
-			var foe := _first_alive(enemies)
-			ally.hand.assign(_draw(ally.adventurer.learned, n, foe))
-			ally.hand.append_array(basics)
+				n = 1
+				pool = pool.filter(func(id): return MoveData.is_basic(id))
+				notes.append("被嚇得腦中一片空白，只想得到最普通的一招。")
+			ally.hand.assign(_draw(pool, maxi(n, 1), _first_alive(enemies)))
 		ally.next_status.clear()
 		ally.hand_note = "　".join(notes)
 
