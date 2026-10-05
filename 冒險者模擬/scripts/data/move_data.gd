@@ -26,13 +26,13 @@ extends RefCounted
 ## 人人都會的一般招。跟學來的招放在同一個池子裡，不是永遠都在
 const BASIC := ["attack", "defend", "dodge"]
 ## 每回合的選項至少有一個攻擊類、一個防守類（擲沙、怒喝不算這兩類）
-const OFFENSE := ["attack", "heavy", "vital", "combo", "sunder"]
-const DEFENSE := ["defend", "dodge", "sweep_kick", "parry", "redirect", "disarm", "break_free"]
+const OFFENSE := ["attack", "heavy", "vital", "combo", "sunder", "falcon"]
+const DEFENSE := ["defend", "dodge", "sweep_kick", "parry", "redirect", "disarm", "break_free", "bastion"]
 ## 撤退不是招式，永遠可以選（被抱住時不行）
 const FLEE := "flee"
 ## 被抱住時能用的招（沒學的不會出現）
 const HELD := ["struggle", "attack", "break_free", "vital"]
-const LEARNABLE := ["sweep_kick", "parry", "redirect", "heavy", "vital", "disarm", "break_free", "sand", "shout", "combo", "sunder"]
+const LEARNABLE := ["sweep_kick", "parry", "redirect", "heavy", "vital", "disarm", "break_free", "sand", "shout", "combo", "sunder", "falcon", "bastion"]
 
 ## 你受傷後的反應（依傷勢挑一句）
 ## shrug：你那一項比對手高很多，打中了也不痛（取代對手「打中你」的描述）
@@ -355,13 +355,15 @@ const MOVES := {
 	},
 
 	# ---------- 絕學 ----------
-	# ult：喊出招名，有專屬的寫法。only_opening：只有對手露出大破綻時才出得來（不做次數限制）
+	# ult：喊出招名，有專屬的寫法。對手拿兵器擋也擋不到（見 Battle「先吃虧」），守夜人也架不開
+	# when：什麼時候才出得來（不做次數限制，見 Battle.ult_ready）
+	#   opening 對手露出大破綻；closed 對手縮在防守後面或正在蓄力；heavy 對手蓄好的重招正砸下來
 	# pre：起手（之後喊出招名，再寫結果）
-	# no_weak：力量輸對手也不會變弱（破綻就是破綻）。對手拿兵器擋也擋不到（見 Battle「先吃虧」）
+	# no_weak：數值輸對手也不會變弱（破綻就是破綻）
 	# 從秘笈學（BookData），不在道場學
 	"sunder": {
 		"name": "北境裁決", "stat": "str", "desc": "北境劍術的絕學。對手露出大破綻時才用得出來（被掃倒、破防、收勢不住、喘氣、卡住）。",
-		"ult": true, "only_opening": true, "pierce": true, "no_weak": true,
+		"ult": true, "when": "opening", "pierce": true, "no_weak": true,
 		"pre": [
 			"你等的就是這一下。",
 			"{name}的空門就在眼前，你雙手握劍，往前踏了一大步。",
@@ -371,6 +373,40 @@ const MOVES := {
 			"這一劍從{name}的肩膀一路劈到腰，{pron}往後退了好幾步才站住。",
 			"劍重重劈在{name}身上，連你自己的手都被震麻了。",
 			"{name}想躲已經來不及，被劈個正著。",
+		]},
+		"vs": {},
+	},
+	"falcon": {
+		"name": "隼之一刺", "stat": "agi", "desc": "南方決鬥家的絕學。對手縮在防守後面、或正在蓄力時才用得出來：從縫裡一劍刺進去，盔甲和盾都擋不住。刺中蓄力的人，那一下就使不出來了。",
+		"ult": true, "when": "closed", "pierce": true,
+		"pre": [
+			"你看準了那道縫。",
+			"你的腳尖往前一滑，身子壓得很低。",
+			"你把劍收到腰側，劍尖對著{name}。",
+		],
+		"default": {"deal": 3.2, "text": [
+			"劍尖從{guard}的邊上鑽進去，刺進{name}的肩窩，又拔了出來。",
+			"{name}還沒看清你的劍，劍尖已經從{pron}腋下刺了進去。",
+			"這一刺又快又直，正好刺進{name}護不到的那道縫。",
+		]},
+		"vs": {
+			"windup": {"deal": 3.2, "effect": "interrupt", "text": [
+				"{name}的力還沒蓄滿，你的劍尖已經刺進{pron}的手臂。{pron}這一下使不出來了。",
+				"{name}舉起{weapon}的那一刻，胸口全空了。你一劍刺進去，{pron}的手垂了下來。",
+			]},
+		},
+	},
+	"bastion": {
+		"name": "不落要塞", "stat": "str", "desc": "守城人的絕學。對手蓄好的重招砸下來的那一刻才用得出來：用劍硬接住，借那股力打回去。",
+		"ult": true, "when": "heavy",
+		"pre": [
+			"你不退。",
+			"你雙腳一前一後釘在地上，劍橫在頭頂。",
+			"{name}的力道壓下來，你迎了上去。",
+		],
+		"default": {"deal": 2.6, "take": 0.0, "text": [
+			"你用劍身接住這一下，膝蓋沉了一寸，沒有退。{name}的力道還壓在你劍上，你順著一推一轉，劍刃落在{pron}身上。",
+			"{weapon}砸在你架起的劍上，火星四濺。你借著這股力往下一帶，{name}收不住，你的劍已經劈了回去。",
 		]},
 		"vs": {},
 	},

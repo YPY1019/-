@@ -1,6 +1,6 @@
 extends Control
 
-## 原型：城鎮 ⇄ 戰鬥，壽命用完（或打倒食人魔）時看這一生。花時間的事在城鎮畫面裡演（年月往上跳）。
+## 原型：城鎮 ⇄ 戰鬥，壽命用完時看這一生（沒有通關）。花時間的事在城鎮畫面裡演（年月往上跳）。
 ## 這裡只負責切換畫面；城鎮規則在 Town，戰鬥規則在 Battle。
 
 var town := Town.new()
@@ -14,9 +14,6 @@ var battle: Battle
 ## 現在打的是 commission 委託 / spar 師傅的考驗
 var fight_kind := ""
 var _settled := []
-
-## 打倒食人魔的那一生已經看過了
-var _clear_shown := false
 ## 死去那一句停多久，才換到「這一生」
 const DEATH_PAUSE := 2.5
 
@@ -48,7 +45,6 @@ func _ready() -> void:
 	margin.add_child(battle_view)
 	life_view = LifeView.new()
 	life_view.restart_requested.connect(func(): get_tree().reload_current_scene())
-	life_view.continue_requested.connect(_show.bind(town_view))
 	margin.add_child(life_view)
 	blocker = Control.new()
 	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -58,7 +54,7 @@ func _ready() -> void:
 
 	town_view.add_messages([
 		{"kind": "big", "text": "你 %d 歲，帶著一把舊鐵劍和 %d 銀來到北境的小城。城裡有冒險者公會的委託板、北境劍術的道場和一間武器店。" % [LifeData.START_AGE, town.hero.money]},
-		{"kind": "info", "text": "目標：壽命用完之前，打倒食人魔。每個月生活費 %d 銀。" % TownData.LIVING_COST},
+		{"kind": "info", "text": "每個月生活費 %d 銀。" % TownData.LIVING_COST},
 	])
 	_show(town_view)
 	town_view.refresh()
@@ -106,10 +102,6 @@ func _to_town_or_end() -> void:
 		blocker.visible = true
 		await get_tree().create_timer(DEATH_PAUSE).timeout
 		blocker.visible = false
-		life_view.show_life(town.hero)
-		_show(life_view)
-	elif town.hero.cleared and not _clear_shown:
-		_clear_shown = true
 		life_view.show_life(town.hero)
 		_show(life_view)
 	else:

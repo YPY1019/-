@@ -8,6 +8,8 @@ extends RefCounted
 ## rare：有名字、只有一把。fx：特效（被動），拿著它的人砍中時發動，敵人拿著也一樣（見 Battle）。
 ##   twin 紅鬃之牙：砍中時常會再咬一口（多一下半傷）
 ##   knell 喪鐘：砍中時常會把對手震開（對手下回合露出破綻；打在你身上是站不穩）
+##   rend 碎門者：砍得穿甲（盔甲擋不住）；對手拿著時，你擋它常常擋不住一半
+##   ward 守夜人：常用護手把砍過來的攻擊架開（傷害剩 WARD_TAKE）。絕學架不開
 ##   特效不寫在任何說明裡，只在戰報裡看得到（show don't tell）。
 ## look：開打前就看得到的樣子。
 
@@ -20,6 +22,8 @@ const SHOP := ["steel_sword"]
 const FX_CHANCE := 0.35
 const TWIN_DAMAGE := 0.5
 const TWIN_MAX := 15
+## ward 架開之後剩幾成傷害
+const WARD_TAKE := 0.3
 
 const WEAPONS := {
 	"old_sword": {"name": "舊鐵劍", "power": 1.0, "cost": 0, "str": 0,
@@ -36,6 +40,12 @@ const WEAPONS := {
 	"knell": {"name": "喪鐘", "power": 1.8, "cost": 0, "str": 0, "rare": true, "fx": "knell",
 		"look": "黑色的大劍，劍身很寬，揮起來會嗡嗡響。",
 		"desc": "黑騎士的大劍。劍身很寬，揮起來會嗡嗡響。"},
+	"gatebreaker": {"name": "碎門者", "power": 1.7, "cost": 0, "str": 17, "rare": true, "fx": "rend",
+		"look": "雙刃大斧，斧刃上全是缺口。",
+		"desc": "烏爾夫的斧頭。據說劈開過三座城門。"},
+	"nightwatch": {"name": "守夜人", "power": 1.9, "cost": 0, "str": 0, "rare": true, "fx": "ward",
+		"look": "老式的長劍，護手很寬，磨得發亮。",
+		"desc": "王都衛隊的隊長一代傳一代的長劍。護手很寬。"},
 }
 
 
@@ -49,6 +59,14 @@ const FX_TEXT := {
 	"knell": {
 		"out": ["劍身嗡的一聲，{name}被震得往後一晃，架勢全散了。", "{name}被震得手腳發軟，一時站不穩。"],
 		"in": ["劍身嗡的一聲，你被震得手臂發麻，腳下站不穩。", "你耳朵裡嗡嗡作響，差點跪下去。"],
+	},
+	"rend": {
+		"out": ["斧刃連甲帶肉劈了進去。", "{name}的甲片被劈開，斧頭砍進了肉裡。"],
+		"in": ["你舉劍去擋，斧頭連你的劍一起壓了下來。", "斧頭劈在你的劍上，力道沒卸掉多少。"],
+	},
+	"ward": {
+		"out": ["你用寬寬的護手架住這一下，力道滑了開去。", "你手腕一翻，護手接住了{name}的攻擊。"],
+		"in": ["{name}手腕一翻，寬寬的護手接住了你的劍。", "你的劍砍在{name}的護手上，滑了開去。"],
 	},
 }
 

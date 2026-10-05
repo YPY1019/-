@@ -194,10 +194,9 @@ func _deal_hands() -> void:
 			# 收招慢的招（裂盾斬），用完下回合不能再用
 			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
 				pool.erase(ally.used[-1])
-			# 絕學只有對手露出大破綻時才出得來
+			# 絕學要等時機才出得來（破綻、對手縮起來、重招砸下來）
 			var foe := _first_alive(enemies)
-			if foe == null or not big_opening(foe):
-				pool = pool.filter(func(id): return not MoveData.MOVES[id].get("only_opening", false))
+			pool = pool.filter(func(id): return foe != null and ult_ready(foe, id))
 			# 自動戰鬥：會的招全部都能挑（學越多招越強）
 			var n := pool.size() if ally.auto else mini(pool.size(), HAND_MAX)
 			if ally.next_status.has("off_balance"):
@@ -370,6 +369,18 @@ func big_opening(foe: Combatant) -> bool:
 	return it.get("type", "") == "opening"
 
 
+## 這招現在出得來嗎（絕學要等時機，見 MoveData 的 when；其他招都出得來）
+func ult_ready(foe: Combatant, move_id: String) -> bool:
+	match MoveData.MOVES[move_id].get("when", ""):
+		"opening":
+			return big_opening(foe)
+		"closed":
+			return foe.intent.get("type", "") == "guard" or foe.intent.get("phase", "") == "windup"
+		"heavy":
+			return foe.intent.get("phase", "") == "strike"
+	return true
+
+
 ## 對手露出破綻時，還拿得起兵器擋你（沒被繳械、兵器沒卡住、資料裡有擋的寫法）
 func can_parry(foe: Combatant) -> bool:
 	if not foe.enemy_def.has("parry") or foe.disarmed:
@@ -445,6 +456,11 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 		show_hit = e.get("hit", false)
 	if take <= 0.0:
 		return
+	# 碎門者：對手拿著它，你擋它常常擋不住一半
+	if take < 1.0 and enemy.weapon_fx == "rend" and (not enemy.fx_shown or rng.randf() < WeaponData.FX_CHANCE):
+		enemy.fx_shown = true
+		take = (1.0 + take) / 2.0
+		ev.append(_ev("fx", enemy.fill(_pick(WeaponData.FX_TEXT["rend"]["in"]))))
 	# 差很多時換寫法：你高很多，打中了也不痛；對手高很多，一下就知道差多少
 	var g := gap(enemy, target, stat)
 	var shrug := power > 0.0 and g <= -GrowthData.OUTCLASS
@@ -452,6 +468,10 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 		ev.append(_ev("action", enemy.fill(_pick(MoveData.HURT["shrug"] if shrug else hits))))
 	if power > 0.0:
 		var dmg := maxi(1, roundi(damage_in(enemy, target, power, stat) * take * _spread()))
+		# 你拿著守夜人：常用護手把這一下架開
+		if target.weapon_fx == "ward" and rng.randf() < WeaponData.FX_CHANCE:
+			dmg = maxi(1, roundi(dmg * WeaponData.WARD_TAKE))
+			ev.append(_ev("fx", enemy.fill(_pick(WeaponData.FX_TEXT["ward"]["out"]))))
 		target.hp = maxi(0, target.hp - dmg)
 		ev.append({"kind": "damage_in", "text": "你", "amount": dmg,
 			"note": "%s %d 對 %d" % [GrowthData.NAMES[stat], target.stats[stat], enemy.stats[stat]]})
@@ -481,7 +501,8 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 
 ## 對手拿著稀有的劍：砍中你時也會發動特效（你先挨過，才知道它多可怕）
 func _weapon_fx_in(enemy: Combatant, target: Combatant, dmg: int, ev: Array) -> void:
-	if enemy.weapon_fx == "" or not target.is_alive():
+	# 碎門者、守夜人不是砍中之後發動的（見 _land、_damage_enemy）
+	if enemy.weapon_fx in ["", "rend", "ward"] or not target.is_alive():
 		return
 	# 第一次砍中一定發動
 	if enemy.fx_shown and rng.randf() >= WeaponData.FX_CHANCE:
@@ -501,7 +522,10 @@ func _weapon_fx_in(enemy: Combatant, target: Combatant, dmg: int, ev: Array) -> 
 
 ## 你拿著稀有的劍：砍中對手時發動特效
 func _weapon_fx_out(ally: Combatant, enemy: Combatant, dmg: int, ev: Array) -> void:
-	if ally.weapon_fx == "" or not enemy.is_alive() or rng.randf() >= WeaponData.FX_CHANCE:
+	if ally.weapon_fx in ["", "ward"] or not enemy.is_alive() or rng.randf() >= WeaponData.FX_CHANCE:
+		return
+	# 碎門者：砍在有甲的人身上才寫
+	if ally.weapon_fx == "rend" and enemy.armor == "none":
 		return
 	var text: String = _pick(WeaponData.FX_TEXT[ally.weapon_fx]["out"])
 	ev.append(_ev("fx", enemy.fill(text.replace("{weapon}", ally.weapon))))
@@ -531,9 +555,15 @@ func _watch_signature(enemy: Combatant, target: Combatant, ev: Array) -> void:
 func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: float, ev: Array) -> void:
 	var m: Dictionary = MoveData.MOVES[move_id]
 	var raw := damage_out(ally, move_id, enemy, deal) * _spread()
-	if not m.get("pierce", false):
+	# 碎門者砍得穿甲
+	if not m.get("pierce", false) and ally.weapon_fx != "rend":
 		raw *= EnemyData.ARMOR_MULT[enemy.armor]
 	var dmg := maxi(1, roundi(raw))
+	# 對手拿著守夜人：常用護手把你的劍架開（絕學架不開）
+	if enemy.weapon_fx == "ward" and not m.get("ult", false) and (not enemy.fx_shown or rng.randf() < WeaponData.FX_CHANCE):
+		enemy.fx_shown = true
+		dmg = maxi(1, roundi(dmg * WeaponData.WARD_TAKE))
+		ev.append(_ev("fx", enemy.fill(_pick(WeaponData.FX_TEXT["ward"]["in"]))))
 	enemy.hp = maxi(0, enemy.hp - dmg)
 	var s: String = m["stat"]
 	ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": dmg,

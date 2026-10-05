@@ -7,6 +7,8 @@ extends RefCounted
 var display_name := "你"
 ## 出道以來過了幾個月（年紀、壽命從這裡算，見 LifeData）
 var month := 0
+## 這一生的壽命：從出道到死一共幾個月（看不到，見 LifeData）
+var life_months := 0
 ## 壽命用完了
 var dead := false
 ## 這一輩子發生的事（結局的生平用）：[{"month", "text"}]
@@ -35,12 +37,13 @@ var beaten: Array[String] = []
 ## 拿著的武器和身上有的武器（買的、從人身上拿的）
 var weapon := WeaponData.START
 var owned_weapons: Array[String] = [WeaponData.START]
-## 打倒食人魔了沒
-var cleared := false
 
 
 func _init() -> void:
 	hp = max_hp()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	life_months = LifeData.roll_life_months(rng)
 
 
 # ---------- 年紀 ----------
@@ -55,7 +58,7 @@ func date_text() -> String:
 
 ## 離壽命用完還有幾個月
 func months_left() -> int:
-	return maxi(0, LifeData.life_months() - month)
+	return maxi(0, life_months - month)
 
 
 ## 這一項老了掉幾點

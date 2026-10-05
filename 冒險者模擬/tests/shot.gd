@@ -110,7 +110,7 @@ func _init() -> void:
 	await _frames(3)
 	_save(out + "/board.png")
 	# 老了：身體掉下來，打一場看戰報
-	h.month = LifeData.life_months() - 30
+	h.month = h.life_months - 30
 	h.hp = h.max_hp()
 	main.town_view.refresh()
 	await _frames(3)
@@ -121,7 +121,7 @@ func _init() -> void:
 	_save(out + "/old_battle.png")
 	await _back(main)
 	# 壽命用完：休養到死，看這一生
-	h.month = LifeData.life_months() - 1
+	h.month = h.life_months - 1
 	h.hp = 1
 	main.town_view._act(main.town.rest(3))
 	await create_timer(3.0).timeout

@@ -3,17 +3,19 @@ extends RefCounted
 
 ## 一生的數字：出道年紀、壽命、老化，和等的畫面、老了的戰報用的句子。只有資料和換算。
 ##
-## 時間用「月」算。冒險者身上記的是出道以來過了幾個月（Adventurer.month）。
-## 每年 1 月長一歲。壽命到了（滿 LIFESPAN 歲的那個 1 月）就是一生結束。
-## 原型的一生壓短（內容只夠玩一小時左右），之後內容變多再拉長。
+## 時間用「月」算。冒險者身上記的是出道以來過了幾個月（Adventurer.month）。每年 1 月長一歲。
+## 壽命看不到（參考俠客遊第三之書）：每一生在 LIFESPAN_MIN～LIFESPAN_MAX 歲之間隨機，畫面上只寫年紀。
+## 原型的一生壓短（內容只夠玩一兩個小時），之後內容變多再拉長。
 ##
-## 老化：過了某個年紀，身體每兩年掉一點。敏捷先掉，再晚一點力量也掉。
+## 老化：過了某個年紀，身體每兩年掉一點。敏捷先掉，再晚一點力量也掉。幾歲開始掉不寫出來。
 ##   掉的是「現在的身體」，練出來的底子還在：招式、秘笈、武器都不掉，境界也不掉。
 
 const START_AGE := 16
 ## 出道那年的幾月
 const START_MONTH := 3
-const LIFESPAN := 36
+## 壽命（歲）的範圍，含頭含尾。死在那一歲的隨機一個月
+const LIFESPAN_MIN := 34
+const LIFESPAN_MAX := 38
 
 ## 過了這個年紀，這一項每 DECLINE_YEARS 年掉 1 點
 const DECLINE_AGE := {"agi": 28, "str": 30}
@@ -38,9 +40,10 @@ static func date_text(month: int) -> String:
 	return "%d 歲 %d 月" % [age_at(month), month_of_year(month)]
 
 
-## 從出道到壽命用完，一共幾個月
-static func life_months() -> int:
-	return (LIFESPAN - START_AGE) * 12 - (START_MONTH - 1)
+## 擲一生的壽命：從出道到死，一共幾個月
+static func roll_life_months(rng: RandomNumberGenerator) -> int:
+	var age := rng.randi_range(LIFESPAN_MIN, LIFESPAN_MAX)
+	return (age - START_AGE) * 12 - (START_MONTH - 1) + rng.randi_range(0, 11)
 
 
 ## 「1 年 6 個月」「3 個月」「1 年」
@@ -124,8 +127,13 @@ const SEASON_LINES := {
 	"winter": ["下雪了。城裡的屋頂一片白。", "井口結了冰，打水要先敲開。", "旅店的爐火從早燒到晚。"],
 }
 
-## 壽命用完的那一刻
-const DEATH_TEXT := "那年冬天特別冷。你在旅店的房間裡睡著，就沒有再醒來。"
+## 壽命用完的那一刻（看季節）
+const DEATH_TEXT := {
+	"spring": "那年春天，你在旅店的房間裡睡著，就沒有再醒來。窗外的柳樹剛發芽。",
+	"summer": "那年夏天的一個晚上，你說有點累，早早就睡了，就沒有再醒來。",
+	"autumn": "那年秋天，你坐在旅店門口曬太陽，坐著坐著就睡著了。老闆娘來叫你吃飯時，你已經走了。",
+	"winter": "那年冬天特別冷。你在旅店的房間裡睡著，就沒有再醒來。",
+}
 
 
 # ---- 老了的戰報 ----

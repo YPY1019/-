@@ -51,7 +51,7 @@ func _value_of(b: Battle, me: Combatant, foe: Combatant, id: String, e: Dictiona
 	var it: Dictionary = foe.intent
 	var m: Dictionary = MoveData.MOVES[id]
 	var deal := b.damage_out(me, id, foe, e.get("deal", 0.0))
-	if not m.get("pierce", false):
+	if not m.get("pierce", false) and me.weapon_fx != "rend":
 		deal *= EnemyData.ARMOR_MULT[foe.armor]
 	# 對手這回合打過來多痛
 	var hit := 0.0

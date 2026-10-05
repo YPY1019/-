@@ -19,7 +19,6 @@ const AGED := "#c9a46a"
 var town: Town
 
 var date_label: Label
-var life_label: Label
 var money_label: Label
 var hp_bar: ProgressBar
 var hp_label: Label
@@ -36,15 +35,12 @@ func _init(p_town: Town) -> void:
 	_rng.randomize()
 	add_theme_constant_override("separation", 12)
 
-	# 上：年紀和壽命、錢、血量、休養
+	# 上：年紀、錢、血量、休養（壽命看不到）
 	var top := UiKit.hbox(28)
 	add_child(top)
 	var date_box := UiKit.vbox(0)
 	date_label = UiKit.label("", 24)
-	date_label.mouse_filter = Control.MOUSE_FILTER_STOP
 	date_box.add_child(date_label)
-	life_label = UiKit.label("", 16)
-	date_box.add_child(life_label)
 	top.add_child(date_box)
 	money_label = UiKit.label("", 24)
 	top.add_child(money_label)
@@ -136,11 +132,9 @@ func play_wait(w: Dictionary, after: Callable) -> void:
 	after.call()
 
 
-## 跳的時候只動年月和壽命，其他的（血量、錢）跳完才更新
+## 跳的時候只動年月，其他的（血量、錢）跳完才更新
 func _show_month(month: int) -> void:
 	date_label.text = LifeData.date_text(month)
-	var left := maxi(0, LifeData.life_months() - month)
-	life_label.text = "壽命 %d・還剩 %s" % [LifeData.LIFESPAN, LifeData.span_text(left)]
 
 
 ## 第幾格寫哪一句：第一格寫剛開始的，中間換季寫季節，最後一格寫快結束的
@@ -165,12 +159,6 @@ func _pick_line(list: Array) -> String:
 func refresh() -> void:
 	var h := town.hero
 	date_label.text = h.date_text()
-	date_label.tooltip_text = "壽命 %d 歲。\n過了 %d 歲，敏捷開始往下掉；過了 %d 歲，力量也會。" % [
-		LifeData.LIFESPAN, LifeData.DECLINE_AGE["agi"], LifeData.DECLINE_AGE["str"]]
-	life_label.text = "壽命 %d・還剩 %s" % [LifeData.LIFESPAN, LifeData.span_text(h.months_left())]
-	# 剩不到四分之一，字變紅
-	var short := h.months_left() < LifeData.life_months() / 4
-	life_label.add_theme_color_override("font_color", Color(BAD) if short else Color(1, 1, 1, 0.6))
 	money_label.text = "%d 銀" % h.money
 	money_label.add_theme_color_override("font_color", Color(BAD) if h.money < 0 else Color(GOLD))
 	hp_label.text = "血量 %d / %d" % [h.hp, h.max_hp()]
@@ -213,10 +201,6 @@ func _build_rest() -> void:
 func _build_me() -> void:
 	UiKit.clear(me_box)
 	var h := town.hero
-	if h.cleared:
-		var c := UiKit.label("★ 原型通關", 22)
-		c.add_theme_color_override("font_color", Color(GOLD))
-		me_box.add_child(c)
 	var realm := _tip(UiKit.label(h.realm_text(), 22), "境界。衝破瓶頸就升一境，血量也跟著變多。")
 	realm.add_theme_color_override("font_color", Color(h.realm_color()))
 	me_box.add_child(realm)
@@ -321,7 +305,7 @@ func _build_board() -> void:
 			title_row.add_child(UiKit.label("打贏過", 16, 0.5))
 		info.add_child(title_row)
 		info.add_child(UiKit.label(e["blurb"], 16, 0.75, true))
-		if named:
+		if e.has("loot") and named:
 			info.add_child(UiKit.label("帶著一把" + WeaponData.get_def(e["loot"])["look"], 16, 0.75, true))
 		for book in e.get("books", []):
 			if not h.books.has(book):

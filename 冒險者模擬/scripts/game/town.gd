@@ -72,7 +72,7 @@ func board() -> Array:
 	return list
 
 
-## 打贏之後：對手身上的東西、卡在瓶頸時打贏強敵就衝破瓶頸、通關
+## 打贏之後：對手身上的東西、卡在瓶頸時打贏強敵就衝破瓶頸
 func _after_win(id: String) -> Array:
 	var msgs := []
 	if not hero.beaten.has(id):
@@ -89,9 +89,6 @@ func _after_win(id: String) -> Array:
 	var stronger: bool = maxi(e["str"], e["agi"]) > hero.cap()
 	if stronger and hero.stuck() and hero.can_break_through():
 		msgs.append_array(_break_through())
-	if id == TownData.GOAL and not hero.cleared:
-		hero.cleared = true
-		msgs.append(_m("big", "★ 原型通關（%s）" % hero.date_text()))
 	return msgs
 
 
@@ -259,7 +256,7 @@ func _pass_months(n: int, kind := "", title := "") -> Array:
 		msgs.append(_m("bad", "你已經欠了 %d 銀。" % -hero.money))
 	if hero.months_left() == 0:
 		hero.dead = true
-		msgs.append(_m("epic", LifeData.DEATH_TEXT))
+		msgs.append(_m("epic", LifeData.DEATH_TEXT[LifeData.SEASONS[LifeData.month_of_year(hero.month)]]))
 	return msgs
 
 

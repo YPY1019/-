@@ -4,7 +4,7 @@ extends SceneTree
 ## 不同的數值、境界、招式和武器組合，每種敵人打很多場（滿血開打，自動戰鬥），看勝率。
 ## 執行：Godot.exe --headless --path . --script res://tests/sim.gd
 
-const N := 300
+const N := 150
 
 const T1 := ["parry", "sweep_kick", "heavy"]
 const T2 := ["redirect", "disarm", "break_free", "vital", "combo"]
@@ -40,7 +40,7 @@ func _init() -> void:
 		["19/10 二境 斷岳 赤牙", 19, 10, 1, T1 + T2 + ULT, "red_fang"],
 		["20/10 二境 斷岳 喪鐘", 20, 10, 1, T1 + T2 + ULT, "knell"],
 	]
-	var ids := ["wolf", "bandit_leader", "deserter", "bear", "merc_captain", "black_knight", "ogre", "master"]
+	var ids := ["merc_captain", "raider", "duelist", "black_knight", "ogre", "old_captain", "rebel_lord"]
 	# 加參數只跑名字裡有這段字的組合：-- "/10"
 	var only := OS.get_cmdline_user_args()
 	if not only.is_empty():
