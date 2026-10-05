@@ -6,6 +6,8 @@ extends VBoxContainer
 
 signal commission_requested(enemy_id: String)
 signal spar_requested
+## 城裡發生了事（寫試玩紀錄用）
+signal messages_added(msgs: Array)
 
 const BAD := "#ff8a8a"
 const GOLD := "#ffd479"
@@ -81,6 +83,7 @@ func add_messages(msgs: Array) -> void:
 	if msgs.is_empty():
 		return
 	log_label.append_text(UiKit.messages_bbcode(msgs) + "\n")
+	messages_added.emit(msgs)
 	refresh()
 
 
@@ -127,6 +130,9 @@ func _build_me() -> void:
 		c.add_theme_color_override("font_color", Color(GOLD))
 		me_box.add_child(c)
 	me_box.add_child(UiKit.heading("身體"))
+	var realm := UiKit.label(h.realm_text(), 22)
+	realm.add_theme_color_override("font_color", Color(h.realm_color()))
+	me_box.add_child(realm)
 	for s in GrowthData.STATS:
 		var row := UiKit.hbox(10)
 		var n := UiKit.label(GrowthData.NAMES[s], 18)
@@ -146,8 +152,8 @@ func _build_me() -> void:
 			cap.add_theme_color_override("font_color", Color(GOLD))
 			row.add_child(cap)
 		me_box.add_child(row)
-	me_box.add_child(UiKit.label("瓶頸：%d　打贏比自己強的對手，或找師傅特訓，才能突破。" % h.cap(), 15, 0.6, true))
-	me_box.add_child(UiKit.label("用哪個數值的招，就練到哪個數值；挨打練體魄。對手太弱練不到。", 15, 0.6, true))
+	me_box.add_child(UiKit.label("瓶頸：%d　卡在瓶頸時，打贏比自己強的對手，或找師傅特訓，就能升一境（血量也會變多）。" % h.cap(), 15, 0.6, true))
+	me_box.add_child(UiKit.label("戰鬥時同一項跟同一項比：比對手低 %d 點以上，靠這項的招一定失敗。用哪項的招就練到哪項，對手那項太低練不到。" % GrowthData.FAIL_GAP, 15, 0.6, true))
 
 	me_box.add_child(UiKit.heading("會的招"))
 	_move_line("一般", MoveData.BASIC)
@@ -190,16 +196,33 @@ func _build_board() -> void:
 		warn.add_theme_color_override("font_color", Color(BAD))
 		board_box.add_child(warn)
 	board_box.add_child(UiKit.label("只有討伐委託。可以越級接，但自負風險。打輸會重傷，被救回城裡要躺好幾天。", 16, 0.6, true))
+	var legend := UiKit.hbox(14)
+	legend.add_child(UiKit.label("危險度對應境界：", 16, 0.6))
+	for i in GrowthData.REALM_NAMES.size():
+		var l := UiKit.label("%s %s" % ["★".repeat(i + 1), GrowthData.REALM_NAMES[i]], 16)
+		l.add_theme_color_override("font_color", Color(GrowthData.REALM_COLORS[i]))
+		legend.add_child(l)
+	var you := UiKit.label("（你：%s）" % h.realm_text(), 16)
+	you.add_theme_color_override("font_color", Color(h.realm_color()))
+	legend.add_child(you)
+	board_box.add_child(legend)
 	for id in EnemyData.ORDER:
 		var c: Dictionary = TownData.COMMISSIONS[id]
 		var e: Dictionary = EnemyData.ENEMIES[id]
 		var row := UiKit.hbox(16)
 		var info := UiKit.vbox(2)
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var title := "%s　%s" % [e["name"], "★".repeat(c["danger"]) + "☆".repeat(5 - c["danger"])]
+		var dg := EnemyData.danger(id)
+		var title_row := UiKit.hbox(12)
+		title_row.add_child(UiKit.label(e["name"], 20))
+		var stars := UiKit.label("%s %s" % [dg["stars"], dg["stage"]], 20)
+		stars.add_theme_color_override("font_color", Color(dg["color"]))
+		stars.tooltip_text = "危險度：大約是%s的人打得贏的" % dg["text"]
+		stars.mouse_filter = Control.MOUSE_FILTER_STOP
+		title_row.add_child(stars)
 		if h.beaten.has(id):
-			title += "　（打贏過）"
-		info.add_child(UiKit.label(title, 20))
+			title_row.add_child(UiKit.label("（打贏過）", 18, 0.7))
+		info.add_child(title_row)
 		info.add_child(UiKit.label(c["text"], 16, 0.75, true))
 		info.add_child(UiKit.label("%s　報酬 %d 銀・來回 %d 天" % [e["blurb"], c["reward"], c["days"]], 15, 0.6, true))
 		row.add_child(info)

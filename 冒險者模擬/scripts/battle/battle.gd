@@ -12,6 +12,7 @@ extends RefCounted
 ##   2. 你從會的招裡「想到」幾招（抽招），加上永遠能用的基本招。剋制對手這招的，比較容易想到。
 ##   3. 你先出手，對手後出手。
 ## 對手的招可能讓你下回合想到的招變少（眼睛進沙、被嚇到、被抱住）。
+## 基礎數值：同一項跟同一項比（見 GrowthData）。差太多招就失敗，差距也改變傷害。
 ## 程式寫成可以多人參戰；文字目前都用「你」寫，加同伴時要改。
 
 ## 每回合最多出現幾個選項。會的招不超過這個數，就全部出現（學了新招只會多一個選項，不會變弱）
@@ -22,8 +23,6 @@ const GOOD_WEIGHT := 3.0
 const WASTED_WEIGHT := 0.2
 ## 對手眼睛進沙時，下一次攻擊打偏的機率
 const BLIND_MISS_CHANCE := 0.6
-## 被抱住時「掙扎」成功的機率
-const STRUGGLE_CHANCE := 0.5
 ## 最多被抱住幾回合，之後對手會把你甩開
 const HOLD_MAX := 2
 
@@ -38,6 +37,8 @@ var round_limit := 0
 ## "" = 還在打；win / lose / flee / survive（撐滿 round_limit）
 var outcome := ""
 var rng := RandomNumberGenerator.new()
+## 整場的文字紀錄（試玩紀錄檔用）：發生的事，加上每回合有哪些選項、選了什麼
+var record: Array[String] = []
 
 
 func _init(p_allies: Array, p_enemies: Array, rng_seed := -1) -> void:
@@ -57,6 +58,7 @@ func start() -> Array:
 	round_no = 1
 	_choose_intents(ev)
 	_deal_hands()
+	_record(ev)
 	return ev
 
 
@@ -81,6 +83,7 @@ func play_round(choices: Dictionary) -> Array:
 
 	# 1. 我方先出手
 	var done := {}
+	var picks := []
 	for ally in allies:
 		if not ally.is_alive() or not choices.has(ally):
 			continue
@@ -91,6 +94,7 @@ func play_round(choices: Dictionary) -> Array:
 		if not ally.hand.has(move_id) and not (move_id == MoveData.FLEE and can_flee(ally)):
 			push_error("招式 %s 不能用" % move_id)
 			move_id = ally.hand[0]
+		picks.append("　〔選項：%s → 選了「%s」〕" % ["、".join(ally.hand.map(func(id): return MoveData.MOVES[id]["name"])), MoveData.MOVES[move_id]["name"]])
 		done[ally] = _player_act(ally, move_id, target, ev)
 
 	# 2. 對手出手
@@ -119,7 +123,26 @@ func play_round(choices: Dictionary) -> Array:
 		round_no += 1
 		_choose_intents(ev)
 		_deal_hands()
+	_record(ev.slice(0, 1))
+	record.append_array(picks)
+	_record(ev.slice(1))
 	return ev
+
+
+func _record(ev: Array) -> void:
+	for e in ev:
+		match e["kind"]:
+			"round":
+				record.append("── %s ──" % e["text"])
+			"tell":
+				record.append("▶ " + e["text"])
+			"damage_in", "damage_out":
+				record.append("　%s −%d（%s）" % [e["text"], e["amount"], e["note"]])
+			_:
+				record.append(e["text"])
+	for ally in allies:
+		if ally.controlled and ally.hand_note != "" and not ev.is_empty() and ev[-1]["kind"] == "tell":
+			record.append("　（%s）" % ally.hand_note)
 
 
 func is_over() -> bool:
@@ -166,23 +189,23 @@ func _deal_hands() -> void:
 				n = 1
 				pool = pool.filter(func(id): return MoveData.is_basic(id))
 				notes.append("你被嚇得腦中一片空白。")
-			ally.hand.assign(_draw(pool, maxi(n, 1), _first_alive(enemies)))
+			ally.hand.assign(_draw(ally, pool, maxi(n, 1), _first_alive(enemies)))
 		ally.next_status.clear()
 		ally.hand_note = "　".join(notes)
 
 
 ## 從會的招裡抽 n 招。至少一個攻擊類、一個防守類（抽得到的話），剩下的隨機。
-func _draw(pool: Array, n: int, foe: Combatant) -> Array:
+func _draw(ally: Combatant, pool: Array, n: int, foe: Combatant) -> Array:
 	var left := pool.duplicate()
 	var out := []
 	if n >= 2:
 		for group in [MoveData.OFFENSE, MoveData.DEFENSE]:
-			var id := _weighted_pick(left.filter(func(m): return group.has(m)), foe)
+			var id := _weighted_pick(ally, left.filter(func(m): return group.has(m)), foe)
 			if id != "":
 				out.append(id)
 				left.erase(id)
 	while out.size() < n and not left.is_empty():
-		var id := _weighted_pick(left, foe)
+		var id := _weighted_pick(ally, left, foe)
 		out.append(id)
 		left.erase(id)
 	return out
@@ -190,7 +213,7 @@ func _draw(pool: Array, n: int, foe: Combatant) -> Array:
 
 ## 剋制對手這招的比較容易出現；用了等於白費的（沒傷害、沒效果、又照樣挨打）很少出現。
 ## 這樣學了新招不會把有用的招擠掉。
-func _weighted_pick(candidates: Array, foe: Combatant) -> String:
+func _weighted_pick(ally: Combatant, candidates: Array, foe: Combatant) -> String:
 	if candidates.is_empty():
 		return ""
 	var weights := []
@@ -198,7 +221,7 @@ func _weighted_pick(candidates: Array, foe: Combatant) -> String:
 	for id in candidates:
 		var w := 1.0
 		if foe != null and not MoveData.is_basic(id):
-			var e := MoveData.entry(id, foe.intent["type"], foe.traits)
+			var e := resolve(ally, id, foe)
 			if e.get("good", false):
 				w = GOOD_WEIGHT
 			elif (e.get("deal", 0.0) <= 0.0 and not e.has("effect")) \
@@ -217,21 +240,16 @@ func _weighted_pick(candidates: Array, foe: Combatant) -> String:
 # ---- 玩家出手 ----
 
 func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array) -> Dictionary:
-	var e: Dictionary
-	if move_id == "struggle":
-		if rng.randf() < STRUGGLE_CHANCE:
-			e = {"take": 0.0, "effect": "escape", "text": ["你拼命一扭，掙脫了出來！", "你咬牙一掙，終於從{name}手裡脫身。"]}
-		else:
-			e = {"take": 1.0, "hit": true, "text": ["你掙扎了半天，還是被死死勒住。"]}
-	else:
-		e = MoveData.entry(move_id, target.intent["type"], target.traits)
+	var e := resolve(ally, move_id, target)
 	var m: Dictionary = MoveData.MOVES[move_id]
 	ev.append(_ev("action", target.fill(_pick(e["text"]))))
+	if e.get("failed", false):
+		ev.append(_ev("info", "（%s差太多：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
 
 	if move_id != MoveData.FLEE:
 		ally.used.append(move_id)
 	if e.get("deal", 0.0) > 0.0:
-		_damage_enemy(target, ally.power_of(move_id) * e["deal"], m.get("pierce", false), ev)
+		_damage_enemy(ally, target, move_id, e["deal"], ev)
 
 	if target.is_alive():
 		match e.get("effect", ""):
@@ -250,6 +268,42 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 	return {"move": move_id, "entry": e}
 
 
+## 這招碰上對手這回合的動作，結果是什麼（數值差太多就換成失敗的版本，加上 failed）。
+## 招有效果（掃倒、破防、掙脫…）或能少挨打時，才有成不成功的問題；單純砍下去只差在痛不痛。
+func resolve(actor: Combatant, move_id: String, foe: Combatant) -> Dictionary:
+	var type: String = foe.intent["type"]
+	var e := MoveData.entry(move_id, type, foe.traits)
+	var m: Dictionary = MoveData.MOVES[move_id]
+	if not m.has("fail"):
+		return e
+	var can_fail: bool = e.has("effect") or (ATTACK_TYPES.has(type) and e.get("take", 1.0) < 1.0)
+	if can_fail and gap(actor, foe, m["stat"]) <= -m.get("fail_gap", GrowthData.FAIL_GAP):
+		e = m["fail"].duplicate()
+		e["failed"] = true
+	return e
+
+
+## 同一項比：出手的人 − 被打的人
+func gap(attacker: Combatant, defender: Combatant, stat: String) -> int:
+	return attacker.stats[stat] - defender.stats[stat]
+
+
+## 我方這招打出去的傷害（還沒算盔甲和浮動）
+func damage_out(ally: Combatant, move_id: String, foe: Combatant, deal: float) -> float:
+	var s: String = MoveData.MOVES[move_id]["stat"]
+	return GrowthData.BASE_DAMAGE * deal * GrowthData.damage_mult(gap(ally, foe, s))
+
+
+## 對手這招打過來的傷害（還沒算你的應對和浮動）
+func damage_in(enemy: Combatant, target: Combatant, power: float, stat: String) -> float:
+	return GrowthData.BASE_DAMAGE * power * GrowthData.damage_mult(gap(enemy, target, stat))
+
+
+## 「力量 12 對 18」：前面是你
+func _compare(ally: Combatant, foe: Combatant, stat: String) -> String:
+	return "你 %d，%s %d" % [ally.stats[stat], foe.display_name, foe.stats[stat]]
+
+
 # ---- 對手出手 ----
 
 func _enemy_act(enemy: Combatant, target: Combatant, d: Dictionary, ev: Array) -> void:
@@ -265,18 +319,18 @@ func _enemy_act(enemy: Combatant, target: Combatant, d: Dictionary, ev: Array) -
 			if enemy.holding == "":
 				return  # 你這回合掙脫了
 			var hold: Dictionary = enemy.action_def(enemy.holding)["hold"]
-			_land(enemy, target, d, hold["power"], hold["hit"], "", ev)
+			_land(enemy, target, d, hold["power"], EnemyData.TYPE_STAT["hold"], hold["hit"], "", ev)
 			enemy.hold_rounds += 1
 		_:
 			var a := enemy.action_def(it["action"])
 			if a.get("pickup", false):
 				enemy.disarmed = false
 			if ATTACK_TYPES.has(a["type"]):
-				_land(enemy, target, d, a.get("power", 1.0), a["hit"], a.get("on_hit", ""), ev)
+				_land(enemy, target, d, a.get("power", 1.0), EnemyData.action_stat(a, a["type"]), a["hit"], a.get("on_hit", ""), ev)
 
 
-## 對手的攻擊打到你身上
-func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, hits: Array, on_hit: String, ev: Array) -> void:
+## 對手的攻擊打到你身上。stat：對手這招靠的數值，跟你的同一項比
+func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, stat: String, hits: Array, on_hit: String, ev: Array) -> void:
 	if target == null or not target.is_alive():
 		return
 	if enemy.blinded:
@@ -295,12 +349,17 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, hit
 	if show_hit:
 		ev.append(_ev("action", enemy.fill(_pick(hits))))
 	if power > 0.0:
-		var dmg := maxi(1, roundi(enemy.atk * power * take * _spread()))
+		var dmg := maxi(1, roundi(damage_in(enemy, target, power, stat) * take * _spread()))
 		target.hp = maxi(0, target.hp - dmg)
-		ev.append({"kind": "damage_in", "text": "你", "amount": dmg})
+		ev.append({"kind": "damage_in", "text": "你", "amount": dmg,
+			"note": "%s %d 對 %d" % [GrowthData.NAMES[stat], target.stats[stat], enemy.stats[stat]]})
 		var hurt := _hurt_line(target, dmg)
 		if hurt != "":
 			ev.append(_ev("pain", hurt))
+	# 你那一項比對手高太多，附加效果沒用
+	if on_hit != "" and GrowthData.fails(gap(enemy, target, stat)):
+		ev.append(_ev("action", enemy.fill(_pick(EnemyData.RESIST[on_hit]))))
+		on_hit = ""
 	match on_hit:
 		"":
 			pass
@@ -324,13 +383,16 @@ func _watch_signature(enemy: Combatant, target: Combatant, ev: Array) -> void:
 	ev.append(_ev("info", _pick(sig["seen"])))
 
 
-func _damage_enemy(enemy: Combatant, raw: float, pierce: bool, ev: Array) -> void:
-	var mult := raw * _spread()
-	if not pierce:
-		mult *= EnemyData.ARMOR_MULT[enemy.armor]
-	var dmg := maxi(1, roundi(mult))
+func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: float, ev: Array) -> void:
+	var m: Dictionary = MoveData.MOVES[move_id]
+	var raw := damage_out(ally, move_id, enemy, deal) * _spread()
+	if not m.get("pierce", false):
+		raw *= EnemyData.ARMOR_MULT[enemy.armor]
+	var dmg := maxi(1, roundi(raw))
 	enemy.hp = maxi(0, enemy.hp - dmg)
-	ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": dmg})
+	var s: String = m["stat"]
+	ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": dmg,
+		"note": "%s %d 對 %d" % [GrowthData.NAMES[s], ally.stats[s], enemy.stats[s]]})
 	if not enemy.is_alive():
 		ev.append(_ev("info", "%s倒下了。" % enemy.display_name))
 		return

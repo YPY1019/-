@@ -1,7 +1,7 @@
 class_name Adventurer
 extends RefCounted
 
-## 冒險者本人：戰鬥以外也會存在的資料（數值、血量、錢、會的招、跟師傅學到哪）。
+## 冒險者本人：戰鬥以外也會存在的資料（數值、境界、血量、錢、會的招、跟師傅學到哪）。
 ## 戰鬥時轉成 Combatant 帶進去。
 
 var display_name := "你"
@@ -10,10 +10,10 @@ var money := TownData.START_MONEY
 var hp := 0
 
 ## 基礎數值和長到一半的經驗
-var stats := {"str": GrowthData.START, "agi": GrowthData.START, "con": GrowthData.START}
-var exp := {"str": 0.0, "agi": 0.0, "con": 0.0}
-## 現在卡在第幾層瓶頸（GrowthData.CAPS 的索引）
-var cap_tier := 0
+var stats := {"str": GrowthData.START, "agi": GrowthData.START}
+var exp := {"str": 0.0, "agi": 0.0}
+## 境界（從 0 算）。境界就是瓶頸：衝破一次瓶頸就升一境
+var realm := 0
 
 ## 學會的招式 id。基本招式不用學。
 var learned: Array[String] = []
@@ -31,20 +31,46 @@ func _init() -> void:
 	hp = max_hp()
 
 
+## 血量 = 境界 ＋ 其他加減（之後的裝備、年紀、舊傷）
 func max_hp() -> int:
-	return GrowthData.max_hp(stats["con"])
+	return GrowthData.REALM_HP[realm] + hp_bonus()
+
+
+func hp_bonus() -> int:
+	return 0
 
 
 func cap() -> int:
-	return GrowthData.CAPS[cap_tier]
+	return GrowthData.CAPS[realm]
 
 
 func at_cap(stat: String) -> bool:
 	return stats[stat] >= cap()
 
 
-func power(stat: String) -> float:
-	return GrowthData.power(stats[stat])
+## 有任何一項卡在瓶頸
+func stuck() -> bool:
+	return GrowthData.STATS.any(func(s): return at_cap(s))
+
+
+func can_break_through() -> bool:
+	return realm < GrowthData.CAPS.size() - 1
+
+
+## 升一境：血量上限跳一截，身上的傷不變
+func break_through() -> void:
+	var old_max := max_hp()
+	realm += 1
+	hp += max_hp() - old_max
+
+
+## 用比較高的那項算前中後段
+func realm_text() -> String:
+	return GrowthData.realm_text(realm, maxi(stats["str"], stats["agi"]))
+
+
+func realm_color() -> String:
+	return GrowthData.REALM_COLORS[realm]
 
 
 func knows(move_id: String) -> bool:
@@ -64,8 +90,6 @@ func add_exp(stat: String, amount: float) -> int:
 		exp[stat] -= GrowthData.EXP_PER_POINT
 		stats[stat] += 1
 		gained += 1
-		if stat == "con":
-			hp += GrowthData.HP_PER_CON
 	if at_cap(stat):
 		exp[stat] = 0.0
 	return gained
@@ -79,5 +103,6 @@ func to_combatant(full := false) -> Combatant:
 	c.controlled = true
 	c.max_hp = max_hp()
 	c.hp = c.max_hp if full else hp
+	c.stats = stats.duplicate()
 	c.adventurer = self
 	return c

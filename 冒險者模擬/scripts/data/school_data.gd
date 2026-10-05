@@ -15,7 +15,7 @@ const TIERS := [
 		"exam": "", "exam_name": ""},
 	{"tier": 2, "moves": ["redirect", "disarm", "break_free"], "cost": 0, "days": 5,
 		"exam": "spar", "exam_name": "接住我三招",
-		"exam_desc": "跟師傅用木劍過招三回合。撐過三回合、血掉不到三成就算通過。花 1 天，不會真的受傷。"},
+		"exam_desc": "跟師傅用木劍過招三回合。撐過三回合、血掉不到三成就算通過。師傅的力量、敏捷都是 15，差太多的話擋不住也閃不掉。花 1 天，不會真的受傷。"},
 	{"tier": 3, "moves": ["vital", "combo"], "cost": 0, "days": 7,
 		"exam": "bear", "exam_name": "去打倒熊",
 		"exam_desc": "接熊的委託，打贏一次。"},

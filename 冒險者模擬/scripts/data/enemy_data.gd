@@ -25,7 +25,9 @@ extends RefCounted
 ##   last 上一招；last_seq 最近兩招；player 你上回合用了這些招之一；chance 機率；rage 只在發狂/沒發狂時
 ## rage：血量低於 hp_below 時發狂，之後改用 weights。
 ## pain：被你打中時的反應。light 輕傷、heavy 重傷、dying 快死了。
-## level：強度。打牠能把你的基礎數值練到多高（見 GrowthData）。
+## str / agi：力量、敏捷。戰鬥時跟你同一項比（見 GrowthData），也決定打牠能把你練到多高。
+##   招靠哪一項看類型（TYPE_STAT），招自己寫了 stat 就用招的。
+## realm：只有人有境界（師傅）。怪物用危險度，從數值算（danger()）。
 ## signature：招牌招，被打中幾次就偷學得會。action 對手的招、learn 你學到的招、seen 被打中時的提示。
 ## win_text / lose_text / flee_text / survive_text：戰鬥結束的句子（不寫就用預設的）。
 ## hide_hp：戰鬥畫面不顯示血量（師傅）。
@@ -40,6 +42,18 @@ const FORCED_OPENING := {
 
 const BLIND_MISS := ["{name}瞇著眼睛亂揮，完全打偏了。", "{name}一邊揉眼睛一邊胡亂出手，連你的衣角都沒碰到。"]
 
+## 對手的招靠哪一項數值
+const TYPE_STAT := {"sweep": "str", "smash": "str", "grab": "str", "hold": "str", "roar": "str",
+	"thrust": "agi", "trick": "agi"}
+
+## 你的數值比對手高太多，對手的招打中了，附加效果卻沒用
+const RESIST := {
+	"held": ["{name}想把你抱住，可是你的力氣比{pron}大，一甩就甩開了。"],
+	"blind": ["沙子撒過來，你早就偏頭躲開了。", "{name}腳尖一勾，你已經先一步閉眼側身，沙子全撒在你肩上。"],
+	"shaken": ["吼聲很大，可是你連眉頭都沒皺一下。"],
+	"off_balance": ["你被撞得晃了一下，腳下卻穩穩的。"],
+}
+
 const ORDER := ["wolf", "bandit_leader", "deserter", "bear", "ogre"]
 
 const ARMOR_MULT := {"none": 1.0, "light": 0.8, "heavy": 0.5}
@@ -48,7 +62,7 @@ const ENEMIES := {
 	"wolf": {
 		"name": "野狼",
 		"blurb": "森林裡常見的野獸。會撲、會咬住不放。",
-		"hp": 45, "atk": 12, "armor": "none", "traits": ["beast"], "pron": "牠", "level": 12,
+		"hp": 50, "str": 7, "agi": 11, "armor": "none", "traits": ["beast"], "pron": "牠",
 		"weapon": "利牙", "guard": "架勢",
 		"scene": ["黃昏的林間小路，落葉被風吹得沙沙作響。", "清晨的霧還沒散，樹林裡安靜得只聽得到你自己的呼吸。"],
 		"start": ["一頭灰毛野狼從樹叢裡鑽出來，壓低身子，黃色的眼睛死盯著你。", "樹叢一陣晃動，一頭瘦骨嶙峋的野狼走了出來，嘴角滴著口水。"],
@@ -77,7 +91,7 @@ const ENEMIES := {
 	"bandit_leader": {
 		"name": "盜匪頭子",
 		"blurb": "在路上攔人搶劫的盜匪頭目，大刀使得很兇，手段也很髒。",
-		"hp": 90, "atk": 30, "armor": "light", "traits": ["disarmable"], "pron": "他", "level": 14,
+		"hp": 150, "str": 12, "agi": 12, "armor": "light", "traits": ["disarmable"], "pron": "他",
 		"weapon": "大刀", "guard": "架勢",
 		"scene": ["荒涼的山道上，兩邊都是陡峭的岩壁，退無可退。", "官道旁的破廟前，地上還散落著被搶過的行李。"],
 		"start": ["盜匪頭子扛著大刀擋在路中間，咧嘴笑著：「把錢留下，人可以走。」", "盜匪頭子從岩石後面跳出來，大刀在手裡轉了一圈：「識相的就把錢袋扔過來。」"],
@@ -122,7 +136,7 @@ const ENEMIES := {
 	"deserter": {
 		"name": "逃兵騎士",
 		"blurb": "從戰場逃出來的騎士，一身鐵甲，盾牌很難打穿。",
-		"hp": 70, "atk": 20, "armor": "heavy", "traits": ["disarmable"], "pron": "他", "level": 15,
+		"hp": 120, "str": 14, "agi": 10, "armor": "heavy", "traits": ["disarmable"], "pron": "他",
 		"weapon": "長劍", "guard": "盾牌",
 		"scene": ["戰場邊緣的焦土上，烏鴉在遠處的屍堆上盤旋。", "下著細雨的石橋上，雨水順著橋面往下流。"],
 		"start": ["一個穿著破舊鐵甲的騎士舉起盾牌，一言不發地朝你走來。頭盔的縫隙後面，看不見他的眼睛。"],
@@ -155,7 +169,7 @@ const ENEMIES := {
 	"bear": {
 		"name": "熊",
 		"blurb": "比人還高的大熊，皮又厚又硬。被牠抱住就麻煩了。",
-		"hp": 170, "atk": 28, "armor": "light", "traits": ["beast", "big"], "pron": "牠", "level": 19,
+		"hp": 220, "str": 17, "agi": 9, "armor": "light", "traits": ["beast", "big"], "pron": "牠",
 		"weapon": "熊掌", "guard": "架勢",
 		"scene": ["山洞口的空地，地上散落著動物的骨頭，空氣裡一股腥臭味。", "溪邊的碎石灘，水聲嘩嘩，地上還有被撕碎的魚。"],
 		"start": ["一頭大熊從洞裡鑽了出來，嗅了嗅空氣，轉頭看向你，喉嚨裡發出低沉的呼嚕聲。"],
@@ -202,7 +216,7 @@ const ENEMIES := {
 	"ogre": {
 		"name": "食人魔",
 		"blurb": "兩個人高的怪物，拖著一根大木棍。力氣大得能把人抓起來摔。",
-		"hp": 300, "atk": 38, "armor": "none", "traits": ["big"], "pron": "牠", "level": 23,
+		"hp": 440, "str": 23, "agi": 8, "armor": "none", "traits": ["big"], "pron": "牠",
 		"weapon": "木棍", "guard": "架勢",
 		"scene": ["倒塌的城牆下，到處都是被砸爛的木箱和碎石。", "暴雨中的沼澤邊，泥水沒過了你的腳踝。"],
 		"start": ["地面一陣震動。食人魔拖著一根大木棍從遠處走來，咧開滿是爛牙的嘴，好像看到了晚餐。"],
@@ -236,10 +250,11 @@ const ENEMIES := {
 	},
 
 	# 北境劍術的師傅：第 2 階的考驗「接住我三招」用。不在委託板上
+	# 數值剛好是第二境入門：閃避、防禦都要比數值，差太多就撐不過
 	"master": {
 		"name": "師傅",
 		"blurb": "",
-		"hp": 999, "atk": 48, "armor": "light", "traits": [], "pron": "他", "level": 0, "hide_hp": true,
+		"hp": 999, "str": 15, "agi": 15, "armor": "light", "traits": [], "pron": "他", "hide_hp": true, "realm": 1,
 		"weapon": "木劍", "guard": "架勢",
 		"scene": ["道場的木地板擦得發亮，牆上掛著一排木劍。窗外下著雪。"],
 		"start": ["師傅丟給你一把木劍，自己也拿起一把，隨手挽了個劍花：「三招。接住了，第 2 階就教你。」"],
@@ -268,3 +283,18 @@ const ENEMIES := {
 		"flee_text": "你舉手認輸。師傅收起木劍：「想清楚了再來。」",
 	},
 }
+
+
+## 對手這招靠哪一項數值
+static func action_stat(action: Dictionary, type: String) -> String:
+	return action.get("stat", TYPE_STAT.get(type, "str"))
+
+
+## 危險度：跟境界對齊。{"realm", "text", "color"}。用比較高的那項算
+static func danger(id: String) -> Dictionary:
+	var d: Dictionary = ENEMIES[id]
+	var value: int = maxi(d["str"], d["agi"])
+	var realm: int = d.get("realm", GrowthData.realm_of_value(value))
+	return {"realm": realm, "color": GrowthData.REALM_COLORS[realm],
+		"stars": "★".repeat(realm + 1), "stage": GrowthData.STAGES[GrowthData.stage(realm, value)],
+		"text": GrowthData.realm_text(realm, value)}

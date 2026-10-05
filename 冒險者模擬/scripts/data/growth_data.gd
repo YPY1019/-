@@ -1,49 +1,88 @@
 class_name GrowthData
 extends RefCounted
 
-## 基礎數值（身體）的數字。只有資料和換算，沒有規則。
+## 基礎數值（身體）和境界的數字。只有資料和換算，沒有規則。
 ##
-## 力量 str：攻擊、裂盾斬、逆流斬、脫鎖、三連斬
+## 力量 str：攻擊、防禦、裂盾斬、逆流斬、脫鎖、三連斬、怒喝、掙扎
 ## 敏捷 agi：閃避、迎擊、低身斬、奪刃、穿隙刺、擲沙
-## 體魄 con：血量；防禦、怒喝；挨打也會練到
+##
+## 戰鬥：同一項跟同一項比。你用力量的招，比雙方的力量；對手用力量的招打你，也比雙方的力量。
+##   差距 = 出手的人 − 被打的人。
+##   差距到 -FAIL_GAP 以下，招一定失敗（掙不開、擋不住、閃不掉、破不了防）。
+##   差距也改變傷害：每差 1 點約 10%。
 ##
 ## 怎麼長：冒險打怪。用了哪個數值的招，就練到哪個數值。
-##   練到多少看對手的「強度」(EnemyData 的 level) 比你的數值高多少：比你弱的對手練不到你。
+##   練多少看對手「那一項」比你高多少：比你低 GROW_OFFSET 點以上的對手練不到你。
 ##   數值到了瓶頸就不長，要衝破瓶頸才能再長：
-##     第一次打贏強度高過瓶頸的對手，或找師傅特訓。
+##     卡在瓶頸時，第一次打贏比瓶頸強的對手，或找師傅特訓。
+##
+## 境界：衝破一次瓶頸就升一境。血量看境界。同一境再分前段、中段、後段（看數值）。
 
-const STATS := ["str", "agi", "con"]
-const NAMES := {"str": "力量", "agi": "敏捷", "con": "體魄"}
+const STATS := ["str", "agi"]
+const NAMES := {"str": "力量", "agi": "敏捷"}
 const START := 10
-## 瓶頸，一層一層往上
-const CAPS := [15, 20, 25]
 
+# ---- 境界 ----
+## 第 i 境的瓶頸（數值最多練到這裡）
+const CAPS := [15, 20, 25]
+## 第 i 境從哪裡算起（算前中後段用）
+const REALM_FLOOR := [10, 15, 20]
+const REALM_NAMES := ["第一境", "第二境", "第三境"]
+## 參考品級顏色：越高越亮眼
+const REALM_COLORS := ["#c9ccd1", "#6fcf7a", "#6fa8ff"]
+const STAGES := ["前段", "中段", "後段"]
+## 第 i 境的血量
+const REALM_HP := [100, 150, 220]
+
+# ---- 戰鬥時的比較 ----
+## 招式打出去、對手打過來的基本傷害（再乘招式倍率、差距倍率）
+const BASE_DAMAGE := 18.0
+## 比對手低這麼多（含）就一定失敗
+const FAIL_GAP := 3
+## 每差 1 點，傷害差幾 %
+const DAMAGE_PER_POINT := 0.1
+const DAMAGE_MULT_MIN := 0.3
+const DAMAGE_MULT_MAX := 1.4
+
+# ---- 成長 ----
 ## 長 1 點要多少經驗
 const EXP_PER_POINT := 100.0
-## 每用一次招給的經驗（再乘上強度差）
+## 每用一次招給的經驗（再乘上成長倍率）
 const EXP_PER_USE := 15.0
-## 對手強度比你的數值高 GAP_DIV 點時，強度差 = 1 倍
-const GAP_DIV := 3.0
-const GAP_MAX := 1.5
+## 對手那一項比你低 GROW_OFFSET 點時練不到；跟你一樣時 = 1 倍
+const GROW_OFFSET := 3.0
+const GROW_MAX := 1.5
 ## 打輸、撤退只學得到一點（不然故意去送死反而練最快）
 const OUTCOME_MULT := {"win": 1.0, "lose": 0.25, "flee": 0.25}
-## 每掉 10% 血量，算體魄用了一次
-const HURT_PER_USE := 0.1
-
-## 數值每 1 點，招式多痛幾 %（數值 10 = 原本的威力）
-const POWER_PER_POINT := 0.06
-const HP_BASE := 60
-const HP_PER_CON := 4
 
 
-static func power(value: int) -> float:
-	return 10.0 * (1.0 + (value - START) * POWER_PER_POINT)
+## 差距 → 傷害倍率
+static func damage_mult(gap: int) -> float:
+	return clampf(1.0 + gap * DAMAGE_PER_POINT, DAMAGE_MULT_MIN, DAMAGE_MULT_MAX)
 
 
-static func max_hp(con: int) -> int:
-	return HP_BASE + con * HP_PER_CON
+static func fails(gap: int) -> bool:
+	return gap <= -FAIL_GAP
 
 
-## 對手強度比你的數值高多少，換成經驗的倍數
-static func gap_mult(enemy_level: int, value: int) -> float:
-	return clampf((enemy_level - value) / GAP_DIV, 0.0, GAP_MAX)
+## 對手那一項 vs 你那一項 → 經驗倍率
+static func grow_mult(enemy_value: int, value: int) -> float:
+	return clampf((enemy_value - value + GROW_OFFSET) / GROW_OFFSET, 0.0, GROW_MAX)
+
+
+## 數值落在第幾境（怪物的危險度用）
+static func realm_of_value(value: int) -> int:
+	for i in CAPS.size():
+		if value <= CAPS[i]:
+			return i
+	return CAPS.size() - 1
+
+
+## 在這一境的前段 0、中段 1、後段 2
+static func stage(realm: int, value: int) -> int:
+	var span: int = CAPS[realm] - REALM_FLOOR[realm]
+	return clampi(int(float(value - REALM_FLOOR[realm]) * 3.0 / span), 0, 2)
+
+
+static func realm_text(realm: int, value: int) -> String:
+	return "%s%s" % [REALM_NAMES[realm], STAGES[stage(realm, value)]]

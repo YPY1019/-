@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## 平衡模擬（開發用，不是遊戲的一部分）。
-## 不同的數值和招式組合，每種敵人打很多場（滿血開打），看勝率。
+## 不同的數值、境界和招式組合，每種敵人打很多場（滿血開打），看勝率。
 ## 電腦玩家見 bot.gd。
 ## 執行：Godot.exe --headless --path . --script res://tests/sim.gd
 
@@ -11,19 +11,24 @@ const N := 300
 const T1 := ["parry", "sweep_kick", "heavy"]
 const T2 := ["redirect", "disarm", "break_free"]
 const T3 := ["vital", "combo"]
+const WILD := ["sand", "shout"]
 
 
 func _init() -> void:
+	# 名字、力量、敏捷、境界（0 起算）、會的招
 	var setups := [
-		["數值10 什麼都不會", 10, []],
-		["數值10 第1階", 10, T1],
-		["數值13 什麼都不會", 13, []],
-		["數值13 第1階", 13, T1],
-		["數值15 第1階", 15, T1],
-		["數值15 第1+2階", 15, T1 + T2],
-		["數值18 第1+2階", 18, T1 + T2],
-		["數值18 全部", 18, T1 + T2 + T3 + ["sand", "shout"]],
-		["數值20 全部", 20, T1 + T2 + T3 + ["sand", "shout"]],
+		["10/10 什麼都不會", 10, 10, 0, []],
+		["10/10 第1階", 10, 10, 0, T1],
+		["13/13 第1階", 13, 13, 0, T1],
+		["15/15 第1階", 15, 15, 0, T1],
+		["15/15 第1+2階", 15, 15, 0, T1 + T2],
+		["15/15 二境 1+2", 15, 15, 1, T1 + T2],
+		["18/15 二境 1+2", 18, 15, 1, T1 + T2],
+		["20/15 二境 全部", 20, 15, 1, T1 + T2 + T3 + WILD],
+		["20/15 三境 全部", 20, 15, 2, T1 + T2 + T3 + WILD],
+		["21/15 三境 全部", 21, 15, 2, T1 + T2 + T3 + WILD],
+		["23/15 三境 全部", 23, 15, 2, T1 + T2 + T3 + WILD],
+		["15/20 二境 全部", 15, 20, 1, T1 + T2 + T3 + WILD],
 	]
 	for s in setups:
 		var line := "%-14s" % s[0]
@@ -33,7 +38,7 @@ func _init() -> void:
 			var rounds := 0
 			var bot := Bot.new()
 			for i in N:
-				var b := _battle(s[1], s[2], id, i)
+				var b := _battle(s[1], s[2], s[3], s[4], id, i)
 				var r := bot.play(b)
 				rounds += r["rounds"]
 				if r["outcome"] in ["win", "survive"]:
@@ -45,10 +50,10 @@ func _init() -> void:
 	quit()
 
 
-func _battle(stat: int, moves: Array, enemy_id: String, rng_seed: int) -> Battle:
+func _battle(str_v: int, agi_v: int, realm: int, moves: Array, enemy_id: String, rng_seed: int) -> Battle:
 	var hero := Adventurer.new()
-	for k in hero.stats:
-		hero.stats[k] = stat
+	hero.stats = {"str": str_v, "agi": agi_v}
+	hero.realm = realm
 	for m in moves:
 		hero.learn(m)
 	var me := hero.to_combatant(true)

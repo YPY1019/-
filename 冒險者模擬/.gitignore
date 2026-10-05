@@ -1,3 +1,6 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# 試玩紀錄檔（每次玩一個檔案）
+試玩紀錄/

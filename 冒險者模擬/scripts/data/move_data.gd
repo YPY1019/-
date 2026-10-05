@@ -16,7 +16,9 @@ extends RefCounted
 ##   good  true = 這招剋這種類型。比較容易出現在選項裡（高手見招拆招）
 ## vs_big：對體型大的對手用的版本。
 ## self：用完之後自己的狀態（off_balance：下回合不能閃避、選項少一個）。
-## stat：這招靠哪個基礎數值（str 力量、agi 敏捷、con 體魄）。決定打多痛，用了也會練到這個數值。
+## stat：這招靠哪個基礎數值（str 力量、agi 敏捷）。跟對手的同一項比，決定成不成功、打多痛；用了也會練到這個數值。
+## fail：數值比對手低太多（見 GrowthData.FAIL_GAP）時的結果。招有效果（掃倒、破防、掙脫…）或能少挨打時才會失敗。
+##   沒寫 take 的話，對手出手就照樣挨打。
 ## text 每次隨機挑一句。{name} 對手、{pron} 他／牠、{weapon} 對手的武器、{guard} 對手的防具。
 
 ## 人人都會的一般招。跟學來的招放在同一個池子裡，不是永遠都在
@@ -41,6 +43,7 @@ const MOVES := {
 	# ---------- 一般招（不用學） ----------
 	"attack": {
 		"name": "攻擊", "stat": "str", "desc": "普通的一劍，出手快。對方橫掃或直刺時搶先砍到，對方的攻擊會被打歪一點。對方防守時砍不進去。",
+		"fail": {"deal": 1.0, "take": 1.0, "hit": true, "text": ["你想搶先出劍，可是{name}比你有力得多，{pron}的攻擊硬是壓了過來。"]},
 		"default": {"deal": 1.0, "take": 1.0, "hit": true, "text": [
 			"你不躲不閃，迎上去一劍砍向{name}。",
 			"你踏前一步，一劍劈向{name}的肩膀，同時也把自己送進了對方的攻擊裡。",
@@ -74,7 +77,8 @@ const MOVES := {
 		},
 	},
 	"defend": {
-		"name": "防禦", "stat": "con", "desc": "用劍擋住攻擊，會受一點傷，擋住後能順手回砍。擋不住擒抱、撒沙和吼聲。",
+		"name": "防禦", "stat": "str", "desc": "用劍擋住攻擊，會受一點傷，擋住後能順手回砍。擋不住擒抱、撒沙和吼聲。",
+		"fail": {"take": 1.0, "hit": true, "text": ["你舉劍硬擋，可是{name}的力氣比你大太多，連人帶劍被打了回來。", "你架劍去擋，劍被硬生生壓回你自己身上。"]},
 		"default": {"text": [
 			"你擺好架勢等著，{name}卻沒有出手，你們隔著幾步互相瞪視。",
 			"你舉劍護住身前，劍尖微微發抖，什麼也沒擋到。",
@@ -99,6 +103,7 @@ const MOVES := {
 	},
 	"dodge": {
 		"name": "閃避", "stat": "agi", "desc": "躲開攻擊，不會受傷。但躲完腳步亂了：下回合不能再閃避，選項也少一個。躲不掉吼聲。",
+		"fail": {"take": 1.0, "hit": true, "text": ["你想閃開，可是{name}比你快太多，攻擊還是追上了你。", "你才剛要側身，{name}已經到了眼前。"]},
 		"self": "off_balance",
 		"default": {"take": 0.0, "text": [
 			"你往後一跳，險險躲開了{name}，落地時腳下一滑。",
@@ -125,14 +130,18 @@ const MOVES := {
 		"vs": {},
 	},
 	"struggle": {
-		"name": "掙扎", "stat": "str", "desc": "被抱住時拼命掙扎，有一半機會掙脫。",
-		"default": {"take": 1.0, "hit": true, "text": ["你拼命掙扎。"]},
+		"name": "掙扎", "stat": "str", "desc": "被抱住時拼命掙扎。力氣要不輸對方才掙得開。",
+		"fail": {"take": 1.0, "hit": true, "text": ["你掙扎了半天，可是{name}的力氣比你大，還是被死死勒住。"]},
+		# 力氣要不輸對方（差距 > -fail_gap）才掙得開
+		"fail_gap": 1,
+		"default": {"take": 0.0, "effect": "escape", "text": ["你拼命一扭，掙脫了出來！", "你咬牙一掙，終於從{name}手裡脫身。"]},
 		"vs": {},
 	},
 
 	# ---------- 要學的招 ----------
 	"sweep_kick": {
 		"name": "低身斬", "stat": "agi", "desc": "對付橫掃：蹲低從底下鑽過，順勢斬對方的腳，把人斬倒。體型大的斬不倒。",
+		"fail": {"deal": 0.3, "take": 1.0, "hit": true, "text": ["你壓低身子斬向{name}的腳，可是{pron}動作比你快得多，腳一抬就讓開了，你自己反倒吃了一記。"]},
 		"default": {"deal": 0.5, "take": 1.0, "hit": true, "text": [
 			"你壓低身子一劍斬向{name}的腳，可是對方根本不是橫掃過來的，你整個人暴露在攻擊底下。",
 		]},
@@ -154,6 +163,7 @@ const MOVES := {
 	},
 	"parry": {
 		"name": "迎擊", "stat": "agi", "desc": "對付直刺和撲咬：把攻擊撥開，同時刺回去。還是會被擦到一下。",
+		"fail": {"take": 1.0, "hit": true, "text": ["你想撥開{weapon}，可是{name}快得你看不清，劍還沒碰到，攻擊已經到了。"]},
 		"default": {"text": ["你擺好撥擋的架勢，{name}卻沒有衝過來，你的劍撥了個空。"]},
 		"vs": {
 			"thrust": {"deal": 1.2, "take": 0.3, "good": true, "text": [
@@ -169,6 +179,7 @@ const MOVES := {
 	},
 	"redirect": {
 		"name": "逆流斬", "stat": "str", "desc": "對付重砸：順著力道把攻擊引開，讓對方收勢不住、往前踉蹌。",
+		"fail": {"take": 1.0, "hit": true, "text": ["你想順勢把{weapon}引開，可是那股力道大得你根本帶不動。"]},
 		"default": {"text": ["你擺出卸力的架勢，雙手虛握著劍，{name}卻沒有砸下來。"]},
 		"vs": {
 			"smash": {"take": 0.2, "effect": "stagger", "good": true, "text": [
@@ -183,10 +194,11 @@ const MOVES := {
 		},
 	},
 	"heavy": {
-		"name": "裂盾斬", "stat": "str", "desc": "雙手全力一擊，盔甲盾牌都擋不住，能打破防守、打斷蓄勢（體型大的打不斷）。出手時破綻大，這回合被打會更痛；用完收招慢，下回合不能閃避、選項少一個。",
+		"name": "裂盾斬", "stat": "str", "desc": "雙手全力一擊，盔甲盾牌都擋不住。對方防守、蓄勢、露出破綻時才是大招：能打破防守、打斷蓄勢（力氣要夠，體型大的打不斷）。對方正在出手時用，威力只跟普通攻擊差不多，挨打還更痛。用完收招慢，下回合不能閃避、選項少一個。",
+		"fail": {"deal": 1.0, "text": ["你全力一劍劈下，{name}卻硬生生扛住了，紋風不動。", "你雙手一劍劈下去，{name}的力氣比你大，連晃都沒晃。"]},
 		"self": "off_balance",
 		"pierce": true,
-		"default": {"deal": 1.4, "take": 1.5, "hit": true, "text": [
+		"default": {"deal": 1.0, "take": 1.5, "hit": true, "text": [
 			"你雙手舉劍，把全身的力氣都壓了上去，一劍重重劈向{name}——同時也把自己的胸口完全敞開。",
 			"你大喝一聲，一劍劈下，劍鋒深深砍進{name}的身體，可是對方的攻擊也結結實實落在你身上。",
 		]},
@@ -208,6 +220,7 @@ const MOVES := {
 	},
 	"vital": {
 		"name": "穿隙刺", "stat": "agi", "desc": "刺向要害或盔甲縫隙，盔甲擋不住。對方露出破綻、蓄勢、或抱住你時威力最大。",
+		"fail": {"deal": 0.5, "take": 1.0, "hit": true, "text": ["你刺向{name}的要害，可是{pron}一扭身就讓開了，劍尖只劃破了點皮。"]},
 		"pierce": true,
 		"default": {"deal": 0.7, "take": 1.0, "hit": true, "text": [
 			"你刺向{name}的要害，可是對方一直在動，劍尖只刺到邊，反而讓自己吃了一記。",
@@ -231,6 +244,7 @@ const MOVES := {
 	},
 	"disarm": {
 		"name": "奪刃", "stat": "agi", "desc": "對付拿武器的對手：在對方揮過來的瞬間把武器打飛。對野獸沒用，太重的武器也絞不動。",
+		"fail": {"take": 1.0, "hit": true, "text": ["你想絞掉{name}的{weapon}，可是{pron}的手比你快，你的劍撲了個空。"]},
 		"default": {"text": ["你盯著{weapon}準備出手，可是{name}沒有揮過來。"]},
 		"vs": {
 			"sweep": {"take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": [
@@ -247,6 +261,7 @@ const MOVES := {
 	},
 	"break_free": {
 		"name": "脫鎖", "stat": "str", "desc": "對付擒抱：在被抱住前鑽出去，或被抱住時掙開，順手回一劍。",
+		"fail": {"take": 1.0, "hit": true, "text": ["你想掙脫，可是{name}的力氣比你大太多，根本動不了。"]},
 		"default": {"take": 1.0, "hit": true, "text": ["你擺出掙脫的架勢，可是{name}根本沒有要抓你。"]},
 		"vs": {
 			"grab": {"deal": 0.5, "take": 0.0, "good": true, "text": [
@@ -263,6 +278,7 @@ const MOVES := {
 	},
 	"sand": {
 		"name": "擲沙", "stat": "agi", "desc": "抓一把沙撒向對方的眼睛。對方下一次攻擊很可能打偏。這回合自己不會躲。",
+		"fail": {"text": ["你抓起一把沙撒過去，{name}一偏頭就躲開了。"]},
 		"default": {"effect": "blind", "take": 1.0, "hit": true, "text": [
 			"你彎腰抓起一把沙土，往{name}臉上狠狠撒去！可是你也沒空躲對方的攻擊。",
 		]},
@@ -273,7 +289,8 @@ const MOVES := {
 		},
 	},
 	"shout": {
-		"name": "怒喝", "stat": "con", "desc": "對野獸大喝一聲，把牠嚇得退縮。也能壓過對方的吼聲。對人沒什麼用。",
+		"name": "怒喝", "stat": "str", "desc": "對野獸大喝一聲，把牠嚇得退縮。也能壓過對方的吼聲。對人沒什麼用。",
+		"fail": {"text": ["你大喝一聲，可是{name}比你壯得多，根本不怕你。"]},
 		"default": {"take": 1.0, "hit": true, "effect": "scare", "requires": "beast", "text": [
 			"你張開雙臂，用盡全身力氣大喝一聲！{name}嚇得一縮。",
 		], "else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}冷笑一聲，根本不吃這一套。"]}},

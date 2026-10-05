@@ -26,6 +26,7 @@ var battle: Battle
 var hero_c: Combatant
 var foe_c: Combatant
 
+var hero_name_label: Label
 var hero_bar: ProgressBar
 var hero_hp_label: Label
 var hero_status: Label
@@ -47,6 +48,7 @@ func _init() -> void:
 	var top := UiKit.hbox(40)
 	add_child(top)
 	var hero_col := _hp_column("你", Color("#5fbf6a"))
+	hero_name_label = hero_col["name"]
 	hero_bar = hero_col["bar"]
 	hero_hp_label = hero_col["hp"]
 	hero_status = hero_col["status"]
@@ -94,7 +96,16 @@ func begin(p_battle: Battle, note := "") -> void:
 	hero_c = battle.allies[0]
 	foe_c = battle.enemies[0]
 	log_label.clear()
-	foe_name_label.text = foe_c.display_name
+	# 人標境界，怪物標危險度，都用境界的顏色
+	var a := hero_c.adventurer
+	hero_name_label.text = "你　%s" % a.realm_text()
+	hero_name_label.add_theme_color_override("font_color", Color(a.realm_color()))
+	var dg := EnemyData.danger(foe_c.enemy_id)
+	if foe_c.enemy_def.has("realm"):
+		foe_name_label.text = "%s　%s" % [foe_c.display_name, dg["text"]]
+	else:
+		foe_name_label.text = "%s　%s %s" % [foe_c.display_name, dg["stars"], dg["stage"]]
+	foe_name_label.add_theme_color_override("font_color", Color(dg["color"]))
 	var hide: bool = foe_c.enemy_def.get("hide_hp", false)
 	foe_bar.visible = not hide
 	foe_hp_label.visible = not hide
@@ -137,7 +148,7 @@ func _append(events: Array) -> void:
 				_flush(para, damage)
 				log_label.append_text("\n[b][font_size=26]%s[/font_size][/b]\n" % text)
 			"damage_in", "damage_out":
-				damage.append("[color=%s]%s −%d[/color]" % [COLOR[e["kind"]], text, e["amount"]])
+				damage.append("[color=%s]%s −%d[/color][color=%s]（%s）[/color]" % [COLOR[e["kind"]], text, e["amount"], COLOR["round"], e["note"]])
 			"action":
 				para.append(text)
 			_:
@@ -223,7 +234,11 @@ func _condition(c: Combatant, is_hero: bool) -> String:
 
 func _show_hint(id: String) -> void:
 	var m: Dictionary = MoveData.MOVES[id]
-	hint_label.text = "%s：%s" % [m["name"], m["desc"]]
+	if m.has("stat"):
+		var s: String = m["stat"]
+		hint_label.text = "%s（靠%s：你 %d，對手 %d）：%s" % [m["name"], GrowthData.NAMES[s], hero_c.stats[s], foe_c.stats[s], m["desc"]]
+	else:
+		hint_label.text = "%s：%s" % [m["name"], m["desc"]]
 
 
 func _hp_column(name_text: String, fill_color: Color) -> Dictionary:

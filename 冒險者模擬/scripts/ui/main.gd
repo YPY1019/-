@@ -4,6 +4,7 @@ extends Control
 ## 這裡只負責切換畫面；城鎮規則在 Town，戰鬥規則在 Battle。
 
 var town := Town.new()
+var play_log := PlayLog.new()
 var town_view: TownView
 var battle_view: BattleView
 var battle: Battle
@@ -28,6 +29,7 @@ func _ready() -> void:
 	town_view = TownView.new(town)
 	town_view.commission_requested.connect(_start_commission)
 	town_view.spar_requested.connect(_start_spar)
+	town_view.messages_added.connect(_on_town_messages)
 	margin.add_child(town_view)
 	battle_view = BattleView.new()
 	battle_view.ended.connect(_on_battle_ended)
@@ -53,12 +55,14 @@ func _make_theme() -> Theme:
 func _start_commission(enemy_id: String) -> void:
 	fight_kind = "commission"
 	battle = town.start_commission(enemy_id)
+	play_log.battle_start("委託：%s" % EnemyData.ENEMIES[enemy_id]["name"], battle)
 	_show_battle("")
 
 
 func _start_spar() -> void:
 	fight_kind = "spar"
 	battle = town.start_spar()
+	play_log.battle_start("師傅的考驗：接住我三招", battle)
 	var me: Combatant = battle.allies[0]
 	_show_battle("（木劍過招：撐過 %d 回合就通過。血量掉到 %d 就算輸。）" % [SchoolData.SPAR_ROUNDS, me.yield_hp])
 
@@ -70,6 +74,7 @@ func _show_battle(note: String) -> void:
 
 
 func _on_battle_ended() -> void:
+	play_log.battle_end(battle)
 	_settled = town.finish_commission(battle) if fight_kind == "commission" else town.finish_spar(battle)
 	battle_view.show_settlement(_settled)
 
@@ -80,3 +85,14 @@ func _back_to_town() -> void:
 	town_view.add_messages(_settled)
 	_settled = []
 	town_view.refresh()
+
+
+func _on_town_messages(msgs: Array) -> void:
+	play_log.messages(msgs)
+	play_log.status(town.hero)
+
+
+## 打到一半關掉遊戲，也把這場寫進試玩紀錄
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and battle != null and not battle.is_over() and battle_view.visible:
+		play_log.battle_end(battle)

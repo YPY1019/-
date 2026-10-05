@@ -43,6 +43,7 @@ func _career(run: int, verbose: bool) -> Dictionary:
 	var rounds := 0
 	var town_actions := 0
 	var lost_at := {}  # enemy -> 在目前實力下輸了幾次
+	var spar_tries := 0
 	var when := {}
 	var power := _power_sig(h)
 	var rng := RandomNumberGenerator.new()
@@ -52,6 +53,7 @@ func _career(run: int, verbose: bool) -> Dictionary:
 		if sig != power:
 			power = sig
 			lost_at.clear()
+			spar_tries = 0
 		# 休養
 		if h.hp < h.max_hp() * 0.6:
 			town.rest(town.days_to_full())
@@ -69,7 +71,8 @@ func _career(run: int, verbose: bool) -> Dictionary:
 		if learned_any:
 			continue
 		# 考驗
-		if town.spar_state()["ok"] and h.learned.size() >= 2:
+		if town.spar_state()["ok"] and h.learned.size() >= 2 and mini(h.stats["str"], h.stats["agi"]) >= 13 and spar_tries < 3:
+			spar_tries += 1
 			var b := town.start_spar()
 			b.rng.seed = rng.randi()
 			rounds += bot.play(b)["rounds"]
@@ -80,9 +83,9 @@ func _career(run: int, verbose: bool) -> Dictionary:
 			continue
 		# 卡瓶頸就特訓
 		var tr := town.train_state()
-		if tr["available"] and tr["ok"] and h.at_cap("str") and h.at_cap("agi"):
+		if tr["available"] and tr["ok"]:
 			town.train()
-			when["特訓到瓶頸%d" % h.cap()] = fights
+			when["特訓升到" + GrowthData.REALM_NAMES[h.realm]] = fights
 			town_actions += 1
 			continue
 		# 挑委託
@@ -94,7 +97,7 @@ func _career(run: int, verbose: bool) -> Dictionary:
 		var target: String = EnemyData.ORDER[mini(best + 1, EnemyData.ORDER.size() - 1)]
 		if lost_at.get(target, 0) >= 2:
 			target = EnemyData.ORDER[maxi(best, 0)]
-		var cap_before := h.cap()
+		var realm_before := h.realm
 		var b := town.start_commission(target)
 		b.rng.seed = rng.randi()
 		var r := bot.play(b)
@@ -106,19 +109,19 @@ func _career(run: int, verbose: bool) -> Dictionary:
 			lost_at[target] = lost_at.get(target, 0) + 1
 		elif not when.has("打贏" + EnemyData.ENEMIES[target]["name"]):
 			when["打贏" + EnemyData.ENEMIES[target]["name"]] = fights
-		if h.cap() > cap_before:
-			when["打贏強敵衝破瓶頸"] = fights
+		if h.realm > realm_before:
+			when["打贏強敵升到" + GrowthData.REALM_NAMES[h.realm]] = fights
 		for k in h.steal_hits:
 			if h.knows(k) and not when.has("偷學" + MoveData.MOVES[k]["name"]):
 				when["偷學" + MoveData.MOVES[k]["name"]] = fights
 		if verbose:
-			print("第%3d天 %-4s %-4s 血%3d/%3d 錢%4d 力%d 敏%d 體%d 瓶頸%d 招%d" % [
+			print("第%3d天 %-4s %-4s 血%3d/%3d 錢%4d 力%d 敏%d %s 招%d" % [
 				h.day, EnemyData.ENEMIES[target]["name"], r["outcome"], h.hp, h.max_hp(), h.money,
-				h.stats["str"], h.stats["agi"], h.stats["con"], h.cap(), h.learned.size()])
+				h.stats["str"], h.stats["agi"], h.realm_text(), h.learned.size()])
 	var minutes := (rounds * SEC_PER_ROUND + (fights + town_actions) * SEC_PER_TOWN) / 60
 	return {"cleared": h.cleared, "days": h.day, "fights": fights, "losses": losses, "minutes": minutes, "when": when}
 
 
 func _power_sig(h: Adventurer) -> String:
-	var total: int = h.stats["str"] + h.stats["agi"] + h.stats["con"]
-	return "%d %d %d %d" % [total / 3, h.learned.size(), h.cap_tier, h.approved_tier]
+	var total: int = h.stats["str"] + h.stats["agi"]
+	return "%d %d %d %d" % [total / 2, h.learned.size(), h.realm, h.approved_tier]

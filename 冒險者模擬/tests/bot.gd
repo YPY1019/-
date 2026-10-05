@@ -13,17 +13,17 @@ func play(b: Battle) -> Dictionary:
 	var foe: Combatant = b.enemies[0]
 	b.start()
 	while not b.is_over() and b.round_no < 60:
-		b.play_round({me: {"move": pick(me, foe), "target": foe}})
+		b.play_round({me: {"move": pick(b, me, foe), "target": foe}})
 	return b.result()
 
 
-func pick(me: Combatant, foe: Combatant) -> String:
+func pick(b: Battle, me: Combatant, foe: Combatant) -> String:
 	for id in me.hand:
 		offered[id] = offered.get(id, 0) + 1
 	var best := me.hand[0]
 	var best_score := -INF
 	for id in me.hand:
-		var score := value(me, foe, id)
+		var score := value(b, me, foe, id)
 		if score > best_score:
 			best_score = score
 			best = id
@@ -31,24 +31,24 @@ func pick(me: Combatant, foe: Combatant) -> String:
 	return best
 
 
-func value(me: Combatant, foe: Combatant, id: String) -> float:
+func value(b: Battle, me: Combatant, foe: Combatant, id: String) -> float:
 	var it: Dictionary = foe.intent
-	if id == "struggle":
-		return 0.5 * 15.0 - 0.5 * foe.atk * 0.7
-	var e := MoveData.entry(id, it["type"], foe.traits)
+	var e := b.resolve(me, id, foe)
 	var m: Dictionary = MoveData.MOVES[id]
-	var deal: float = e.get("deal", 0.0) * me.power_of(id)
+	var deal := b.damage_out(me, id, foe, e.get("deal", 0.0))
 	if not m.get("pierce", false):
 		deal *= EnemyData.ARMOR_MULT[foe.armor]
-	var power := 0.0
+	# 對手這回合打過來多痛
+	var hit := 0.0
 	var on_hit := ""
 	if it["phase"] == "hold":
-		power = foe.action_def(foe.holding)["hold"]["power"]
+		hit = b.damage_in(foe, me, foe.action_def(foe.holding)["hold"]["power"], "str")
 	elif it["phase"] in ["do", "strike"] and it["action"] != "":
 		var a := foe.action_def(it["action"])
-		power = a.get("power", 0.0)
+		hit = b.damage_in(foe, me, a.get("power", 0.0), EnemyData.action_stat(a, a["type"]))
 		on_hit = a.get("on_hit", "")
-	var take: float = e.get("take", 1.0 if power > 0.0 else 0.0)
+	var take: float = e.get("take", 1.0 if hit > 0.0 or on_hit != "" else 0.0)
+	var typical := b.damage_in(foe, me, 1.0, "str")
 	var bonus := 0.0
 	if take > 0.0:
 		match on_hit:
@@ -68,10 +68,10 @@ func value(me: Combatant, foe: Combatant, id: String) -> float:
 		"escape":
 			bonus += 15.0
 	if m.get("self", "") == "off_balance":
-		bonus -= 0.3 * foe.atk  # 下回合不能閃避、選項少一個
+		bonus -= 0.3 * typical  # 下回合不能閃避、選項少一個
 		if it["phase"] == "windup" and not (e.get("effect", "") == "interrupt"):
-			bonus -= 0.6 * foe.atk * foe.action_def(it["action"]).get("power", 1.0)  # 對方蓄勢的重招下回合打下來，躲不掉
-	return deal + bonus - take * foe.atk * power
+			bonus -= 0.6 * typical * foe.action_def(it["action"]).get("power", 1.0)  # 對方蓄勢的重招下回合打下來，躲不掉
+	return deal + bonus - take * hit
 
 
 func usage() -> String:

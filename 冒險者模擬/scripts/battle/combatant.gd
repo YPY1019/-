@@ -13,8 +13,8 @@ var max_hp := 1
 var hp := 1
 ## 血量掉到這裡（含）就算倒下。木劍過招時不是 0
 var yield_hp := 0
-## 敵人的攻擊力。玩家方看基礎數值，見 power_of()
-var atk := 0
+## 基礎數值 {"str", "agi"}。戰鬥時同一項跟同一項比
+var stats := {}
 var armor := "none"
 var traits: Array = []
 var weapon := ""
@@ -22,7 +22,8 @@ var guard_item := ""
 ## 他／牠
 var pron := "牠"
 
-## 敵人資料（敵人才有）
+## 敵人資料和 id（敵人才有）
+var enemy_id := ""
 var enemy_def := {}
 ## 冒險者本人（玩家方才有）
 var adventurer: Adventurer
@@ -66,25 +67,19 @@ static func from_enemy(id: String) -> Combatant:
 	c.side = Side.ENEMY
 	c.max_hp = d["hp"]
 	c.hp = d["hp"]
-	c.atk = d["atk"]
+	c.stats = {"str": d["str"], "agi": d["agi"]}
 	c.armor = d["armor"]
 	c.traits = d["traits"]
 	c.weapon = d["weapon"]
 	c.guard_item = d["guard"]
 	c.pron = d.get("pron", "牠")
 	c.enemy_def = d
+	c.enemy_id = id
 	return c
 
 
 func is_alive() -> bool:
 	return hp > yield_hp
-
-
-## 用這招打出去的攻擊力。玩家方看這招靠的基礎數值，敵人用 atk
-func power_of(move_id: String) -> float:
-	if adventurer == null:
-		return atk
-	return adventurer.power(MoveData.MOVES[move_id].get("stat", "str"))
 
 
 func action_def(id: String) -> Dictionary:

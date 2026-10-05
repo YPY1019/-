@@ -7,16 +7,14 @@ extends RefCounted
 
 var hero := Adventurer.new()
 
-## 正在打的委託和開打前的血量（結算用）
+## 正在打的委託（結算用）
 var _fight_enemy := ""
-var _hp_before := 0
 
 
 # ---------- 委託 ----------
 
 func start_commission(enemy_id: String) -> Battle:
 	_fight_enemy = enemy_id
-	_hp_before = hero.hp
 	return Battle.new([hero.to_combatant()], [Combatant.from_enemy(enemy_id)])
 
 
@@ -41,21 +39,20 @@ func finish_commission(battle: Battle) -> Array:
 	msgs.append_array(_pass_days(days))
 	if r["outcome"] == "win":
 		msgs.append_array(_after_win(id))
-	msgs.append_array(_grow(EnemyData.ENEMIES[id]["level"], r))
+	msgs.append_array(_grow(EnemyData.ENEMIES[id], r))
 	msgs.append_array(_steal(r["sig_hits"]))
 	return msgs
 
 
-## 打贏之後：第一次打贏強敵衝破瓶頸、師傅的考驗、通關
+## 打贏之後：卡在瓶頸時第一次打贏強敵就衝破瓶頸、師傅的考驗、通關
 func _after_win(id: String) -> Array:
 	var msgs := []
 	if not hero.beaten.has(id):
 		hero.beaten.append(id)
-		var level: int = EnemyData.ENEMIES[id]["level"]
-		if level > hero.cap() and hero.cap_tier < GrowthData.CAPS.size() - 1:
-			var old := hero.cap()
-			hero.cap_tier += 1
-			msgs.append(_m("big", "第一次打贏比自己強的對手。你覺得身體裡有什麼被打通了。（瓶頸 %d → %d）" % [old, hero.cap()]))
+		var e: Dictionary = EnemyData.ENEMIES[id]
+		var stronger: bool = maxi(e["str"], e["agi"]) > hero.cap()
+		if stronger and hero.stuck() and hero.can_break_through():
+			msgs.append(_break_through("第一次打贏比自己強的對手。你覺得身體裡有什麼被打通了。"))
 	msgs.append_array(_check_bear_exam())
 	if id == TownData.GOAL and not hero.cleared:
 		hero.cleared = true
@@ -72,15 +69,23 @@ func _check_bear_exam() -> Array:
 
 # ---------- 基礎數值成長 ----------
 
-## 用了哪個數值的招就練到哪個數值；挨打練體魄。練多少看對手比你強多少。
-func _grow(enemy_level: int, r: Dictionary) -> Array:
-	var uses := {"str": 0.0, "agi": 0.0, "con": 0.0}
+## 升一境。回傳訊息
+func _break_through(why: String) -> Dictionary:
+	var old_realm: String = GrowthData.REALM_NAMES[hero.realm]
+	var old_cap := hero.cap()
+	var old_hp := hero.max_hp()
+	hero.break_through()
+	return _m("big", "%s\n　%s → %s：瓶頸 %d → %d，血量上限 %d → %d。" % [
+		why, old_realm, GrowthData.REALM_NAMES[hero.realm], old_cap, hero.cap(), old_hp, hero.max_hp()])
+
+
+## 用了哪個數值的招就練到哪個數值。練多少看對手「那一項」比你高多少。
+func _grow(enemy: Dictionary, r: Dictionary) -> Array:
+	var uses := {"str": 0.0, "agi": 0.0}
 	for id in r["used"]:
 		var s: String = MoveData.MOVES[id].get("stat", "")
 		if s != "":
 			uses[s] += 1.0
-	var lost := maxf(0.0, _hp_before - r["hp"]) / hero.max_hp()
-	uses["con"] += lost / GrowthData.HURT_PER_USE
 	var mult: float = GrowthData.OUTCOME_MULT[r["outcome"]]
 
 	var msgs := []
@@ -91,11 +96,11 @@ func _grow(enemy_level: int, r: Dictionary) -> Array:
 		if hero.at_cap(s):
 			msgs.append(_m("info", "%s卡在瓶頸（%d），練不上去了。" % [stat_name, hero.cap()]))
 			continue
-		var gap := GrowthData.gap_mult(enemy_level, hero.stats[s])
-		if gap <= 0.0:
-			msgs.append(_m("info", "這種對手已經練不到你的%s了。" % stat_name))
+		var grow := GrowthData.grow_mult(enemy[s], hero.stats[s])
+		if grow <= 0.0:
+			msgs.append(_m("info", "%s的%s只有 %d，已經練不到你的%s了。" % [enemy["name"], stat_name, enemy[s], stat_name]))
 			continue
-		var gained := hero.add_exp(s, GrowthData.EXP_PER_USE * uses[s] * gap * mult)
+		var gained := hero.add_exp(s, GrowthData.EXP_PER_USE * uses[s] * grow * mult)
 		if gained > 0:
 			msgs.append(_m("good", "%s +%d（現在 %d）" % [stat_name, gained, hero.stats[s]]))
 			if hero.at_cap(s):
@@ -230,13 +235,15 @@ func finish_spar(battle: Battle) -> Array:
 
 ## 特訓過瓶頸：{"available", "ok", "why", "cost", "days", "next"}
 func train_state() -> Dictionary:
-	if hero.cap_tier >= SchoolData.TRAIN.size():
+	if hero.realm >= SchoolData.TRAIN.size():
 		return {"available": false}
-	var t: Dictionary = SchoolData.TRAIN[hero.cap_tier]
+	var t: Dictionary = SchoolData.TRAIN[hero.realm]
 	var st := {"available": true, "ok": false, "why": "", "cost": t["cost"], "days": t["days"],
-		"next": GrowthData.CAPS[hero.cap_tier + 1]}
+		"next": GrowthData.CAPS[hero.realm + 1]}
 	if not enrolled():
 		st["why"] = "先入門：學一招第 1 階的招"
+	elif not hero.stuck():
+		st["why"] = "還沒練到瓶頸"
 	elif hero.money < t["cost"]:
 		st["why"] = "錢不夠"
 	else:
@@ -248,10 +255,8 @@ func train() -> Array:
 	var st := train_state()
 	if not st.get("ok", false):
 		return []
-	var old := hero.cap()
 	hero.money -= st["cost"]
-	hero.cap_tier += 1
-	var msgs := [_m("big", "師傅帶著你苦練了 %d 天。你的瓶頸從 %d 提高到 %d。" % [st["days"], old, hero.cap()])]
+	var msgs := [_break_through("師傅帶著你苦練了 %d 天。" % st["days"])]
 	msgs.append_array(_pass_days(st["days"]))
 	return msgs
 
