@@ -1,22 +1,24 @@
 extends Control
 
-## 原型：城鎮 ⇄ 等的畫面 ⇄ 戰鬥，壽命用完（或打倒食人魔）時看這一生。
+## 原型：城鎮 ⇄ 戰鬥，壽命用完（或打倒食人魔）時看這一生。花時間的事在城鎮畫面裡演（年月往上跳）。
 ## 這裡只負責切換畫面；城鎮規則在 Town，戰鬥規則在 Battle。
 
 var town := Town.new()
 var play_log := PlayLog.new()
 var town_view: TownView
 var battle_view: BattleView
-var wait_view: WaitView
+## 等的時候擋住所有按鈕（透明，蓋在最上面）
+var blocker: Control
 var life_view: LifeView
 var battle: Battle
 ## 現在打的是 commission 委託 / spar 師傅的考驗
 var fight_kind := ""
 var _settled := []
-## 等的畫面演完要做的事
-var _after_wait := Callable()
+
 ## 打倒食人魔的那一生已經看過了
 var _clear_shown := false
+## 死去那一句停多久，才換到「這一生」
+const DEATH_PAUSE := 2.5
 
 
 func _ready() -> void:
@@ -44,13 +46,15 @@ func _ready() -> void:
 	battle_view.loot_taken.connect(_take_loot)
 	battle_view.equip_requested.connect(_equip)
 	margin.add_child(battle_view)
-	wait_view = WaitView.new()
-	wait_view.finished.connect(_on_wait_finished)
-	margin.add_child(wait_view)
 	life_view = LifeView.new()
 	life_view.restart_requested.connect(func(): get_tree().reload_current_scene())
 	life_view.continue_requested.connect(_show.bind(town_view))
 	margin.add_child(life_view)
+	blocker = Control.new()
+	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+	blocker.visible = false
+	add_child(blocker)
 
 	town_view.add_messages([
 		{"kind": "big", "text": "你 %d 歲，帶著一把舊鐵劍和 %d 銀來到北境的小城。城裡有冒險者公會的委託板、北境劍術的道場和一間武器店。" % [LifeData.START_AGE, town.hero.money]},
@@ -69,41 +73,39 @@ func _make_theme() -> Theme:
 	return t
 
 
-## 一次只顯示一個畫面
-func _show(view: Control) -> void:
-	for v in [town_view, battle_view, wait_view, life_view]:
+## 一次只顯示一個畫面。refresh = false：城鎮畫面先不更新（等的時候，跳完才更新）
+func _show(view: Control, refresh := true) -> void:
+	for v in [town_view, battle_view, life_view]:
 		v.visible = v == view
-	if view == town_view:
+	if view == town_view and refresh:
 		town_view.refresh()
 
 
-# ---------- 等的畫面 ----------
+# ---------- 等（花時間的事） ----------
 
-## w：Town.take_wait() 那一段。results：跳完才給的結果。after：演完之後
-func _wait(w: Dictionary, results: Array, after: Callable) -> void:
-	_after_wait = after
-	_show(wait_view)
-	wait_view.play(w, results)
-
-
-func _on_wait_finished() -> void:
-	if not _after_wait.is_valid():
-		return
-	var after := _after_wait
-	_after_wait = Callable()
-	after.call()
+## w：Town.take_wait() 那一段。在城鎮畫面裡跳年月，跳的時候按鈕按不了。after：跳完之後
+func _wait(w: Dictionary, after: Callable) -> void:
+	_show(town_view, false)
+	blocker.visible = true
+	town_view.play_wait(w, func():
+		blocker.visible = false
+		after.call())
 
 
-## 城裡花時間的事（學招、讀秘笈、休養）：演完才寫進紀錄
+## 城裡花時間的事（學招、讀秘笈、休養）：跳完才寫結果
 func _on_wait_requested(w: Dictionary, msgs: Array) -> void:
-	_wait(w, msgs, func():
+	_wait(w, func():
 		town_view.add_messages(msgs)
 		_to_town_or_end())
 
 
-## 回城。壽命用完了就看這一生
+## 回城。壽命用完了，停一下讓人看到最後那句，再看這一生
 func _to_town_or_end() -> void:
 	if town.hero.dead:
+		_show(town_view)
+		blocker.visible = true
+		await get_tree().create_timer(DEATH_PAUSE).timeout
+		blocker.visible = false
 		life_view.show_life(town.hero)
 		_show(life_view)
 	elif town.hero.cleared and not _clear_shown:
@@ -116,10 +118,10 @@ func _to_town_or_end() -> void:
 
 # ---------- 委託 ----------
 
-## 出發：路上的時間先演，到了才開打
+## 出發：路上的時間先跳，到了才開打
 func _depart(enemy_id: String) -> void:
 	var msgs := town.depart(enemy_id)
-	_wait(town.take_wait(), msgs.filter(func(m): return m["kind"] == "epic"), func():
+	_wait(town.take_wait(), func():
 		town_view.add_messages(msgs)
 		if town.hero.dead:
 			_to_town_or_end()
@@ -167,7 +169,7 @@ func _equip(id: String) -> void:
 	battle_view.refresh_loot(town.hero, town.loot)
 
 
-## 回城。打輸了要先躺幾個月（演等的畫面；結算已經寫在戰報下面，只有死去要再寫）
+## 回城。打輸了要先躺幾個月（在城鎮畫面裡跳年月），跳完才寫結算
 func _back_to_town() -> void:
 	town.clear_loot()
 	var msgs := _settled + town.return_to_town()
@@ -177,7 +179,7 @@ func _back_to_town() -> void:
 		town_view.add_messages(msgs)
 		_to_town_or_end()
 		return
-	_wait(w, msgs.filter(func(m): return m["kind"] == "epic"), func():
+	_wait(w, func():
 		town_view.add_messages(msgs)
 		_to_town_or_end())
 

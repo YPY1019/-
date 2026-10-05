@@ -32,7 +32,7 @@ func _init() -> void:
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/settle_first.png")
-	_back(main)
+	await _back(main)
 
 	# 第二次打同一個
 	main.town.hero.hp = main.town.hero.max_hp()
@@ -41,7 +41,7 @@ func _init() -> void:
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/settle_again.png")
-	_back(main)
+	await _back(main)
 	await _frames(3)
 	_save(out + "/town_after.png")
 
@@ -50,7 +50,7 @@ func _init() -> void:
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/spar.png")
-	_back(main)
+	await _back(main)
 
 	# 按撤退
 	main.town.hero.hp = main.town.hero.max_hp()
@@ -59,14 +59,14 @@ func _init() -> void:
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/flee.png")
-	_back(main)
+	await _back(main)
 
 	# 每種委託都打一次，確認不會壞掉
 	for enemy in EnemyData.ORDER:
 		main.town.hero.hp = main.town.hero.max_hp()
 		_fight(main, enemy)
 		main.battle_view._skip()
-		_back(main)
+		await _back(main)
 	await _frames(3)
 	_save(out + "/end.png")
 	# 有名的強者：用強一點的角色打，看絕學、稀有的劍、升境的寫法
@@ -87,7 +87,7 @@ func _init() -> void:
 		main._take_loot("sunder_book")
 		await _frames(3)
 		_save(out + "/book_loot.png")
-	_back(main)
+	await _back(main)
 	await _frames(3)
 	_save(out + "/book_town.png")
 	# 讀秘笈：等的畫面跳到一半、跳完
@@ -96,13 +96,12 @@ func _init() -> void:
 	_save(out + "/wait_read.png")
 	await create_timer(3.0).timeout
 	_save(out + "/wait_read_done.png")
-	main._on_wait_finished()
 	await _frames(3)
 	_save(out + "/book_read.png")
 	h.hp = h.max_hp()
 	_fight(main, "black_knight")
 	main.battle_view._skip()
-	_back(main)
+	await _back(main)
 	var tabs2: TabContainer = main.town_view.find_children("*", "TabContainer", true, false)[0]
 	tabs2.current_tab = 2
 	await _frames(3)
@@ -120,15 +119,14 @@ func _init() -> void:
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/old_battle.png")
-	_back(main)
+	await _back(main)
 	# 壽命用完：休養到死，看這一生
 	h.month = LifeData.life_months() - 1
 	h.hp = 1
 	main.town_view._act(main.town.rest(3))
 	await create_timer(3.0).timeout
 	_save(out + "/death_wait.png")
-	main._on_wait_finished()
-	await _frames(3)
+	await create_timer(2.0).timeout
 	_save(out + "/life.png")
 	quit()
 
@@ -140,12 +138,11 @@ func _fight(main: Node, enemy: String) -> void:
 	main._start_commission(enemy)
 
 
-## 回城。打輸要躺的那段等，直接跳完
+## 回城。打輸要躺的那段，等它跳完
 func _back(main: Node) -> void:
 	main._back_to_town()
-	if main.wait_view.visible:
-		main.wait_view.timer.stop()
-		main._on_wait_finished()
+	while main.blocker.visible:
+		await create_timer(0.2).timeout
 
 
 func _save(path: String) -> void:

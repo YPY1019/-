@@ -3,7 +3,7 @@ extends VBoxContainer
 
 ## 城鎮畫面：你的狀態、委託板（含懸賞）、北境劍術道場、武器（你的武器和武器店）、休養。只負責顯示和按鈕，規則都在 Town。
 ## 要開打時發出 commission_requested / spar_requested，由 main 切到戰鬥畫面。
-## 花時間的事（學招、讀秘笈、休養）發出 wait_requested，由 main 演等的畫面。
+## 花時間的事（學招、讀秘笈、休養）發出 wait_requested，由 main 擋住按鈕、呼叫 play_wait 演那段時間。
 
 signal commission_requested(enemy_id: String)
 signal spar_requested
@@ -33,6 +33,7 @@ var log_label: RichTextLabel
 
 func _init(p_town: Town) -> void:
 	town = p_town
+	_rng.randomize()
 	add_theme_constant_override("separation", 12)
 
 	# 上：年紀和壽命、錢、血量、休養
@@ -100,6 +101,65 @@ func add_messages(msgs: Array) -> void:
 	log_label.append_text(UiKit.messages_bbcode(msgs) + "\n")
 	messages_added.emit(msgs)
 	refresh()
+
+
+# ---------- 等（花時間的事） ----------
+# 不另開畫面：左上的年月一格一格往上跳，手寫片段寫進下面的紀錄。跳完 after 才給結果。
+# 整段幾秒鐘，不能跳過；跳的時候按鈕按不了（由 main 擋住）。
+
+## 每個月跳多快：整段的秒數 = 月數 × WAIT_SEC_PER_MONTH，限制在最短和最長之間
+const WAIT_SEC_PER_MONTH := 0.3
+const WAIT_MIN_SEC := 1.0
+const WAIT_MAX_SEC := 3.5
+## 最多寫幾句季節
+const WAIT_SEASON_MAX := 2
+const LINE_COLOR := "#9aa3ad"
+
+var _rng := RandomNumberGenerator.new()
+
+
+## w：Town.take_wait() 那一段。跳完呼叫 after
+func play_wait(w: Dictionary, after: Callable) -> void:
+	var from: int = w["from"]
+	var months: int = w["months"]
+	var schedule := _wait_schedule(w["kind"], from, months)
+	log_label.append_text("[color=%s]%s……[/color]\n" % [LINE_COLOR, w["title"]])
+	_show_month(from)
+	if months > 0:
+		var step := clampf(months * WAIT_SEC_PER_MONTH, WAIT_MIN_SEC, WAIT_MAX_SEC) / months
+		for tick in range(1, months + 1):
+			await get_tree().create_timer(step).timeout
+			_show_month(from + tick)
+			if schedule.has(tick):
+				log_label.append_text("[i][color=%s]%s[/color][/i]\n" % [LINE_COLOR, schedule[tick]])
+	await get_tree().create_timer(0.3).timeout
+	after.call()
+
+
+## 跳的時候只動年月和壽命，其他的（血量、錢）跳完才更新
+func _show_month(month: int) -> void:
+	date_label.text = LifeData.date_text(month)
+	var left := maxi(0, LifeData.life_months() - month)
+	life_label.text = "壽命 %d・還剩 %s" % [LifeData.LIFESPAN, LifeData.span_text(left)]
+
+
+## 第幾格寫哪一句：第一格寫剛開始的，中間換季寫季節，最後一格寫快結束的
+func _wait_schedule(kind: String, from: int, months: int) -> Dictionary:
+	var lines: Dictionary = LifeData.WAIT_LINES[kind]
+	var s := {1: _pick_line(lines["start"])}
+	var seasons := 0
+	for i in range(2, months):
+		var m := LifeData.month_of_year(from + i)
+		if m % 3 == 0 and seasons < WAIT_SEASON_MAX:
+			s[i] = _pick_line(LifeData.SEASON_LINES[LifeData.SEASONS[m]])
+			seasons += 1
+	if months >= 3 and not lines["end"].is_empty():
+		s[months] = _pick_line(lines["end"])
+	return s
+
+
+func _pick_line(list: Array) -> String:
+	return list[_rng.randi_range(0, list.size() - 1)]
 
 
 func refresh() -> void:
