@@ -69,6 +69,24 @@ func _init() -> void:
 		main._back_to_town()
 	await _frames(3)
 	_save(out + "/end.png")
+	# 有名的強者：用強一點的角色打，看絕學、稀有的劍、升境的寫法
+	var h: Adventurer = main.town.hero
+	h.stats = {"str": 18, "agi": 18}
+	h.realm = 1
+	h.learn("sunder")
+	h.hp = h.max_hp()
+	main._start_commission("merc_captain")
+	main.battle_view._skip()
+	await _frames(3)
+	_save(out + "/named.png")
+	main._back_to_town()
+	var tabs2: TabContainer = main.town_view.find_children("*", "TabContainer", true, false)[0]
+	tabs2.current_tab = 2
+	await _frames(3)
+	_save(out + "/weapons.png")
+	tabs2.current_tab = 0
+	await _frames(3)
+	_save(out + "/board.png")
 	quit()
 
 

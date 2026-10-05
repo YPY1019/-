@@ -22,6 +22,8 @@ var stats := {}
 var armor := "none"
 var traits: Array = []
 var weapon := ""
+## 武器特效（WeaponData 的 fx）。有名的強者拿著稀有的劍，打你時也會發動
+var weapon_fx := ""
 var guard_item := ""
 ## 他／牠
 var pron := "牠"
@@ -45,6 +47,8 @@ var held := false
 var used: Array[String] = []
 ## 這場被敵人招牌招打中幾次：你偷學的招 id -> 次數
 var sig_hits := {}
+## 這場挨過的武器特效
+var felt_fx: Array[String] = []
 
 ## ---- 敵人 ----
 ## 這回合要做的事：{"action", "type", "phase": windup/strike/do/forced/hold, "text", "target"}
@@ -59,6 +63,8 @@ var hold_rounds := 0
 var disarmed := false
 var blinded := false
 var raging := false
+## 怕了、逃走了（算你贏）
+var fled := false
 var recent_actions: Array[String] = []
 ## 對手上回合用的招（習慣會看這個）
 var last_player_move := ""
@@ -77,13 +83,15 @@ static func from_enemy(id: String) -> Combatant:
 	c.weapon = d["weapon"]
 	c.guard_item = d["guard"]
 	c.pron = d.get("pron", "牠")
+	if d.has("loot"):
+		c.weapon_fx = WeaponData.fx(d["loot"])
 	c.enemy_def = d
 	c.enemy_id = id
 	return c
 
 
 func is_alive() -> bool:
-	return hp > yield_hp
+	return hp > yield_hp and not fled
 
 
 func action_def(id: String) -> Dictionary:

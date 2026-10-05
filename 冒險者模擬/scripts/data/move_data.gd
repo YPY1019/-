@@ -25,20 +25,35 @@ extends RefCounted
 ## 人人都會的一般招。跟學來的招放在同一個池子裡，不是永遠都在
 const BASIC := ["attack", "defend", "dodge"]
 ## 每回合的選項至少有一個攻擊類、一個防守類（擲沙、怒喝不算這兩類）
-const OFFENSE := ["attack", "heavy", "vital", "combo"]
+const OFFENSE := ["attack", "heavy", "vital", "combo", "sunder"]
 const DEFENSE := ["defend", "dodge", "sweep_kick", "parry", "redirect", "disarm", "break_free"]
 ## 撤退不是招式，永遠可以選（被抱住時不行）
 const FLEE := "flee"
 ## 被抱住時能用的招（沒學的不會出現）
 const HELD := ["struggle", "attack", "break_free", "vital"]
-const LEARNABLE := ["sweep_kick", "parry", "redirect", "heavy", "vital", "disarm", "break_free", "sand", "shout", "combo"]
+const LEARNABLE := ["sweep_kick", "parry", "redirect", "heavy", "vital", "disarm", "break_free", "sand", "shout", "combo", "sunder"]
 
 ## 你受傷後的反應（依傷勢挑一句）
+## shrug：你那一項比對手高很多，打中了也不痛（取代對手「打中你」的描述）
+## crushed：對手那一項比你高很多，挨一下就知道差多少
 const HURT := {
 	"light": ["你咬緊牙關，沒有退。", "你悶哼一聲，把劍握得更緊。", "傷口火辣辣地痛，你甩了甩頭。"],
 	"heavy": ["你眼前一陣發黑，差點站不穩。", "痛楚像火一樣燒遍全身，你踉蹌著退了一步。", "你吐出一口血沫，硬是撐住了。"],
 	"critical": ["你的視線開始模糊，手裡的劍越來越重。", "你感覺力氣正從傷口一點一點流走。", "你的腿在發抖，每一次呼吸都帶著血腥味。"],
+	"shrug": [
+		"{name}的攻擊落在你身上。你晃了一下，站穩了。",
+		"{weapon}打在你身上，像打在一塊石頭上。你連腳步都沒挪。",
+		"你硬吃了這一下，只覺得有點痛。{name}自己倒是愣了一下。",
+	],
+	"crushed": [
+		"這一下重得不像話，你整個人被打飛出去，在地上滾了好幾圈。",
+		"你根本來不及反應。等你回過神，人已經在好幾步外了。",
+		"你的手臂被震得失去知覺——這不是同一個層次的力氣。",
+	],
 }
+
+## 絕學第一次用出來
+const ULT_FIRST := "這是你第一次把這一招完整地使出來。握劍的手在發抖——不是因為累。"
 
 const MOVES := {
 	# ---------- 一般招（不用學） ----------
@@ -335,6 +350,25 @@ const MOVES := {
 			"windup": {"deal": 2.2, "text": ["趁{name}還在蓄勢，你一連砍出三劍！"]},
 			"guard": {"deal": 0.4, "text": ["你一連三劍砍在{guard}上，叮叮噹噹，一劍也沒砍進去。"]},
 		},
+	},
+
+	# ---------- 絕學 ----------
+	# ult：喊出招名，有專屬的寫法。only_opening：只有對手露出大破綻時才出得來（不做次數限制）
+	# no_weak：力量輸對手也不會變弱（破綻就是破綻）
+	"sunder": {
+		"name": "斷岳", "stat": "str", "desc": "北境劍術的絕學，只有一招。對手露出大破綻時才出得來（被掃倒、破防、收勢不住、喘氣、卡住…），一出手就是決定勝負的一劍。",
+		"ult": true, "only_opening": true, "pierce": true, "no_weak": true,
+		"pre": [
+			"{name}的破綻就在眼前。你雙手握劍，把這些日子挨過的每一下、練過的每一劍，全壓了進去——",
+			"時間好像慢了下來。你看見{name}身上那道空門，看得清清楚楚。你舉起劍——",
+			"你的呼吸停了一拍。腳下一沉，劍從背後高高揚起——",
+		],
+		"default": {"deal": 6.0, "text": [
+			"劍光像一道從天上裂開的縫。{name}連叫都來不及，整個人被劈得往後飛出去，地面被劍氣犁出一道深溝。",
+			"一聲悶響，像山崩。{name}被這一劍從肩頭劈到腰間，往後倒退了好幾步，腳下的地面裂開了。",
+			"劍落下的時候幾乎沒有聲音。等{name}低頭，身上已經多了一道從頭到腳的血線。",
+		]},
+		"vs": {},
 	},
 }
 

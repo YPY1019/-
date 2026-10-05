@@ -1,7 +1,7 @@
 class_name TownView
 extends VBoxContainer
 
-## 城鎮畫面：你的狀態、委託板、北境劍術道場、武器店、休養。只負責顯示和按鈕，規則都在 Town。
+## 城鎮畫面：你的狀態、委託板（含懸賞）、北境劍術道場、武器（你的武器和武器店）、休養。只負責顯示和按鈕，規則都在 Town。
 ## 要開打時發出 commission_requested / spar_requested，由 main 切到戰鬥畫面。
 
 signal commission_requested(enemy_id: String)
@@ -70,7 +70,7 @@ func _init(p_town: Town) -> void:
 	tabs.add_child(dojo)
 	shop_box = UiKit.vbox(10)
 	var shop := _scroll(shop_box)
-	shop.name = "武器店"
+	shop.name = "武器"
 	tabs.add_child(shop)
 
 	# 下：發生了什麼事
@@ -214,24 +214,42 @@ func _build_board() -> void:
 		l.add_theme_color_override("font_color", Color(GrowthData.REALM_COLORS[i]))
 		legend.add_child(l)
 	board_box.add_child(legend)
-	for id in EnemyData.ORDER:
+	var header_done := false
+	for id in town.board():
 		var c: Dictionary = TownData.COMMISSIONS[id]
 		var e: Dictionary = EnemyData.ENEMIES[id]
+		var named: bool = EnemyData.NAMED.has(id)
+		if named and not header_done:
+			header_done = true
+			var head := UiKit.heading("懸賞：有名有姓的強者")
+			head.add_theme_color_override("font_color", Color(GOLD))
+			board_box.add_child(head)
+			board_box.add_child(UiKit.label("打倒他們，身上的東西就是你的。只有一次機會——打倒了就不會再出現。", 15, 0.7, true))
 		var row := UiKit.hbox(16)
 		var info := UiKit.vbox(2)
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var dg := EnemyData.danger(id)
 		var title_row := UiKit.hbox(12)
-		title_row.add_child(UiKit.label(e["name"], 20))
-		var stars := UiKit.label("%s %s" % [dg["stars"], dg["stage"]], 20)
+		title_row.add_child(UiKit.label("%s %s" % [e["title"], e["name"]] if named else e["name"], 20))
+		# 人標境界，怪物標危險度
+		var stars := UiKit.label(dg["text"] if named else "%s %s" % [dg["stars"], dg["stage"]], 20)
 		stars.add_theme_color_override("font_color", Color(dg["color"]))
-		stars.tooltip_text = "危險度：大約是%s的人打得贏的" % dg["text"]
+		stars.tooltip_text = "境界" if named else "危險度：大約是%s的人打得贏的" % dg["text"]
 		stars.mouse_filter = Control.MOUSE_FILTER_STOP
 		title_row.add_child(stars)
 		if h.beaten.has(id):
 			title_row.add_child(UiKit.label("（打贏過）", 18, 0.7))
 		info.add_child(title_row)
 		info.add_child(UiKit.label(e["blurb"], 16, 0.75, true))
+		if named:
+			var w := WeaponData.get_def(e["loot"])
+			var carry := UiKit.label("身上帶著「%s」：%s" % [w["name"], w["look"]], 16, 1.0, true)
+			carry.add_theme_color_override("font_color", Color(GOLD))
+			info.add_child(carry)
+			if h.felt_fx.has(w["fx"]):
+				var felt := UiKit.label("你挨過它：%s" % w["fx_desc"], 16, 1.0, true)
+				felt.add_theme_color_override("font_color", Color(BAD))
+				info.add_child(felt)
 		info.add_child(UiKit.label("報酬 %d 銀・來回 %d 天" % [c["reward"], c["days"]], 15, 0.6))
 		if h.last_fights.has(id):
 			info.add_child(UiKit.label("上次：" + _last_text(h.last_fights[id]), 15, 0.85))
@@ -316,42 +334,68 @@ func _move_row(id: String) -> void:
 	dojo_box.add_child(row)
 
 
-# ---------- 武器店 ----------
+# ---------- 武器（你的武器、武器店） ----------
 
 func _build_shop() -> void:
 	UiKit.clear(shop_box)
 	var h := town.hero
-	shop_box.add_child(UiKit.label("劍越好，你打出去的每一招都越痛。好劍很重，力量不夠拿不動。", 16, 0.7, true))
-	for id in WeaponData.ORDER:
+	shop_box.add_child(UiKit.heading("你的武器"))
+	for id in h.owned_weapons:
 		var w := WeaponData.get_def(id)
-		var st := town.weapon_state(id)
 		var row := UiKit.hbox(12)
-		var info := UiKit.vbox(0)
-		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var title := "%s　傷害 ×%.1f" % [w["name"], w["power"]]
-		if w["str"] > 0:
-			title += "　（力量 %d）" % w["str"]
-		info.add_child(UiKit.label(title, 19, 1.0 if st["owned"] or st["ok"] else 0.5))
-		info.add_child(UiKit.label(w["desc"], 15, 0.6, true))
+		var info := _weapon_info(w, h.can_wield(id))
+		if w.has("fx_desc"):
+			info.add_child(UiKit.label(w["fx_desc"], 15, 0.9, true))
 		row.add_child(info)
 		if h.weapon == id:
 			var using := UiKit.label("用著", 17)
 			using.add_theme_color_override("font_color", Color("#9be39b"))
 			row.add_child(using)
-		elif st["owned"]:
-			row.add_child(UiKit.label("已有", 17, 0.6))
+		elif not h.can_wield(id):
+			row.add_child(UiKit.label("拿不動", 17, 0.6))
 		else:
-			var b := UiKit.button("買（%d 銀）" % w["cost"], 170)
+			var b := UiKit.button("換上", 120)
 			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			b.disabled = not st["ok"]
-			b.pressed.connect(func(): _act(town.buy_weapon(id)))
-			var col := UiKit.vbox(2)
-			col.add_child(b)
-			if not st["ok"]:
-				col.add_child(UiKit.label("、".join(st["why"]), 14, 0.7))
-			row.add_child(col)
+			b.pressed.connect(func(): _act(town.equip(id)))
+			row.add_child(b)
 		shop_box.add_child(row)
 		shop_box.add_child(HSeparator.new())
+
+	shop_box.add_child(UiKit.heading("武器店"))
+	shop_box.add_child(UiKit.label("店裡只有普通貨。好劍不在店裡——在強者手上。", 16, 0.7, true))
+	for id in WeaponData.SHOP:
+		var w := WeaponData.get_def(id)
+		var st := town.weapon_state(id)
+		if st["owned"]:
+			continue
+		var row := UiKit.hbox(12)
+		row.add_child(_weapon_info(w, st["ok"]))
+		var b := UiKit.button("買（%d 銀）" % w["cost"], 170)
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		b.disabled = not st["ok"]
+		b.pressed.connect(func(): _act(town.buy_weapon(id)))
+		var col := UiKit.vbox(2)
+		col.add_child(b)
+		if not st["ok"]:
+			col.add_child(UiKit.label("、".join(st["why"]), 14, 0.7))
+		row.add_child(col)
+		shop_box.add_child(row)
+		shop_box.add_child(HSeparator.new())
+
+
+## 武器的名字、傷害、門檻、說明。稀有的劍名字是金色的
+func _weapon_info(w: Dictionary, usable: bool) -> VBoxContainer:
+	var info := UiKit.vbox(0)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var title := "%s　傷害 ×%.1f" % [w["name"], w["power"]]
+	if w["str"] > 0:
+		title += "　（力量 %d）" % w["str"]
+	var name_label := UiKit.label(title, 19, 1.0 if usable else 0.5)
+	if w.get("rare", false):
+		name_label.add_theme_color_override("font_color", Color(GOLD))
+	info.add_child(name_label)
+	info.add_child(UiKit.label(w["desc"], 15, 0.6, true))
+	return info
 
 
 ## 委託板上的「上次：贏・5 回合・掉 25 血」

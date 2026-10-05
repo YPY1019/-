@@ -43,6 +43,8 @@ const FAIL_GAP := 3
 const DAMAGE_PER_POINT := 0.1
 const DAMAGE_MULT_MIN := 0.3
 const DAMAGE_MULT_MAX := 1.4
+## 差這麼多（含）就是「不同層次」：戰報換寫法（打中了也不痛／一下就被打飛），對手會怕、會逃
+const OUTCLASS := 4
 
 # ---- 成長 ----
 ## 長 1 點要多少經驗

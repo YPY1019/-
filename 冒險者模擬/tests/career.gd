@@ -6,6 +6,8 @@ extends SceneTree
 ## 執行：Godot.exe --headless --path . --script res://tests/career.gd
 
 const RUNS := 30
+## 挑戰的順序（大約由弱到強）
+const LADDER := ["wolf", "bandit_leader", "deserter", "bear", "merc_captain", "black_knight", "ogre"]
 ## 估算真人花的時間：每回合幾秒（自動播放，有時按「看完」）、每次城裡的動作幾秒
 const SEC_PER_ROUND := 2
 const SEC_PER_FIGHT := 15
@@ -72,13 +74,16 @@ func _career(run: int, verbose: bool) -> Dictionary:
 					learned_any = true
 		if learned_any:
 			continue
-		# 買劍：買得起最好的就買
+		# 買劍、換劍：換上拿得動的最好的劍；店裡的比較好就買
+		var best_w := h.weapon
+		for w in h.owned_weapons:
+			if h.can_wield(w) and WeaponData.get_def(w)["power"] > WeaponData.get_def(best_w)["power"]:
+				best_w = w
+		if best_w != h.weapon:
+			town.equip(best_w)
 		var bought := false
-		for i in range(WeaponData.ORDER.size() - 1, 0, -1):
-			var w: String = WeaponData.ORDER[i]
-			if WeaponData.ORDER.find(h.weapon) >= i:
-				break
-			if town.weapon_state(w)["ok"]:
+		for w in WeaponData.SHOP:
+			if WeaponData.get_def(w)["power"] > WeaponData.get_def(h.weapon)["power"] and town.weapon_state(w)["ok"]:
 				town.buy_weapon(w)
 				when["買" + WeaponData.get_def(w)["name"]] = fights
 				town_actions += 1
@@ -98,17 +103,24 @@ func _career(run: int, verbose: bool) -> Dictionary:
 				when["通過師傅考驗"] = fights
 			continue
 		# 挑委託
-		# 挑戰「打贏過的最強對手」的下一個；在目前實力下連輸兩次，就回去打打得贏的
-		var best := -1
-		for i in EnemyData.ORDER.size():
-			if h.beaten.has(EnemyData.ORDER[i]):
-				best = i
-		var target: String = EnemyData.ORDER[mini(best + 1, EnemyData.ORDER.size() - 1)]
-		# 欠錢時也回去打打得贏的賺錢
+		# 挑戰還沒打贏過的最弱對手；在目前實力下連輸兩次（或欠錢），就回去打打得贏的一般委託
+		var target := ""
+		for id in LADDER:
+			if not h.beaten.has(id):
+				target = id
+				break
+		if target == "":
+			target = TownData.GOAL
 		if lost_at.get(target, 0) >= 2 or h.money < 0:
-			target = EnemyData.ORDER[maxi(best, 0)]
-			if lost_at.get(target, 0) >= 2:
-				target = EnemyData.ORDER[maxi(best - 1, 0)]
+			var safe := []
+			for id in EnemyData.ORDER:
+				if h.beaten.has(id):
+					safe.append(id)
+			if safe.is_empty():
+				safe = [EnemyData.ORDER[0]]
+			target = safe[-1]
+			if lost_at.get(target, 0) >= 2 and safe.size() > 1:
+				target = safe[-2]
 		var realm_before := h.realm
 		var b := town.start_commission(target)
 		b.rng.seed = rng.randi()

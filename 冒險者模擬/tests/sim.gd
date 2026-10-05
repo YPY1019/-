@@ -7,8 +7,8 @@ extends SceneTree
 const N := 300
 
 const T1 := ["parry", "sweep_kick", "heavy"]
-const T2 := ["redirect", "disarm", "break_free"]
-const T3 := ["vital", "combo"]
+const T2 := ["redirect", "disarm", "break_free", "vital", "combo"]
+const ULT := ["sunder"]
 const WILD := ["sand", "shout"]
 
 
@@ -17,38 +17,48 @@ func _init() -> void:
 	var setups := [
 		["10/10 什麼都不會", 10, 10, 0, [], "old_sword"],
 		["10/10 基礎", 10, 10, 0, T1, "old_sword"],
-		["12/12 基礎 鋼劍", 12, 12, 0, T1, "steel_sword"],
-		["15/15 基礎", 15, 15, 0, T1, "old_sword"],
+		["12/12 基礎 大刀", 12, 12, 0, T1, "bandit_blade"],
+		["13/13 基礎 鋼劍", 13, 13, 0, T1, "steel_sword"],
 		["15/15 基礎 鋼劍", 15, 15, 0, T1, "steel_sword"],
-		["15/15 基礎 騎士", 15, 15, 0, T1, "knight_sword"],
-		["15/15 進階", 15, 15, 0, T1 + T2, "old_sword"],
 		["15/15 進階 鋼劍", 15, 15, 0, T1 + T2, "steel_sword"],
 		["15/15 進階 騎士", 15, 15, 0, T1 + T2, "knight_sword"],
-		["15/15 二境 進階 騎士", 15, 15, 1, T1 + T2, "knight_sword"],
-		["18/15 二境 全部 騎士", 18, 15, 1, T1 + T2 + T3 + WILD, "knight_sword"],
-		["20/15 二境 進階 騎士", 20, 15, 1, T1 + T2, "knight_sword"],
-		["20/15 二境 全部 騎士", 20, 15, 1, T1 + T2 + T3 + WILD, "knight_sword"],
-		["20/15 二境 全部 秘銀", 20, 15, 1, T1 + T2 + T3 + WILD, "mithril_sword"],
+		["16/15 二境 進階 騎士", 16, 15, 1, T1 + T2, "knight_sword"],
+		["16/15 二境 斷岳 騎士", 16, 15, 1, T1 + T2 + ULT, "knight_sword"],
+		["16/15 二境 斷岳 赤牙", 16, 15, 1, T1 + T2 + ULT, "red_fang"],
+		["16/16 二境 斷岳 騎士", 16, 16, 1, T1 + T2 + ULT, "knight_sword"],
+		["17/17 二境 斷岳 騎士", 17, 17, 1, T1 + T2 + ULT, "knight_sword"],
+		["18/18 二境 斷岳 赤牙", 18, 18, 1, T1 + T2 + ULT, "red_fang"],
+		["20/18 二境 斷岳 赤牙", 20, 18, 1, T1 + T2 + ULT, "red_fang"],
+		["18/16 二境 斷岳 騎士", 18, 16, 1, T1 + T2 + ULT, "knight_sword"],
+		["18/16 二境 斷岳 赤牙", 18, 16, 1, T1 + T2 + ULT + WILD, "red_fang"],
+		["20/17 二境 斷岳 赤牙", 20, 17, 1, T1 + T2 + ULT + WILD, "red_fang"],
+		["20/17 二境 斷岳 喪鐘", 20, 17, 1, T1 + T2 + ULT + WILD, "knell"],
+		["20/17 三境 斷岳 喪鐘", 20, 17, 2, T1 + T2 + ULT + WILD, "knell"],
 	]
+	var ids := ["wolf", "bandit_leader", "deserter", "bear", "merc_captain", "black_knight", "ogre", "master"]
 	for s in setups:
 		var line := "%-18s" % s[0]
-		for id in EnemyData.ORDER + ["master"]:
+		for id in ids:
 			var wins := 0
 			var fled := 0
 			var hp_sum := 0
 			var rounds := 0
+			var ults := 0
 			var pilot := AutoPilot.new()
 			for i in N:
 				var b := _battle(s[1], s[2], s[3], s[4], s[5], id, i)
 				var r := pilot.play(b)
 				rounds += r["rounds"]
+				ults += r["used"].count("sunder")
 				if r["outcome"] in ["win", "survive"]:
 					wins += 1
 					hp_sum += r["hp"]
 				elif r["outcome"] == "flee":
 					fled += 1
-			line += " | %s %3d%% 逃%2d%% 剩%3d 回%4.1f" % [
-				EnemyData.ENEMIES[id]["name"], 100 * wins / N, 100 * fled / N, hp_sum / maxi(1, wins), float(rounds) / N]
+			line += " | %s %3d%% 剩%3d 回%4.1f" % [
+				EnemyData.ENEMIES[id]["name"].substr(0, 2), 100 * wins / N, hp_sum / maxi(1, wins), float(rounds) / N]
+			if ults > 0:
+				line += " 斷%.1f" % (float(ults) / N)
 		print(line)
 	quit()
 

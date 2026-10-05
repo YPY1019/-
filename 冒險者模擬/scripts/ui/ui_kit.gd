@@ -8,6 +8,7 @@ const MSG_COLOR := {
 	"good": "#9be39b",
 	"bad": "#ff8a8a",
 	"big": "#ffd479",
+	"epic": "#ffe9a8",
 }
 
 
@@ -68,5 +69,9 @@ static func clear(node: Node) -> void:
 static func messages_bbcode(msgs: Array) -> String:
 	var lines := []
 	for m in msgs:
-		lines.append("[color=%s]%s[/color]" % [MSG_COLOR.get(m["kind"], "#ffffff"), m["text"]])
+		if m["kind"] == "epic":
+			# 一輩子記得的大事：字大一點，前後空一行
+			lines.append("\n[font_size=22][color=%s]%s[/color][/font_size]\n" % [MSG_COLOR["epic"], m["text"]])
+		else:
+			lines.append("[color=%s]%s[/color]" % [MSG_COLOR.get(m["kind"], "#ffffff"), m["text"]])
 	return "\n".join(lines)

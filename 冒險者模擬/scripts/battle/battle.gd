@@ -26,6 +26,9 @@ const WASTED_WEIGHT := 0.2
 const BLIND_MISS_CHANCE := 0.6
 ## 最多被抱住幾回合，之後對手會把你甩開
 const HOLD_MAX := 2
+## 怕你的對手：血掉到這裡以下、每挨一下有這個機率逃走
+const FEAR_FLEE_HP := 0.6
+const FEAR_FLEE_CHANCE := 0.5
 
 const ATTACK_TYPES := ["sweep", "thrust", "smash", "grab", "trick", "roar", "hold"]
 const END_TEXT := {"win": "你贏了！", "lose": "你眼前一黑，倒了下去。", "flee": "你逃掉了。", "survive": "你撐過去了。"}
@@ -56,6 +59,8 @@ func start() -> Array:
 	for e in enemies:
 		ev.append(_ev("scene", e.fill(_pick(e.enemy_def["scene"]))))
 		ev.append(_ev("action", e.fill(_pick(e.enemy_def["start"]))))
+		if _afraid(e):
+			ev.append(_ev("info", e.fill(_pick(e.enemy_def.get("fear", EnemyData.FEAR)))))
 	round_no = 1
 	_choose_intents(ev)
 	_deal_hands()
@@ -160,11 +165,13 @@ func is_over() -> bool:
 func result() -> Dictionary:
 	var hero := allies[0]
 	return {"outcome": outcome, "rounds": round_no, "hp": hero.hp, "max_hp": hero.max_hp,
-		"used": hero.used, "sig_hits": hero.sig_hits}
+		"used": hero.used, "sig_hits": hero.sig_hits, "felt_fx": hero.felt_fx}
 
 
 ## 結束的句子，敵人資料裡有寫就用敵人的
 func _end_text() -> String:
+	if outcome == "win" and enemies[0].fled:
+		return EnemyData.FLED_END
 	var d: Dictionary = enemies[0].enemy_def
 	return d.get(outcome + "_text", END_TEXT[outcome])
 
@@ -188,6 +195,10 @@ func _deal_hands() -> void:
 			# 收招慢的招（裂盾斬），用完下回合不能再用
 			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
 				pool.erase(ally.used[-1])
+			# 絕學只有對手露出大破綻時才出得來
+			var foe := _first_alive(enemies)
+			if foe == null or not big_opening(foe):
+				pool = pool.filter(func(id): return not MoveData.MOVES[id].get("only_opening", false))
 			# 自動戰鬥：會的招全部都能挑（學越多招越強）
 			var n := pool.size() if ally.auto else mini(pool.size(), HAND_MAX)
 			if ally.next_status.has("off_balance"):
@@ -254,7 +265,14 @@ func _weighted_pick(ally: Combatant, candidates: Array, foe: Combatant) -> Strin
 func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array) -> Dictionary:
 	var e := resolve(ally, move_id, target)
 	var m: Dictionary = MoveData.MOVES[move_id]
+	if m.get("ult", false):
+		# 絕學：先寫起手，喊出招名，再寫結果
+		ev.append(_ev("action", target.fill(_pick(m["pre"]))))
+		ev.append(_ev("ult", "「%s」！" % m["name"]))
 	ev.append(_ev("action", target.fill(_pick(e["text"]))))
+	if m.get("ult", false) and ally.adventurer != null and not ally.adventurer.used_ever.has(move_id) \
+			and not ally.used.has(move_id):
+		ev.append(_ev("big", MoveData.ULT_FIRST))
 	if e.get("failed", false):
 		ev.append(_ev("stat", "（%s差太多：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
 
@@ -300,10 +318,32 @@ func gap(attacker: Combatant, defender: Combatant, stat: String) -> int:
 	return attacker.stats[stat] - defender.stats[stat]
 
 
+## 你比對手高出多少，看對手最強的那一項
+func outclass(hero: Combatant, foe: Combatant) -> int:
+	var key := "str" if foe.stats["str"] >= foe.stats["agi"] else "agi"
+	return hero.stats[key] - foe.stats[key]
+
+
+## 對手比你弱太多，怕你（會逃）
+func _afraid(foe: Combatant) -> bool:
+	return not foe.enemy_def.get("no_flee", false) and outclass(allies[0], foe) >= GrowthData.OUTCLASS
+
+
+## 對手這回合露出大破綻（絕學出得來）：被逼出來的破綻（嚇退不算），或自己露出來的（喘氣、卡住、撿武器）
+func big_opening(foe: Combatant) -> bool:
+	var it := foe.intent
+	if it.get("phase", "") == "forced":
+		return it.get("reason", "") != "scare"
+	return it.get("type", "") == "opening"
+
+
 ## 我方這招打出去的傷害（算了武器，還沒算盔甲和浮動）
 func damage_out(ally: Combatant, move_id: String, foe: Combatant, deal: float) -> float:
-	var s: String = MoveData.MOVES[move_id]["stat"]
-	return GrowthData.BASE_DAMAGE * deal * ally.attack_mult * GrowthData.damage_mult(gap(ally, foe, s))
+	var m: Dictionary = MoveData.MOVES[move_id]
+	var mult := GrowthData.damage_mult(gap(ally, foe, m["stat"]))
+	if m.get("no_weak", false):
+		mult = maxf(mult, 1.0)
+	return GrowthData.BASE_DAMAGE * deal * ally.attack_mult * mult
 
 
 ## 對手這招打過來的傷害（還沒算你的應對和浮動）
@@ -358,16 +398,24 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 		show_hit = e.get("hit", false)
 	if take <= 0.0:
 		return
+	# 差很多時換寫法：你高很多，打中了也不痛；對手高很多，一下就知道差多少
+	var g := gap(enemy, target, stat)
+	var shrug := power > 0.0 and g <= -GrowthData.OUTCLASS
 	if show_hit:
-		ev.append(_ev("action", enemy.fill(_pick(hits))))
+		ev.append(_ev("action", enemy.fill(_pick(MoveData.HURT["shrug"] if shrug else hits))))
 	if power > 0.0:
 		var dmg := maxi(1, roundi(damage_in(enemy, target, power, stat) * take * _spread()))
 		target.hp = maxi(0, target.hp - dmg)
 		ev.append({"kind": "damage_in", "text": "你", "amount": dmg,
 			"note": "%s %d 對 %d" % [GrowthData.NAMES[stat], target.stats[stat], enemy.stats[stat]]})
-		var hurt := _hurt_line(target, dmg)
+		var hurt := ""
+		if g >= GrowthData.OUTCLASS and dmg >= 15 and target.is_alive() and rng.randf() < 0.5:
+			hurt = _pick(MoveData.HURT["crushed"])
+		elif not shrug:
+			hurt = _hurt_line(target, dmg)
 		if hurt != "":
 			ev.append(_ev("pain", hurt))
+		_weapon_fx_in(enemy, target, dmg, ev)
 	# 你那一項比對手高太多，附加效果沒用
 	if on_hit != "" and GrowthData.fails(gap(enemy, target, stat)):
 		ev.append(_ev("action", enemy.fill(_pick(EnemyData.RESIST[on_hit]))))
@@ -382,6 +430,41 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 		_:
 			target.next_status.append(on_hit)
 	_watch_signature(enemy, target, ev)
+
+
+## 對手拿著稀有的劍：砍中你時也會發動特效（你先挨過，才知道它多可怕）
+func _weapon_fx_in(enemy: Combatant, target: Combatant, dmg: int, ev: Array) -> void:
+	if enemy.weapon_fx == "" or not target.is_alive() or rng.randf() >= WeaponData.FX_CHANCE:
+		return
+	ev.append(_ev("fx", enemy.fill(_pick(WeaponData.FX_TEXT[enemy.weapon_fx]["in"]))))
+	if not target.felt_fx.has(enemy.weapon_fx):
+		target.felt_fx.append(enemy.weapon_fx)
+	match enemy.weapon_fx:
+		"twin":
+			var extra := maxi(1, roundi(dmg * WeaponData.TWIN_DAMAGE))
+			target.hp = maxi(0, target.hp - extra)
+			ev.append({"kind": "damage_in", "text": "你", "amount": extra, "note": "赤牙"})
+		"knell":
+			if not target.next_status.has("off_balance"):
+				target.next_status.append("off_balance")
+
+
+## 你拿著稀有的劍：砍中對手時發動特效
+func _weapon_fx_out(ally: Combatant, enemy: Combatant, dmg: int, ev: Array) -> void:
+	if ally.weapon_fx == "" or not enemy.is_alive() or rng.randf() >= WeaponData.FX_CHANCE:
+		return
+	var text: String = _pick(WeaponData.FX_TEXT[ally.weapon_fx]["out"])
+	ev.append(_ev("fx", enemy.fill(text.replace("{weapon}", ally.weapon))))
+	match ally.weapon_fx:
+		"twin":
+			var extra := maxi(1, roundi(dmg * WeaponData.TWIN_DAMAGE))
+			enemy.hp = maxi(0, enemy.hp - extra)
+			ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": extra, "note": ally.weapon})
+			if not enemy.is_alive():
+				ev.append(_ev("info", "%s倒下了。" % enemy.display_name))
+		"knell":
+			# 下回合露出破綻（斷岳出得來）
+			enemy.forced_next = "stagger"
 
 
 ## 偷學：被對手的招牌招打中，記一次
@@ -408,13 +491,27 @@ func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: flo
 	if not enemy.is_alive():
 		ev.append(_ev("info", "%s倒下了。" % enemy.display_name))
 		return
+	# 差很多時換寫法：你高很多，對手被打飛；對手高很多，砍中了也沒用
 	var pain: Dictionary = enemy.enemy_def["pain"]
+	var g := gap(ally, enemy, s)
 	if enemy.hp <= enemy.max_hp * 0.25:
 		ev.append(_ev("pain", enemy.fill(_pick(pain["dying"]))))
+	elif g >= GrowthData.OUTCLASS and dmg >= 15:
+		ev.append(_ev("pain", enemy.fill(_pick(EnemyData.OVERWHELMED))))
+	elif g <= -GrowthData.OUTCLASS and dmg < 20:
+		ev.append(_ev("pain", enemy.fill(_pick(EnemyData.UNFAZED))))
 	elif dmg >= 15:
 		ev.append(_ev("pain", enemy.fill(_pick(pain["heavy"]))))
 	elif rng.randf() < 0.5:
 		ev.append(_ev("pain", enemy.fill(_pick(pain["light"]))))
+	_weapon_fx_out(ally, enemy, dmg, ev)
+	if not enemy.is_alive():
+		return
+	# 比你弱太多的對手，挨痛了會逃
+	if _afraid(enemy) and enemy.hp < enemy.max_hp * FEAR_FLEE_HP and rng.randf() < FEAR_FLEE_CHANCE:
+		enemy.fled = true
+		ev.append(_ev("info", enemy.fill(_pick(enemy.enemy_def.get("fear_flee", EnemyData.FEAR_FLEE)))))
+		return
 	if not enemy.raging and enemy.enemy_def.has("rage"):
 		var rage: Dictionary = enemy.enemy_def["rage"]
 		if enemy.hp < enemy.max_hp * rage["hp_below"]:
@@ -442,8 +539,8 @@ func _choose_intents(ev: Array) -> void:
 			var hold: Dictionary = enemy.action_def(enemy.holding)["hold"]
 			intent.merge({"action": enemy.holding, "type": "hold", "phase": "hold", "text": enemy.fill(_pick(hold["tell"]))})
 		elif enemy.forced_next != "":
-			intent.merge({"action": "", "type": "opening", "phase": "forced",
-				"text": enemy.fill(_pick(EnemyData.FORCED_OPENING[enemy.forced_next]))})
+			intent.merge({"action": "", "type": "opening", "phase": "forced", "reason": enemy.forced_next,
+				"text":enemy.fill(_pick(EnemyData.FORCED_OPENING[enemy.forced_next]))})
 			enemy.forced_next = ""
 			enemy.pending = ""
 			_remember(enemy, "forced")

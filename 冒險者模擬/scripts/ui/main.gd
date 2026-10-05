@@ -37,7 +37,7 @@ func _ready() -> void:
 	margin.add_child(battle_view)
 
 	town_view.add_messages([
-		{"kind": "big", "text": "你帶著一把舊鐵劍和 %d 銀來到北境的小城。城裡有冒險者公會的委託板、一間北境劍術的道場，還有武器店。" % town.hero.money},
+		{"kind": "big", "text": "你帶著一把舊鐵劍和 %d 銀來到北境的小城。城裡有冒險者公會的委託板、一間北境劍術的道場，還有一間只賣普通貨的武器店。" % town.hero.money},
 		{"kind": "info", "text": "戰鬥會自己打，你只要決定接哪個委託、學什麼、買什麼。打的時候可以調速度、隨時撤退，也可以設血剩多少就自動撤退。"},
 		{"kind": "info", "text": "目標：打倒食人魔。每天生活費 %d 銀。" % TownData.LIVING_COST},
 	])

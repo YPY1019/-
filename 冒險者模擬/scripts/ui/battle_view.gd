@@ -27,6 +27,9 @@ const COLOR := {
 	"pain": "#c9b8a6",
 	"status": "#c9b8a6",
 	"end": "#ffffff",
+	"ult": "#ffe9a8",
+	"big": "#ffd479",
+	"fx": "#e0a0ff",
 }
 
 var battle: Battle
@@ -134,7 +137,9 @@ func begin(p_battle: Battle, note := "") -> void:
 	hero_name_label.text = "你　%s　%s" % [a.realm_text(), WeaponData.get_def(a.weapon)["name"]]
 	hero_name_label.add_theme_color_override("font_color", Color(a.realm_color()))
 	var dg := EnemyData.danger(foe_c.enemy_id)
-	if foe_c.enemy_def.has("realm"):
+	if foe_c.enemy_def.has("title"):
+		foe_name_label.text = "%s %s　%s" % [foe_c.enemy_def["title"], foe_c.display_name, dg["text"]]
+	elif foe_c.enemy_def.has("realm"):
 		foe_name_label.text = "%s　%s" % [foe_c.display_name, dg["text"]]
 	else:
 		foe_name_label.text = "%s　%s %s" % [foe_c.display_name, dg["stars"], dg["stage"]]
@@ -217,6 +222,14 @@ func _append(events: Array) -> void:
 			"end":
 				_flush(para, damage)
 				log_label.append_text("\n[b][font_size=26]%s[/font_size][/b]\n" % text)
+			"ult":
+				# 絕學喊出招名：自己一行、字很大
+				_flush(para, damage)
+				log_label.append_text("[center][b][font_size=34][color=%s]%s[/color][/font_size][/b][/center]\n" % [COLOR["ult"], text])
+			"big":
+				# 大事自己一行
+				_flush(para, damage)
+				log_label.append_text("[color=%s]%s[/color]\n" % [COLOR["big"], text])
 			"damage_in", "damage_out":
 				damage.append("[color=%s]%s −%d[/color]" % [COLOR[e["kind"]], text, e["amount"]])
 			"stat":

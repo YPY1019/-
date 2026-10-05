@@ -3,7 +3,7 @@ extends RefCounted
 
 ## 城鎮的規則：委託、休養、天數和生活費、師傅、武器店、戰鬥打完的結算（數值成長、瓶頸、偷學）。
 ## 不碰畫面：每個動作回傳訊息清單 [{"kind", "text"}]，畫面照著顯示。
-##   kind：info 一般、good 好事、bad 壞事、big 大事
+##   kind：info 一般、good 好事、bad 壞事、big 大事、epic 一輩子記得的大事（升境、拿到稀有的劍、學到絕學）
 
 var hero := Adventurer.new()
 
@@ -41,11 +41,31 @@ func finish_commission(battle: Battle) -> Array:
 			days += TownData.INJURED_DAYS
 			msgs.append(_m("bad", "你重傷倒地，被路過的商隊撿了回來。昏迷了好幾天，醒來時躺在城裡的旅店。"))
 	msgs.append_array(_pass_days(days))
+	_remember_fight(r)
 	if r["outcome"] == "win":
 		msgs.append_array(_after_win(id))
 	msgs.append_array(_grow(EnemyData.ENEMIES[id], r))
 	msgs.append_array(_steal(r["sig_hits"]))
 	return msgs
+
+
+## 用過的招、挨過的武器特效
+func _remember_fight(r: Dictionary) -> void:
+	for id in r["used"]:
+		if not hero.used_ever.has(id):
+			hero.used_ever.append(id)
+	for fx in r["felt_fx"]:
+		if not hero.felt_fx.has(fx):
+			hero.felt_fx.append(fx)
+
+
+## 委託板上有哪些對手：一般的都在；有名字的強者打倒了就不會再出現
+func board() -> Array:
+	var list: Array = EnemyData.ORDER.duplicate()
+	for id in EnemyData.NAMED:
+		if not hero.beaten.has(id):
+			list.append(id)
+	return list
 
 
 ## 這場打得怎樣（委託板上寫「上次」用）
@@ -63,9 +83,10 @@ func _after_win(id: String) -> Array:
 		hero.beaten.append(id)
 	# 卡在瓶頸時打贏比瓶頸強的對手就衝破。以前打贏過也算，不然先打贏、後卡瓶頸的人會卡死
 	var e: Dictionary = EnemyData.ENEMIES[id]
+	msgs.append_array(_loot(e))
 	var stronger: bool = maxi(e["str"], e["agi"]) > hero.cap()
 	if stronger and hero.stuck() and hero.can_break_through():
-		msgs.append(_break_through("卡在瓶頸時打贏了比自己強的對手。你覺得身體裡有什麼被打通了。"))
+		msgs.append_array(_break_through(e))
 	msgs.append_array(_check_bear_exam())
 	if id == TownData.GOAL and not hero.cleared:
 		hero.cleared = true
@@ -82,14 +103,43 @@ func _check_bear_exam() -> Array:
 
 # ---------- 基礎數值成長 ----------
 
+## 打贏就拿到對手身上的武器（沒有的話）。稀有的劍是大事，直接換上
+func _loot(e: Dictionary) -> Array:
+	var id: String = e.get("loot", "")
+	if id == "" or hero.owned_weapons.has(id):
+		return []
+	var w := WeaponData.get_def(id)
+	hero.owned_weapons.append(id)
+	if w.get("rare", false):
+		hero.weapon = id
+		return [_m("epic", "%s\n你拿到了「%s」。" % [w["get"], w["name"]]),
+			_m("info", "（換上了。%s）" % w["fx_desc"])]
+	var msgs := [_m("good", "你從%s身上拿到了%s。" % [e["name"], w["name"]])]
+	if WeaponData.get_def(hero.weapon)["power"] < w["power"]:
+		if hero.can_wield(id):
+			hero.weapon = id
+			msgs.append(_m("info", "比你手上的好，換上了。"))
+		else:
+			msgs.append(_m("info", "比你手上的好，可是太重，你還拿不動（力量要 %d）。" % w["str"]))
+	return msgs
+
+
+## 升境的那一刻（每一境寫法不同）
+const BREAKTHROUGH_TEXT := [
+	"",
+	"{name}倒下的那一刻，你沒有鬆一口氣——身體裡有什麼東西在翻湧。\n像一道一直關著的門，被人從裡面一腳踹開。血在血管裡奔流，呼吸變得又深又長，手裡的劍突然輕得像一根樹枝。\n你跨過去了。",
+	"這一次你知道會發生什麼。你站在{name}倒下的地方，閉上眼睛，等它來。\n先是一陣耳鳴，接著整個世界變得很安靜。你聽得見自己的心跳，一下、一下，沉得像戰鼓。睜開眼的時候，你看得見風吹過草地的每一道紋路。\n你又跨過去了。",
+]
+
+
 ## 升一境。回傳訊息
-func _break_through(why: String) -> Dictionary:
-	var old_realm: String = GrowthData.REALM_NAMES[hero.realm]
+func _break_through(beaten: Dictionary) -> Array:
 	var old_cap := hero.cap()
 	var old_hp := hero.max_hp()
 	hero.break_through()
-	return _m("big", "%s\n　%s → %s：瓶頸 %d → %d，血量上限 %d → %d。" % [
-		why, old_realm, GrowthData.REALM_NAMES[hero.realm], old_cap, hero.cap(), old_hp, hero.max_hp()])
+	var text: String = BREAKTHROUGH_TEXT[hero.realm].format({"name": beaten["name"]})
+	return [_m("epic", "%s\n—— %s ——" % [text, GrowthData.REALM_NAMES[hero.realm]]),
+		_m("info", "（瓶頸 %d → %d，血量上限 %d → %d）" % [old_cap, hero.cap(), old_hp, hero.max_hp()])]
 
 
 ## 用了哪個數值的招就練到哪個數值。練多少看對手「那一項」比你高多少。
@@ -205,7 +255,9 @@ func learn_move(id: String) -> Array:
 	hero.money -= st["cost"]
 	hero.learn(id)
 	var msgs := []
-	if st["cost"] > 0:
+	if MoveData.MOVES[id].get("ult", false):
+		msgs.append(_m("epic", "%s\n你學會了北境劍術的絕學「%s」。" % [SchoolData.ULT_SCENE, MoveData.MOVES[id]["name"]]))
+	elif st["cost"] > 0:
 		msgs.append(_m("good", "你交了 %d 銀學費，師傅教你「%s」。" % [st["cost"], MoveData.MOVES[id]["name"]]))
 	else:
 		msgs.append(_m("good", "師傅教你「%s」。" % MoveData.MOVES[id]["name"]))
@@ -271,6 +323,13 @@ func buy_weapon(id: String) -> Array:
 	hero.owned_weapons.append(id)
 	hero.weapon = id
 	return [_m("good", "你花了 %d 銀買下%s，換上了。" % [w["cost"], w["name"]])]
+
+
+func equip(id: String) -> Array:
+	if not hero.owned_weapons.has(id) or not hero.can_wield(id) or hero.weapon == id:
+		return []
+	hero.weapon = id
+	return [_m("info", "你換上了%s。" % WeaponData.get_def(id)["name"])]
 
 
 func _m(kind: String, text: String) -> Dictionary:
