@@ -32,6 +32,7 @@ extends RefCounted
 ## win_text / lose_text / flee_text / survive_text：戰鬥結束的句子（不寫就用預設的）。
 ## hide_hp：戰鬥畫面不顯示血量（師傅）。
 ## loot：打贏就拿到的武器（WeaponData）。稀有的劍拿在手上時，他打你也會發動那把劍的特效。
+## books：身上帶的秘笈（BookData），打贏就在戰利品裡。
 ## parry：露出破綻時還拿兵器擋你的寫法（先吃虧，見 Battle.can_parry）。沒寫的不會擋。no_parry：這個破綻擋不了（兵器卡住）。
 ## title：名號（有名的強者）。no_flee：再怎麼打不過也不會逃。fear / fear_flee：怕你時的句子。
 
@@ -289,7 +290,7 @@ const ENEMIES := {
 		"name": "羅德里克", "title": "傭兵隊長",
 		"blurb": "傭兵團「紅鬃」的隊長。獨眼。",
 		"hp": 260, "str": 18, "agi": 18, "armor": "light", "traits": [], "pron": "他",
-		"weapon": "鋸齒劍", "guard": "架勢", "loot": "red_fang", "no_flee": true,
+		"weapon": "鋸齒劍", "guard": "架勢", "loot": "red_fang", "books": ["sunder_book"], "no_flee": true,
 		"parry": ["羅德里克腳下還沒站穩，劍卻已經橫在身前。你砍上去，鋸齒卡住了你的劍刃。", "你搶上一步出劍，羅德里克的劍往上一挑，把你的劍架開了。"],
 		"scene": ["傭兵營地外的空地，篝火還在冒煙。十幾個傭兵圍成一圈等著看。"],
 		"start": ["一個獨眼的高個子從人群裡走出來，拔出一把暗紅色的劍：「就是你要拿我的人頭？」"],

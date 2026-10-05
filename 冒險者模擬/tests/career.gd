@@ -73,6 +73,13 @@ func _career(run: int, verbose: bool) -> Dictionary:
 					town_actions += 1
 					when["學會" + MoveData.MOVES[id]["name"]] = fights
 					learned_any = true
+		# 讀秘笈
+		for id in h.books:
+			if town.book_state(id)["ok"]:
+				town.read_book(id)
+				town_actions += 1
+				when["讀完" + BookData.get_def(id)["name"]] = fights
+				learned_any = true
 		if learned_any:
 			continue
 		# 買劍、換劍：換上拿得動的最好的劍；店裡的比較好就買
@@ -130,10 +137,9 @@ func _career(run: int, verbose: bool) -> Dictionary:
 		town.finish_commission(b)
 		for id in town.loot.duplicate():
 			town.take_loot(id)
-		if h.lore.has(SchoolData.ULT) and not when.has("拿到口訣"):
-			when["拿到口訣"] = fights
-		if h.knows(SchoolData.ULT) and not when.has("悟出絕學"):
-			when["悟出絕學"] = fights
+		town.return_to_town()
+		if not h.books.is_empty() and not when.has("拿到劍譜"):
+			when["拿到劍譜"] = fights
 		fights += 1
 		if r["outcome"] != "win":
 			losses += 1

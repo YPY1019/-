@@ -27,7 +27,6 @@ const COLOR := {
 	"status": "#c9b8a6",
 	"ult": "#ffe9a8",
 	"big": "#ffd479",
-	"lore": "#ffe9a8",
 }
 
 var battle: Battle
@@ -330,16 +329,20 @@ func refresh_loot(hero: Adventurer, drops: Array) -> void:
 		drop_list.add_child(UiKit.label("（空了）", 16, 0.5))
 
 
-## 一把武器一行：名字（滑鼠移上去看說明）＋右邊的按鈕
+## 一樣東西一行：名字（滑鼠移上去看說明）＋右邊的按鈕。秘笈用品級的顏色
 func _loot_row(id: String, right: Control) -> HBoxContainer:
-	var w := WeaponData.get_def(id)
 	var row := UiKit.hbox(8)
-	var n := UiKit.label(w["name"], 18)
+	var n: Label
+	if BookData.is_book(id):
+		n = UiKit.book_label(id, 18)
+	else:
+		var w := WeaponData.get_def(id)
+		n = UiKit.label(w["name"], 18)
+		n.tooltip_text = UiKit.weapon_tooltip(w)
+		if w.get("rare", false):
+			n.add_theme_color_override("font_color", Color(COLOR["big"]))
 	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	n.tooltip_text = UiKit.weapon_tooltip(w)
 	n.mouse_filter = Control.MOUSE_FILTER_STOP
-	if w.get("rare", false):
-		n.add_theme_color_override("font_color", Color(COLOR["big"]))
 	row.add_child(n)
 	row.add_child(right)
 	return row

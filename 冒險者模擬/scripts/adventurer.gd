@@ -21,10 +21,10 @@ var learned: Array[String] = []
 var steal_hits := {}
 ## 師傅認可到第幾階（第 1 階交學費就教，所以一開始是 1）
 var approved_tier := 1
-## 拿到口訣的招（還沒悟出來的絕學）
-var lore: Array[String] = []
-## 想起口訣、劍卻還是砍到對手兵器上幾次（跨場累計，到了 Battle.LORE_MISSES 才悟得出來）
-var lore_misses := 0
+## 身上的秘笈（BookData）。讀完就學會裡面的招，書還留著
+var books: Array[String] = []
+## 師傅交代的事：劍譜拿回去給師傅看過了沒
+var errand_reported := false
 ## 打贏過的敵人
 var beaten: Array[String] = []
 ## 拿著的武器和身上有的武器（買的、從人身上拿的）

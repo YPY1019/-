@@ -77,6 +77,16 @@ static func messages_bbcode(msgs: Array) -> String:
 	return "\n".join(lines)
 
 
+## 秘笈的名字：書名號、品級的顏色，滑鼠移上去看說明和要讀幾天
+static func book_label(id: String, size := 18) -> Label:
+	var b := BookData.get_def(id)
+	var l := label("《%s》" % b["name"], size)
+	l.add_theme_color_override("font_color", Color(BookData.color(id)))
+	l.tooltip_text = "%s\n讀完要 %d 天" % [b["desc"], b["days"]]
+	l.mouse_filter = Control.MOUSE_FILTER_STOP
+	return l
+
+
 ## 武器的滑鼠提示：說明，加上想查才看的數字
 static func weapon_tooltip(w: Dictionary) -> String:
 	var lines := [w["desc"], "傷害 ×%.1f" % w["power"]]

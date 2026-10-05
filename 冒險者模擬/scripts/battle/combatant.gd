@@ -47,8 +47,6 @@ var held := false
 var used: Array[String] = []
 ## 這場被敵人招牌招打中幾次：你偷學的招 id -> 次數
 var sig_hits := {}
-## 這場想起口訣、劍卻還是砍到對手兵器上幾次（打完加到 Adventurer.lore_misses）
-var lore_misses := 0
 
 ## ---- 敵人 ----
 ## 這回合要做的事：{"action", "type", "phase": windup/strike/do/forced/hold, "text", "target"}

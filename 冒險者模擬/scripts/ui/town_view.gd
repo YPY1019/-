@@ -175,8 +175,23 @@ func _build_me() -> void:
 		if SchoolData.tier_of(id) == 0:
 			wild.append(id)
 	_move_flow(wild)
-	if not h.lore.is_empty():
-		me_box.add_child(UiKit.label(SchoolData.ERRAND["lore"], 16, 0.7, true))
+
+	if not h.books.is_empty():
+		me_box.add_child(UiKit.heading("秘笈"))
+		for id in h.books:
+			var st := town.book_state(id)
+			var row := UiKit.hbox(10)
+			var n := UiKit.book_label(id, 18)
+			n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(n)
+			if st["read"]:
+				row.add_child(UiKit.label("讀過", 16, 0.5))
+			else:
+				var b := UiKit.button("讀（%d 天）" % st["days"], 130)
+				b.disabled = not st["ok"]
+				b.pressed.connect(func(): _act(town.read_book(id)))
+				row.add_child(b)
+			me_box.add_child(row)
 
 
 ## 一排招式名字，滑鼠移上去看說明
@@ -223,6 +238,9 @@ func _build_board() -> void:
 		info.add_child(UiKit.label(e["blurb"], 16, 0.75, true))
 		if named:
 			info.add_child(UiKit.label("帶著一把" + WeaponData.get_def(e["loot"])["look"], 16, 0.75, true))
+		for book in e.get("books", []):
+			if not h.books.has(book):
+				info.add_child(UiKit.label("身上還有%s。" % BookData.get_def(book)["look"], 16, 0.75, true))
 		info.add_child(UiKit.label("%d 銀・來回 %d 天" % [c["reward"], c["days"]], 15, 0.6))
 		info.tooltip_text = c["text"]
 		info.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -255,13 +273,15 @@ func _build_dojo() -> void:
 					row.add_child(b)
 					dojo_box.add_child(row)
 			"errand":
-				# 絕學：師傅交代事情之後才出現。不在道場學（口訣 ＋ 實戰悟出），悟出來之後才列出招名
+				# 絕學：師傅交代事情之後才出現。不在道場學（讀秘笈），讀完之後才列出招名
 				if h.approved_tier < 2:
 					continue
 				dojo_box.add_child(UiKit.heading(t["name"]))
 				if not h.knows(SchoolData.ULT):
-					var line: String = SchoolData.ERRAND["lore"] if h.lore.has(SchoolData.ULT) else SchoolData.ERRAND["reminder"]
-					dojo_box.add_child(UiKit.label(line, 17, 0.8, true))
+					if h.errand_reported:
+						dojo_box.add_child(UiKit.book_label(SchoolData.ERRAND["book"], 19))
+					else:
+						dojo_box.add_child(UiKit.label(SchoolData.ERRAND["reminder"], 17, 0.8, true))
 					dojo_box.add_child(HSeparator.new())
 					continue
 			_:

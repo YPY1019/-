@@ -82,9 +82,11 @@ func _on_battle_ended() -> void:
 		battle_view.show_loot(town.hero, town.loot)
 
 
+## 拿到的東西接在結算後面，回城時一起寫進城裡的紀錄
 func _take_loot(id: String) -> void:
-	town.take_loot(id)
-	play_log.write(["拿走了%s" % WeaponData.get_def(id)["name"]])
+	var msgs := town.take_loot(id)
+	_settled.append_array(msgs)
+	battle_view.show_settlement(msgs)
 	battle_view.refresh_loot(town.hero, town.loot)
 
 
@@ -97,7 +99,7 @@ func _back_to_town() -> void:
 	town.clear_loot()
 	battle_view.visible = false
 	town_view.visible = true
-	town_view.add_messages(_settled)
+	town_view.add_messages(_settled + town.return_to_town())
 	_settled = []
 	town_view.refresh()
 

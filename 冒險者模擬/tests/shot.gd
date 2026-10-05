@@ -73,12 +73,29 @@ func _init() -> void:
 	var h: Adventurer = main.town.hero
 	h.stats = {"str": 18, "agi": 18}
 	h.realm = 1
-	h.learn("sunder")
+	h.approved_tier = 2
 	h.hp = h.max_hp()
+	main.town_view.refresh()
+	await _frames(3)
+	_save(out + "/board_before.png")
 	main._start_commission("merc_captain")
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/named.png")
+	# 劍譜在戰利品裡：拿走
+	if main.town.loot.has("sunder_book"):
+		main._take_loot("sunder_book")
+		await _frames(3)
+		_save(out + "/book_loot.png")
+	main._back_to_town()
+	await _frames(3)
+	_save(out + "/book_town.png")
+	main.town_view.add_messages(main.town.read_book("sunder_book"))
+	await _frames(3)
+	_save(out + "/book_read.png")
+	h.hp = h.max_hp()
+	main._start_commission("black_knight")
+	main.battle_view._skip()
 	main._back_to_town()
 	var tabs2: TabContainer = main.town_view.find_children("*", "TabContainer", true, false)[0]
 	tabs2.current_tab = 2

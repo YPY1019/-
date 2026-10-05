@@ -29,8 +29,6 @@ const HOLD_MAX := 2
 ## 怕你的對手：血掉到這裡以下、每挨一下有這個機率逃走
 const FEAR_FLEE_HP := 0.6
 const FEAR_FLEE_CHANCE := 0.5
-## 血掉到這裡以下就算硬仗（見 hard_fight）
-const HARD_FIGHT_HP := 0.5
 ## 先吃虧：對手露出破綻時，你一般的砍法砍到他及時擋過來的兵器上的機率。
 ## 看你這招的數值比對手低多少：差距 0 時 GUARD_BASE，每低 1 點多 GUARD_PER_POINT
 const GUARD_BASE := 0.25
@@ -38,8 +36,6 @@ const GUARD_PER_POINT := 0.1
 const GUARD_MAX := 0.7
 ## 砍到兵器上，傷害剩這個比例
 const GUARDED_DEAL := 0.35
-## 先差一點：拿到口訣後，想起口訣、劍還是砍到兵器上幾次，才悟得出來（跨場累計）
-const LORE_MISSES := 2
 ## 你的反應句：對手那一項比你高很多、而且這一下掉了這個比例以上的血，才寫「被打飛」
 const CRUSHED_HP := 0.15
 
@@ -167,7 +163,7 @@ func is_over() -> bool:
 func result() -> Dictionary:
 	var hero := allies[0]
 	return {"outcome": outcome, "rounds": round_no, "hp": hero.hp, "max_hp": hero.max_hp,
-		"used": hero.used, "sig_hits": hero.sig_hits, "lore_misses": hero.lore_misses}
+		"used": hero.used, "sig_hits": hero.sig_hits}
 
 
 ## 結束的句子，敵人資料裡有寫就用敵人的
@@ -197,14 +193,8 @@ func _deal_hands() -> void:
 			# 收招慢的招（裂盾斬），用完下回合不能再用
 			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
 				pool.erase(ally.used[-1])
-			# 絕學只有對手露出大破綻時才出得來。只有口訣、還沒悟出來的，要在硬仗裡才悟得出來；
-			# 還沒差一點夠次數的，要對手拿得起兵器擋（不然沒有「砍到兵器上」這回事）
+			# 絕學只有對手露出大破綻時才出得來
 			var foe := _first_alive(enemies)
-			if foe != null and big_opening(foe) and hard_fight(ally, foe) \
-					and (_lore_misses_left(ally) <= 0 or can_parry(foe)):
-				for id in ally.adventurer.lore:
-					if not pool.has(id):
-						pool.append(id)
 			if foe == null or not big_opening(foe):
 				pool = pool.filter(func(id): return not MoveData.MOVES[id].get("only_opening", false))
 			# 自動戰鬥：會的招全部都能挑（學越多招越強）
@@ -272,32 +262,15 @@ func _weighted_pick(ally: Combatant, candidates: Array, foe: Combatant) -> Strin
 
 func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array) -> Dictionary:
 	var m: Dictionary = MoveData.MOVES[move_id]
-	if m.get("ult", false) and not _knows(ally, move_id) and not ally.used.has(move_id) and _lore_misses_left(ally) > 0:
-		# 先差一點：想起口訣，手還是照老習慣砍向對手的兵器（算一般的攻擊）
-		var n: int = LORE_MISSES - _lore_misses_left(ally)
-		ally.lore_misses += 1
-		var lines: Array = m["lore_miss"][mini(n, m["lore_miss"].size() - 1)]
-		move_id = "attack"
-		m = MoveData.MOVES[move_id]
-		var miss := {"deal": MoveData.entry(move_id, "opening", target.traits)["deal"] * GUARDED_DEAL, "text": lines}
-		return _land_player(ally, move_id, miss, target, ev)
-
 	var e := resolve(ally, move_id, target)
 	# 先吃虧：對手露出破綻，還拿得起兵器擋，你的劍常常砍到兵器上（絕學不會）
 	if not m.get("ult", false) and e.get("deal", 0.0) > 0.0 and big_opening(target) and can_parry(target) \
 			and rng.randf() < guard_chance(ally, move_id, target):
 		e = {"deal": e["deal"] * GUARDED_DEAL, "text": target.enemy_def["parry"]}
 	if m.get("ult", false):
-		if _knows(ally, move_id):
-			# 絕學：先寫起手，喊出招名，再寫結果
-			ev.append(_ev("action", target.fill(_pick(m["pre"]))))
-			ev.append(_ev("ult", "「%s」！" % m["name"]))
-		elif not ally.used.has(move_id):
-			# 第一次悟出來：想起口訣，還不知道招名
-			ev.append(_ev("lore", target.fill(_pick(m["realize"]))))
-		else:
-			# 同一場再用：還不知道招名，只寫起手
-			ev.append(_ev("action", target.fill(_pick(m["pre"]))))
+		# 絕學：先寫起手，喊出招名，再寫結果
+		ev.append(_ev("action", target.fill(_pick(m["pre"]))))
+		ev.append(_ev("ult", "「%s」！" % m["name"]))
 	return _land_player(ally, move_id, e, target, ev)
 
 
@@ -373,11 +346,6 @@ func _afraid(foe: Combatant) -> bool:
 	return not foe.enemy_def.get("no_flee", false) and outclass(allies[0], foe) >= GrowthData.OUTCLASS
 
 
-## 硬仗（只有口訣的絕學悟得出來）：你的血掉到一半以下，或對手最強的那項比你高
-func hard_fight(hero: Combatant, foe: Combatant) -> bool:
-	return hero.hp <= hero.max_hp * HARD_FIGHT_HP or outclass(hero, foe) < 0
-
-
 ## 對手這回合露出大破綻（絕學出得來）：被逼出來的破綻（嚇退不算），或自己露出來的（喘氣、卡住、撿武器）
 func big_opening(foe: Combatant) -> bool:
 	var it := foe.intent
@@ -398,17 +366,6 @@ func can_parry(foe: Combatant) -> bool:
 func guard_chance(ally: Combatant, move_id: String, foe: Combatant) -> float:
 	var g := gap(ally, foe, MoveData.MOVES[move_id]["stat"])
 	return clampf(GUARD_BASE - g * GUARD_PER_POINT, 0.0, GUARD_MAX)
-
-
-func _knows(ally: Combatant, move_id: String) -> bool:
-	return ally.adventurer != null and ally.adventurer.knows(move_id)
-
-
-## 還要差一點幾次才悟得出來
-func _lore_misses_left(ally: Combatant) -> int:
-	if ally.adventurer == null:
-		return 0
-	return LORE_MISSES - ally.adventurer.lore_misses - ally.lore_misses
 
 
 ## 我方這招打出去的傷害（算了武器，還沒算盔甲和浮動）
