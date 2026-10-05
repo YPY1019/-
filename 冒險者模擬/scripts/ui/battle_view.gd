@@ -1,14 +1,19 @@
 class_name BattleView
 extends VBoxContainer
 
-## 戰鬥畫面。只負責顯示和按鈕，規則都在 Battle。
+## 戰鬥畫面（自動戰鬥試驗）。只負責顯示，規則都在 Battle，挑招在 AutoPilot。
+## 戰鬥自己打：每隔一下打一回合，戰報一段一段出來；按「看完」一次打完。
 ## 戰鬥紀錄參考 CK3 單挑：開場交代場景，每回合把雙方的動作寫成一整段，數字另外放一行小字，
 ## 雙方的狀態用文字描述。
+## 打完在右邊並排顯示「上次 vs 這次」。
 ##
 ## 打完發出 ended（外面結算後呼叫 show_settlement），按「回到城裡」發出 closed。
 
 signal ended
 signal closed
+
+## 每回合間隔幾秒
+const ROUND_SEC := 0.8
 
 const COLOR := {
 	"round": "#8a8f98",
@@ -21,10 +26,15 @@ const COLOR := {
 	"status": "#c9b8a6",
 	"end": "#ffffff",
 }
+const BETTER := "#9be39b"
+const WORSE := "#ff8a8a"
+const OUTCOME_NAMES := {"win": "贏", "lose": "輸", "flee": "撤退", "survive": "撐過"}
 
 var battle: Battle
 var hero_c: Combatant
 var foe_c: Combatant
+var pilot := AutoPilot.new()
+var timer: Timer
 
 var hero_name_label: Label
 var hero_bar: ProgressBar
@@ -35,9 +45,9 @@ var foe_hp_label: Label
 var foe_name_label: Label
 var foe_status: Label
 var log_label: RichTextLabel
-var tell_label: Label
-var hint_label: Label
-var move_row: HBoxContainer
+var report_panel: PanelContainer
+var report_box: VBoxContainer
+var play_box: HBoxContainer
 var end_box: HBoxContainer
 
 
@@ -60,35 +70,46 @@ func _init() -> void:
 	foe_status = foe_col["status"]
 	top.add_child(foe_col["box"])
 
-	# 中：戰鬥紀錄
+	# 中：左邊戰鬥紀錄，右邊打完的「上次 vs 這次」
+	var mid := UiKit.hbox(12)
+	mid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(mid)
 	log_label = RichTextLabel.new()
 	log_label.bbcode_enabled = true
 	log_label.scroll_following = true
 	log_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_label.add_theme_constant_override("line_separation", 6)
 	var log_panel := PanelContainer.new()
+	log_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_panel.add_child(log_label)
-	add_child(log_panel)
+	mid.add_child(log_panel)
+	report_box = UiKit.vbox(6)
+	report_panel = PanelContainer.new()
+	report_panel.custom_minimum_size.x = 430
+	var report_margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		report_margin.add_theme_constant_override("margin_" + side, 12)
+	report_margin.add_child(report_box)
+	report_panel.add_child(report_margin)
+	mid.add_child(report_panel)
 
-	# 對手現在的動作
-	tell_label = UiKit.label("", 22, 1.0, true)
-	tell_label.add_theme_color_override("font_color", Color(COLOR["tell"]))
-	add_child(tell_label)
-
-	# 下：選項
-	move_row = UiKit.hbox(10)
-	add_child(move_row)
-
-	hint_label = UiKit.label("", 16, 0.6, true)
-	add_child(hint_label)
-
-	# 結束後的按鈕
+	# 下：打的時候「看完」，打完「回到城裡」
+	play_box = UiKit.hbox(10)
+	var skip := UiKit.button("看完", 170, 52)
+	skip.pressed.connect(_skip)
+	play_box.add_child(skip)
+	add_child(play_box)
 	end_box = UiKit.hbox(10)
 	var back := UiKit.button("回到城裡", 170, 52)
 	back.pressed.connect(func(): closed.emit())
 	end_box.add_child(back)
 	add_child(end_box)
+
+	timer = Timer.new()
+	timer.wait_time = ROUND_SEC
+	timer.timeout.connect(_play_one)
+	add_child(timer)
 
 
 func begin(p_battle: Battle, note := "") -> void:
@@ -96,9 +117,10 @@ func begin(p_battle: Battle, note := "") -> void:
 	hero_c = battle.allies[0]
 	foe_c = battle.enemies[0]
 	log_label.clear()
+	report_panel.visible = false
 	# 人標境界，怪物標危險度，都用境界的顏色
 	var a := hero_c.adventurer
-	hero_name_label.text = "你　%s" % a.realm_text()
+	hero_name_label.text = "你　%s　%s" % [a.realm_text(), WeaponData.get_def(a.weapon)["name"]]
 	hero_name_label.add_theme_color_override("font_color", Color(a.realm_color()))
 	var dg := EnemyData.danger(foe_c.enemy_id)
 	if foe_c.enemy_def.has("realm"):
@@ -113,20 +135,31 @@ func begin(p_battle: Battle, note := "") -> void:
 	if note != "":
 		log_label.append_text("[color=%s]%s[/color]\n" % [COLOR["info"], note])
 	_refresh()
+	timer.start()
 
 
-## 打完的結算（拿到多少錢、數值成長…）接在戰鬥紀錄後面
-func show_settlement(msgs: Array) -> void:
+## 打完的結算（拿到多少錢、數值成長…）接在戰鬥紀錄後面；report 是 Town.last_report（空的 = 不比）
+func show_settlement(msgs: Array, report := {}) -> void:
 	log_label.append_text("\n" + UiKit.messages_bbcode(msgs) + "\n")
+	if not report.is_empty():
+		_build_report(report)
 
 
-func _on_move(id: String) -> void:
+func _play_one() -> void:
 	if battle == null or battle.is_over():
+		timer.stop()
 		return
-	_append(battle.play_round({hero_c: {"move": id, "target": foe_c}}))
+	var choice := pilot.choose(battle, hero_c, foe_c)
+	_append(battle.play_round({hero_c: {"move": choice, "target": foe_c}}))
 	_refresh()
 	if battle.is_over():
+		timer.stop()
 		ended.emit()
+
+
+func _skip() -> void:
+	while battle != null and not battle.is_over():
+		_play_one()
 
 
 ## 把事件排成段落：同一回合的敘述接成一段，傷害數字另外一行小字
@@ -174,41 +207,105 @@ func _refresh() -> void:
 	foe_hp_label.text = "%d / %d" % [foe_c.hp, foe_c.max_hp]
 	hero_status.text = _condition(hero_c, true)
 	foe_status.text = _condition(foe_c, false)
-
 	var over := battle.is_over()
-	if not over and hero_c.hand_note != "":
-		hero_status.text += hero_c.hand_note
-	move_row.visible = not over
-	hint_label.visible = not over
+	play_box.visible = not over
 	end_box.visible = over
-	if over:
-		tell_label.text = ""
-		return
-	tell_label.text = "▶ " + foe_c.intent["text"]
 
-	# 選項每回合都不同，重新排按鈕
-	UiKit.clear(move_row)
-	for opt in battle.hand_options(hero_c):
-		var b := UiKit.button(opt["name"], 150, 52)
-		if opt["weak"] != "":
-			# 數值差太多，這回合用了一定失敗
-			b.text = "%s\n%s" % [opt["name"], opt["weak"]]
-			b.add_theme_font_size_override("font_size", 17)
-			b.add_theme_color_override("font_color", Color(COLOR["damage_in"]))
-		b.tooltip_text = opt["desc"]
-		b.pressed.connect(_on_move.bind(opt["id"]))
-		b.mouse_entered.connect(_show_hint.bind(opt["id"]))
-		move_row.add_child(b)
-	# 撤退不是招式，跟選項分開放在最右邊
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	move_row.add_child(spacer)
-	var flee := UiKit.button("撤退", 120, 52)
-	flee.disabled = not battle.can_flee(hero_c)
-	flee.pressed.connect(_on_move.bind(MoveData.FLEE))
-	flee.mouse_entered.connect(_show_hint.bind(MoveData.FLEE))
-	move_row.add_child(flee)
-	hint_label.text = ""
+
+# ---------- 上次 vs 這次 ----------
+
+func _build_report(report: Dictionary) -> void:
+	UiKit.clear(report_box)
+	report_panel.visible = true
+	var before: Dictionary = report["before"]
+	var now: Dictionary = report["now"]
+	if before.is_empty():
+		report_box.add_child(UiKit.heading("第一次打%s" % foe_c.display_name))
+		report_box.add_child(UiKit.label("下次再打，會跟這次比。", 16, 0.6, true))
+	else:
+		report_box.add_child(UiKit.heading("跟上次比"))
+
+	var grid := GridContainer.new()
+	grid.columns = 3 if not before.is_empty() else 2
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 6)
+	report_box.add_child(grid)
+	var head := ["", "上次（第 %d 天）" % before.get("day", 0), "這次"] if not before.is_empty() else ["", "這次"]
+	for h in head:
+		grid.add_child(UiKit.label(h, 16, 0.6))
+
+	# 每列：名稱、上次、這次、比較用的 key（見 _score；"" = 不比）
+	var rows := [
+		["結果", _outcome(before), _outcome(now), "outcome"],
+		["回合", str(before.get("rounds", "")), str(now["rounds"]), "rounds"],
+		["你掉的血", "%d / %d" % [before.get("hp_lost", 0), before.get("max_hp", 0)], "%d / %d" % [now["hp_lost"], now["max_hp"]], "hp_lost"],
+		["對手剩的血", "%d%%" % roundi(before.get("foe_left", 0.0) * 100), "%d%%" % roundi(now["foe_left"] * 100), "foe_left"],
+		["境界", before.get("realm", ""), now["realm"], ""],
+		["力量／敏捷", "%d／%d" % [before.get("str", 0), before.get("agi", 0)], "%d／%d" % [now["str"], now["agi"]], "stats"],
+		["武器", before.get("weapon", ""), now["weapon"], ""],
+	]
+	for row in rows:
+		grid.add_child(UiKit.label(row[0], 17, 0.75))
+		if not before.is_empty():
+			grid.add_child(UiKit.label(row[1], 17, 0.75))
+		var cell := UiKit.label(row[2], 18)
+		if not before.is_empty() and row[3] != "":
+			var diff := _score(row[3], now) - _score(row[3], before)
+			# 回合數只在兩次都打贏時比
+			var comparable: bool = row[3] != "rounds" or (now["outcome"] == "win" and before["outcome"] == "win")
+			if comparable and absf(diff) > 0.001:
+				cell.add_theme_color_override("font_color", Color(BETTER if diff > 0 else WORSE))
+		grid.add_child(cell)
+
+	# 多了什麼新東西
+	if not before.is_empty():
+		var news := []
+		if now["weapon"] != before["weapon"]:
+			news.append("換了%s" % now["weapon"])
+		for id in now["learned"]:
+			if not before["learned"].has(id):
+				news.append("學會「%s」" % MoveData.MOVES[id]["name"])
+		if not news.is_empty():
+			var l := UiKit.label("這次多了：" + "、".join(news), 17, 1.0, true)
+			l.add_theme_color_override("font_color", Color(COLOR["tell"]))
+			report_box.add_child(l)
+
+	# 這場用了哪些招，用得多的排前面
+	var used: Dictionary = now["used"]
+	var ids := used.keys()
+	ids.sort_custom(func(a, b): return used[a] > used[b])
+	var parts := []
+	for id in ids:
+		var s := "%s ×%d" % [MoveData.MOVES[id]["name"], used[id]]
+		if not before.is_empty() and not before["learned"].has(id) and not MoveData.is_basic(id):
+			s = "★" + s
+		parts.append(s)
+	report_box.add_child(UiKit.label("這場用了：" + "、".join(parts), 16, 0.8, true))
+
+
+func _outcome(r: Dictionary) -> String:
+	if r.is_empty():
+		return ""
+	var text: String = OUTCOME_NAMES[r["outcome"]]
+	if r["outcome"] == "flee":
+		text += "（第 %d 回合）" % r["rounds"]
+	return text
+
+
+## 比較用的分數，越大越好
+func _score(key: String, r: Dictionary) -> float:
+	match key:
+		"outcome":
+			return {"lose": 0, "flee": 1, "win": 2}.get(r["outcome"], 0)
+		"rounds":
+			return -r["rounds"]
+		"hp_lost":
+			return -float(r["hp_lost"]) / r["max_hp"]
+		"foe_left":
+			return -r["foe_left"]
+		"stats":
+			return r["str"] + r["agi"]
+	return 0.0
 
 
 ## 用文字描述狀態，不只看血條
@@ -235,15 +332,6 @@ func _condition(c: Combatant, is_hero: bool) -> String:
 	if r >= 0.25:
 		return c.fill("{name}傷得不輕，動作慢了下來。")
 	return c.fill("{name}快撐不住了。")
-
-
-func _show_hint(id: String) -> void:
-	var m: Dictionary = MoveData.MOVES[id]
-	if m.has("stat"):
-		var s: String = m["stat"]
-		hint_label.text = "%s（靠%s：你 %d，對手 %d）：%s" % [m["name"], GrowthData.NAMES[s], hero_c.stats[s], foe_c.stats[s], m["desc"]]
-	else:
-		hint_label.text = "%s：%s" % [m["name"], m["desc"]]
 
 
 func _hp_column(name_text: String, fill_color: Color) -> Dictionary:

@@ -6,7 +6,8 @@ extends RefCounted
 ## 招式分三階，畫面上叫基礎招、進階招、絕學（暫定，跟「第二境」分開）。
 ## 基礎招：交學費就教。
 ## 進階招、絕學：錢沒用，要師傅認可（通過考驗），而且數值要到門檻。
-## 特訓：付錢請師傅帶你過瓶頸（加快，不是買）。
+## 高階的招比低階的強（自動戰鬥試驗）：學了高階，角色就改用高階的。
+## 師傅不能帶你過瓶頸（實力和認可是兩回事）。
 
 const NAME := "北境劍術"
 const MASTER_ENEMY := "master"
@@ -27,7 +28,7 @@ const REQ := {
 	"redirect": {"str": 13},
 	"disarm": {"agi": 13},
 	"break_free": {"str": 13},
-	"vital": {"agi": 17},
+	"vital": {"agi": 14},
 	"combo": {"str": 17},
 }
 
@@ -36,12 +37,6 @@ const SPAR_DAYS := 1
 const SPAR_ROUNDS := 3
 ## 血掉到這個比例以下就算輸（掉超過四成）
 const SPAR_YIELD := 0.6
-
-## 特訓過瓶頸：第 i 個是從 CAPS[i] 練到 CAPS[i+1]
-const TRAIN := [
-	{"cost": 300, "days": 10},
-	{"cost": 600, "days": 15},
-]
 
 
 static func tier_of(move_id: String) -> int:

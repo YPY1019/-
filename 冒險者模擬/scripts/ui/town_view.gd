@@ -1,7 +1,7 @@
 class_name TownView
 extends VBoxContainer
 
-## 城鎮畫面：你的狀態、委託板、北境劍術道場、休養。只負責顯示和按鈕，規則都在 Town。
+## 城鎮畫面：你的狀態、委託板、北境劍術道場、武器店、休養。只負責顯示和按鈕，規則都在 Town。
 ## 要開打時發出 commission_requested / spar_requested，由 main 切到戰鬥畫面。
 
 signal commission_requested(enemy_id: String)
@@ -22,6 +22,7 @@ var rest_row: HBoxContainer
 var me_box: VBoxContainer
 var board_box: VBoxContainer
 var dojo_box: VBoxContainer
+var shop_box: VBoxContainer
 var log_label: RichTextLabel
 
 
@@ -67,6 +68,10 @@ func _init(p_town: Town) -> void:
 	var dojo := _scroll(dojo_box)
 	dojo.name = "北境劍術道場"
 	tabs.add_child(dojo)
+	shop_box = UiKit.vbox(10)
+	var shop := _scroll(shop_box)
+	shop.name = "武器店"
+	tabs.add_child(shop)
 
 	# 下：發生了什麼事
 	log_label = RichTextLabel.new()
@@ -99,6 +104,7 @@ func refresh() -> void:
 	_build_me()
 	_build_board()
 	_build_dojo()
+	_build_shop()
 
 
 func _act(msgs: Array) -> void:
@@ -155,9 +161,11 @@ func _build_me() -> void:
 			row.add_child(cap)
 		me_box.add_child(row)
 	if h.stuck() and h.can_break_through():
-		var hint := UiKit.label("卡在瓶頸：打贏 %s 的對手，或去道場特訓" % "★".repeat(h.realm + 2), 16, 1.0, true)
+		var hint := UiKit.label("卡在瓶頸：打贏 %s 的對手就能突破" % "★".repeat(h.realm + 2), 16, 1.0, true)
 		hint.add_theme_color_override("font_color", Color(GOLD))
 		me_box.add_child(hint)
+	var w := WeaponData.get_def(h.weapon)
+	me_box.add_child(UiKit.label("武器：%s（傷害 ×%.1f）" % [w["name"], w["power"]], 18))
 
 	me_box.add_child(UiKit.heading("會的招"))
 	_move_line("一般", MoveData.BASIC)
@@ -225,6 +233,8 @@ func _build_board() -> void:
 		info.add_child(title_row)
 		info.add_child(UiKit.label(e["blurb"], 16, 0.75, true))
 		info.add_child(UiKit.label("報酬 %d 銀・來回 %d 天" % [c["reward"], c["days"]], 15, 0.6))
+		if h.last_fights.has(id):
+			info.add_child(UiKit.label("上次：" + _last_text(h.last_fights[id]), 15, 0.85))
 		info.tooltip_text = c["text"]
 		info.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(info)
@@ -262,21 +272,6 @@ func _build_dojo() -> void:
 		for id in t["moves"]:
 			_move_row(id)
 		dojo_box.add_child(HSeparator.new())
-
-	dojo_box.add_child(UiKit.heading("特訓"))
-	var tr := town.train_state()
-	if not tr["available"]:
-		dojo_box.add_child(UiKit.label("師傅：「我能帶你的，已經都帶了。」", 16, 0.7, true))
-		return
-	var row := UiKit.hbox(12)
-	var b := UiKit.button("過瓶頸，升%s（%d 銀、%d 天）" % [GrowthData.REALM_NAMES[h.realm + 1], tr["cost"], tr["days"]], 320)
-	b.disabled = not tr["ok"]
-	b.tooltip_text = tr["why"]
-	b.pressed.connect(func(): _act(town.train()))
-	row.add_child(b)
-	if tr["why"] != "":
-		row.add_child(UiKit.label(tr["why"], 16, 0.7))
-	dojo_box.add_child(row)
 
 
 func _exam_line(t: Dictionary, passed: bool) -> void:
@@ -319,6 +314,54 @@ func _move_row(id: String) -> void:
 			col.add_child(why)
 		row.add_child(col)
 	dojo_box.add_child(row)
+
+
+# ---------- 武器店 ----------
+
+func _build_shop() -> void:
+	UiKit.clear(shop_box)
+	var h := town.hero
+	shop_box.add_child(UiKit.label("劍越好，你打出去的每一招都越痛。好劍很重，力量不夠拿不動。", 16, 0.7, true))
+	for id in WeaponData.ORDER:
+		var w := WeaponData.get_def(id)
+		var st := town.weapon_state(id)
+		var row := UiKit.hbox(12)
+		var info := UiKit.vbox(0)
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var title := "%s　傷害 ×%.1f" % [w["name"], w["power"]]
+		if w["str"] > 0:
+			title += "　（力量 %d）" % w["str"]
+		info.add_child(UiKit.label(title, 19, 1.0 if st["owned"] or st["ok"] else 0.5))
+		info.add_child(UiKit.label(w["desc"], 15, 0.6, true))
+		row.add_child(info)
+		if h.weapon == id:
+			var using := UiKit.label("用著", 17)
+			using.add_theme_color_override("font_color", Color("#9be39b"))
+			row.add_child(using)
+		elif st["owned"]:
+			row.add_child(UiKit.label("已有", 17, 0.6))
+		else:
+			var b := UiKit.button("買（%d 銀）" % w["cost"], 170)
+			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			b.disabled = not st["ok"]
+			b.pressed.connect(func(): _act(town.buy_weapon(id)))
+			var col := UiKit.vbox(2)
+			col.add_child(b)
+			if not st["ok"]:
+				col.add_child(UiKit.label("、".join(st["why"]), 14, 0.7))
+			row.add_child(col)
+		shop_box.add_child(row)
+		shop_box.add_child(HSeparator.new())
+
+
+## 委託板上的「上次：贏・5 回合・掉 25 血」
+func _last_text(r: Dictionary) -> String:
+	match r["outcome"]:
+		"win":
+			return "贏・%d 回合・掉 %d 血" % [r["rounds"], r["hp_lost"]]
+		"flee":
+			return "撤退・打掉對手 %d%% 的血" % roundi((1.0 - r["foe_left"]) * 100)
+	return "輸・打掉對手 %d%% 的血" % roundi((1.0 - r["foe_left"]) * 100)
 
 
 # ---------- 小工具 ----------

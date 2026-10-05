@@ -1,15 +1,15 @@
 extends SceneTree
 
 ## 整輪模擬（開發用）：電腦玩家從第 1 天玩到打倒食人魔，看要幾天、幾場、什麼時候學到什麼。
-## 策略很簡單：傷了就休養、能學就學、能考就考、卡瓶頸有錢就特訓；
-## 委託挑「最難、但在目前實力下還沒連輸兩次」的。
+## 策略很簡單：傷了就休養、能學就學、能考就考、買得起更好的劍就買；
+## 委託挑「最難、但在目前實力下還沒連輸兩次」的。戰鬥是自動的（AutoPilot）。
 ## 執行：Godot.exe --headless --path . --script res://tests/career.gd
 
-const Bot := preload("res://tests/bot.gd")
 const RUNS := 30
-## 估算真人花的時間：每回合幾秒、每次城裡的動作幾秒
-const SEC_PER_ROUND := 10
-const SEC_PER_TOWN := 15
+## 估算真人花的時間：每回合幾秒（自動播放，有時按「看完」）、每次城裡的動作幾秒
+const SEC_PER_ROUND := 2
+const SEC_PER_FIGHT := 15
+const SEC_PER_TOWN := 10
 
 
 func _init() -> void:
@@ -27,7 +27,9 @@ func _init() -> void:
 	for r in cleared:
 		for k in r["when"]:
 			milestones[k] = milestones.get(k, []) + [r["when"][k]]
-	for k in milestones:
+	var keys := milestones.keys()
+	keys.sort_custom(func(a, b): return milestones[a][milestones[a].size() / 2] < milestones[b][milestones[b].size() / 2])
+	for k in keys:
 		var v: Array = milestones[k]
 		v.sort()
 		print("　%s：第 %d 場左右（%d/%d 輪有）" % [k, v[v.size() / 2], v.size(), cleared.size()])
@@ -37,7 +39,7 @@ func _init() -> void:
 func _career(run: int, verbose: bool) -> Dictionary:
 	var town := Town.new()
 	var h := town.hero
-	var bot := Bot.new()
+	var pilot := AutoPilot.new()
 	var fights := 0
 	var losses := 0
 	var rounds := 0
@@ -70,23 +72,30 @@ func _career(run: int, verbose: bool) -> Dictionary:
 					learned_any = true
 		if learned_any:
 			continue
+		# 買劍：買得起最好的就買
+		var bought := false
+		for i in range(WeaponData.ORDER.size() - 1, 0, -1):
+			var w: String = WeaponData.ORDER[i]
+			if WeaponData.ORDER.find(h.weapon) >= i:
+				break
+			if town.weapon_state(w)["ok"]:
+				town.buy_weapon(w)
+				when["買" + WeaponData.get_def(w)["name"]] = fights
+				town_actions += 1
+				bought = true
+				break
+		if bought:
+			continue
 		# 考驗
-		if town.spar_state()["ok"] and h.learned.size() >= 2 and mini(h.stats["str"], h.stats["agi"]) >= 13 and spar_tries < 3:
+		if town.spar_state()["ok"] and h.learned.size() >= 2 and spar_tries < 3:
 			spar_tries += 1
 			var b := town.start_spar()
 			b.rng.seed = rng.randi()
-			rounds += bot.play(b)["rounds"]
+			rounds += pilot.play(b)["rounds"]
 			town.finish_spar(b)
-			town_actions += 1
+			fights += 1
 			if h.approved_tier >= 2:
 				when["通過師傅考驗"] = fights
-			continue
-		# 卡瓶頸就特訓
-		var tr := town.train_state()
-		if tr["available"] and tr["ok"]:
-			town.train()
-			when["特訓升到" + GrowthData.REALM_NAMES[h.realm]] = fights
-			town_actions += 1
 			continue
 		# 挑委託
 		# 挑戰「打贏過的最強對手」的下一個；在目前實力下連輸兩次，就回去打打得贏的
@@ -95,33 +104,43 @@ func _career(run: int, verbose: bool) -> Dictionary:
 			if h.beaten.has(EnemyData.ORDER[i]):
 				best = i
 		var target: String = EnemyData.ORDER[mini(best + 1, EnemyData.ORDER.size() - 1)]
-		if lost_at.get(target, 0) >= 2:
+		# 欠錢時也回去打打得贏的賺錢
+		if lost_at.get(target, 0) >= 2 or h.money < 0:
 			target = EnemyData.ORDER[maxi(best, 0)]
+			if lost_at.get(target, 0) >= 2:
+				target = EnemyData.ORDER[maxi(best - 1, 0)]
 		var realm_before := h.realm
 		var b := town.start_commission(target)
 		b.rng.seed = rng.randi()
-		var r := bot.play(b)
+		var r := pilot.play(b)
 		rounds += r["rounds"]
-		var msgs := town.finish_commission(b)
+		town.finish_commission(b)
 		fights += 1
 		if r["outcome"] != "win":
 			losses += 1
 			lost_at[target] = lost_at.get(target, 0) + 1
-		elif not when.has("打贏" + EnemyData.ENEMIES[target]["name"]):
-			when["打贏" + EnemyData.ENEMIES[target]["name"]] = fights
+		else:
+			# 去別處打贏一場、喘口氣，就再去試打不贏的
+			for k in lost_at:
+				if k != target:
+					lost_at[k] = mini(lost_at[k], 1)
+			if not when.has("打贏" + EnemyData.ENEMIES[target]["name"]):
+				when["打贏" + EnemyData.ENEMIES[target]["name"]] = fights
 		if h.realm > realm_before:
-			when["打贏強敵升到" + GrowthData.REALM_NAMES[h.realm]] = fights
+			when["升到" + GrowthData.REALM_NAMES[h.realm]] = fights
 		for k in h.steal_hits:
 			if h.knows(k) and not when.has("偷學" + MoveData.MOVES[k]["name"]):
 				when["偷學" + MoveData.MOVES[k]["name"]] = fights
 		if verbose:
-			print("第%3d天 %-4s %-4s 血%3d/%3d 錢%4d 力%d 敏%d %s 招%d" % [
-				h.day, EnemyData.ENEMIES[target]["name"], r["outcome"], h.hp, h.max_hp(), h.money,
-				h.stats["str"], h.stats["agi"], h.realm_text(), h.learned.size()])
-	var minutes := (rounds * SEC_PER_ROUND + (fights + town_actions) * SEC_PER_TOWN) / 60
+			print("第%3d天 %-4s %-4s %2d回 血%3d/%3d 錢%4d 力%d 敏%d %s %s 招%d" % [
+				h.day, EnemyData.ENEMIES[target]["name"], r["outcome"], r["rounds"], h.hp, h.max_hp(), h.money,
+				h.stats["str"], h.stats["agi"], h.realm_text(), WeaponData.get_def(h.weapon)["name"], h.learned.size()])
+	var minutes := (rounds * SEC_PER_ROUND + fights * SEC_PER_FIGHT + town_actions * SEC_PER_TOWN) / 60
+	if not h.cleared:
+		print("沒通關：第%d天 %d場 錢%d 力%d 敏%d %s %s 招%s 打贏過%s" % [h.day, fights, h.money, h.stats["str"], h.stats["agi"], h.realm_text(), h.weapon, h.learned, h.beaten])
 	return {"cleared": h.cleared, "days": h.day, "fights": fights, "losses": losses, "minutes": minutes, "when": when}
 
 
 func _power_sig(h: Adventurer) -> String:
 	var total: int = h.stats["str"] + h.stats["agi"]
-	return "%d %d %d %d" % [total / 2, h.learned.size(), h.realm, h.approved_tier]
+	return "%d %d %d %d %s" % [total / 2, h.learned.size(), h.realm, h.approved_tier, h.weapon]

@@ -179,16 +179,19 @@ const MOVES := {
 		},
 	},
 	"redirect": {
-		"name": "逆流斬", "stat": "str", "desc": "對付重砸：順著力道把攻擊引開，讓對方收勢不住、往前踉蹌。",
+		"name": "逆流斬", "stat": "str", "desc": "對付重砸和橫掃：順著力道把攻擊引開，再借力斬回去（比防禦強）。對重砸最有效，能讓對方收勢不住、往前踉蹌。",
 		"fail": {"take": 1.0, "hit": true, "text": ["你想順勢把{weapon}引開，可是那股力道大得你根本帶不動。"]},
 		"default": {"text": ["你擺出卸力的架勢，雙手虛握著劍，{name}卻沒有砸下來。"]},
 		"vs": {
-			"smash": {"take": 0.2, "effect": "stagger", "good": true, "text": [
-				"你不硬接，劍身斜斜一引，順著{weapon}的力道把它帶到一旁。{weapon}擦著你的肩膀砸進地裡，{name}收勢不住，整個人往前撲了過來。",
-				"你像推開一扇門一樣，輕輕一帶就把{weapon}引歪了。地面被砸出一個坑，{name}踉蹌著衝過你身邊，背後全空了。",
+			"smash": {"deal": 0.8, "take": 0.2, "effect": "stagger", "good": true, "text": [
+				"你不硬接，劍身斜斜一引，順著{weapon}的力道把它帶到一旁，回手一劍斬在{name}身上。{weapon}砸進地裡，{name}收勢不住，整個人往前撲了過來。",
+				"你像推開一扇門一樣，輕輕一帶就把{weapon}引歪了，劍鋒順勢劃過{name}的身體。地面被砸出一個坑，{name}踉蹌著衝過你身邊，背後全空了。",
 			]},
-			"sweep": {"take": 0.5, "text": ["你順著{weapon}的力道一帶，卸掉了一半力道，剩下的還是打在你身上。"]},
-			"thrust": {"take": 0.6, "text": ["你想卸開{weapon}，可是它來得太快太直，只卸掉一點。"]},
+			"sweep": {"deal": 0.8, "take": 0.3, "good": true, "text": [
+				"你順著{weapon}的力道一帶，卸掉了大半，借著那股勁一劍斬了回去。",
+				"{weapon}掃到你身前，你的劍貼上去一轉，力道被引向一旁，劍鋒反過來削在{name}身上。",
+			]},
+			"thrust": {"deal": 0.4, "take": 0.6, "text": ["你想卸開{weapon}，可是它來得太快太直，只卸掉一點，回手一劍也砍得很淺。"]},
 			"grab": {"take": 1.0, "hit": true, "text": ["你想卸開{name}的力道，可是{pron}是整個撲上來的。"]},
 			"trick": {"take": 1.0, "hit": true, "text": ["你擺出卸力的架勢，可是對方根本沒出力。"]},
 			"roar": {"take": 1.0, "hit": true, "text": ["你擺出卸力的架勢，可是吼聲卸不掉。"]},
@@ -221,18 +224,18 @@ const MOVES := {
 		},
 	},
 	"vital": {
-		"name": "穿隙刺", "stat": "agi", "desc": "刺向要害或盔甲縫隙，盔甲擋不住。對方露出破綻、蓄勢、或抱住你時威力最大。",
+		"name": "穿隙刺", "stat": "agi", "desc": "刺向要害或盔甲縫隙，盔甲擋不住。平常也跟攻擊一樣痛；對方露出破綻、蓄勢、或抱住你時，比裂盾斬還痛。",
 		"fail": {"deal": 0.5, "take": 1.0, "hit": true, "text": ["你刺向{name}的要害，可是{pron}一扭身就讓開了，劍尖只劃破了點皮。"]},
 		"pierce": true,
-		"default": {"deal": 0.7, "take": 1.0, "hit": true, "text": [
-			"你刺向{name}的要害，可是對方一直在動，劍尖只刺到邊，反而讓自己吃了一記。",
+		"default": {"deal": 1.0, "take": 1.0, "hit": true, "text": [
+			"你刺向{name}的要害，對方一扭身，劍尖還是刺進了肉裡，可是你自己也吃了一記。",
 		]},
 		"vs": {
-			"opening": {"deal": 3.0, "good": true, "text": [
+			"opening": {"deal": 3.5, "good": true, "text": [
 				"你看準破綻，整個人貼上去，一劍刺進{name}的要害，劍身沒入了一半！",
 				"你的劍尖從縫隙裡鑽了進去，深深刺入{name}的身體。你拔出劍時，帶出一道血箭。",
 			]},
-			"windup": {"deal": 2.0, "good": true, "text": [
+			"windup": {"deal": 2.5, "good": true, "text": [
 				"{name}把全身的力氣都蓄在下一擊上，身上的空門全露了出來。你一步搶進去，劍尖狠狠刺了進去！",
 			]},
 			"smash": {"deal": 1.5, "take": 1.0, "hit": true, "text": [
@@ -313,17 +316,24 @@ const MOVES := {
 		},
 	},
 	"combo": {
-		"name": "三連斬", "stat": "str", "desc": "一口氣連砍三劍，每一劍都不重。對方露出破綻時最痛，平常跟普通攻擊差不多，砍不穿厚甲。",
-		"default": {"deal": 0.9, "take": 1.0, "hit": true, "text": [
+		"name": "三連斬", "stat": "str", "desc": "一口氣連砍三劍。什麼時候用都比普通攻擊痛，對方露出破綻時比裂盾斬還痛。砍不穿厚甲和盾。",
+		"default": {"deal": 1.4, "take": 1.0, "hit": true, "text": [
 			"你一連砍出三劍，劍光連成一片，可是{name}也同時出手了。",
 		]},
 		"vs": {
-			"opening": {"deal": 2.2, "good": true, "text": [
+			# 出手快：跟攻擊一樣搶先砍到，對方的攻擊被打歪一點
+			"sweep": {"deal": 1.4, "take": 0.7, "hit": true, "text": [
+				"你搶在{weapon}掃過來之前連砍三劍，{name}的攻擊被你打得歪了一截。",
+			]},
+			"thrust": {"deal": 1.4, "take": 0.7, "hit": true, "text": [
+				"{name}還沒衝到，你的三劍已經先落在{pron}身上，{pron}的攻擊偏了幾分。",
+			]},
+			"opening": {"deal": 3.0, "good": true, "text": [
 				"你抓住空檔，劍一劍接一劍落下，三道血口幾乎同時出現在{name}身上！",
 				"你的劍快得只剩一片影子，{name}還沒反應過來，已經連中三劍。",
 			]},
-			"windup": {"deal": 1.8, "text": ["趁{name}還在蓄勢，你一連砍出三劍！"]},
-			"guard": {"deal": 0.3, "text": ["你一連三劍砍在{guard}上，叮叮噹噹，一劍也沒砍進去。"]},
+			"windup": {"deal": 2.2, "text": ["趁{name}還在蓄勢，你一連砍出三劍！"]},
+			"guard": {"deal": 0.4, "text": ["你一連三劍砍在{guard}上，叮叮噹噹，一劍也沒砍進去。"]},
 		},
 	},
 }

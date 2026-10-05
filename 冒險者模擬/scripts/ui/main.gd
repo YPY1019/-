@@ -1,6 +1,6 @@
 extends Control
 
-## 原型第 2 段：城鎮 ⇄ 戰鬥。
+## 原型（自動戰鬥試驗）：城鎮 ⇄ 戰鬥。
 ## 這裡只負責切換畫面；城鎮規則在 Town，戰鬥規則在 Battle。
 
 var town := Town.new()
@@ -37,7 +37,8 @@ func _ready() -> void:
 	margin.add_child(battle_view)
 
 	town_view.add_messages([
-		{"kind": "big", "text": "你帶著一把劍和 %d 銀來到北境的小城。城裡有冒險者公會的委託板，也有一間北境劍術的道場。" % town.hero.money},
+		{"kind": "big", "text": "你帶著一把舊鐵劍和 %d 銀來到北境的小城。城裡有冒險者公會的委託板、一間北境劍術的道場，還有武器店。" % town.hero.money},
+		{"kind": "info", "text": "戰鬥會自己打，你只要決定接哪個委託、學什麼、買什麼。血剩兩成會自動撤退。"},
 		{"kind": "info", "text": "目標：打倒食人魔。每天生活費 %d 銀。" % TownData.LIVING_COST},
 	])
 	_back_to_town()
@@ -75,8 +76,12 @@ func _show_battle(note: String) -> void:
 
 func _on_battle_ended() -> void:
 	play_log.battle_end(battle)
-	_settled = town.finish_commission(battle) if fight_kind == "commission" else town.finish_spar(battle)
-	battle_view.show_settlement(_settled)
+	if fight_kind == "commission":
+		_settled = town.finish_commission(battle)
+		battle_view.show_settlement(_settled, town.last_report)
+	else:
+		_settled = town.finish_spar(battle)
+		battle_view.show_settlement(_settled)
 
 
 func _back_to_town() -> void:

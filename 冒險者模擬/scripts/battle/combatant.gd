@@ -7,8 +7,12 @@ enum Side { ALLY, ENEMY }
 
 var display_name := ""
 var side := Side.ENEMY
-## true = 玩家下指令；false = 自動行動（敵人，之後的同伴）
+## true = 用冒險者會的招（玩家方）；false = 自動行動（敵人，之後的同伴）
 var controlled := false
+## true = 自動挑招（自動戰鬥試驗）：不抽招，會的招全部都能挑
+var auto := false
+## 打出去的傷害倍率（武器）
+var attack_mult := 1.0
 var max_hp := 1
 var hp := 1
 ## 血量掉到這裡（含）就算倒下。木劍過招時不是 0

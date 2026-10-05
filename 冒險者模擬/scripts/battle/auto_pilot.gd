@@ -1,23 +1,31 @@
+class_name AutoPilot
 extends RefCounted
 
-## 模擬用的電腦玩家（開發用）：每回合從手上挑「眼前最划算」的招。
-## 它不懂對手的習慣，也不會想下一步，真人應該打得比它好。
+## 自動戰鬥：冒險者自己挑招。每回合從手上挑「眼前最划算」的招。
+## 它不懂對手的習慣，也不會想下一步。血剩兩成就撤退（被抱住時撤不了）。
+## 模擬（tests/）也用它。
 
-## 每招「出現在選項裡」和「被選中」的次數
+## 血量掉到最大血量的這個比例（含）以下就撤退
+const RETREAT_AT := 0.2
+
+## 每招「能挑」和「被挑中」的次數（模擬看平衡用）
 var offered := {}
 var picked := {}
 
 
+## 一口氣打完（模擬用）
 func play(b: Battle) -> Dictionary:
 	var me: Combatant = b.allies[0]
 	var foe: Combatant = b.enemies[0]
 	b.start()
 	while not b.is_over() and b.round_no < 60:
-		b.play_round({me: {"move": pick(b, me, foe), "target": foe}})
+		b.play_round({me: {"move": choose(b, me, foe), "target": foe}})
 	return b.result()
 
 
-func pick(b: Battle, me: Combatant, foe: Combatant) -> String:
+func choose(b: Battle, me: Combatant, foe: Combatant) -> String:
+	if me.hp <= me.max_hp * RETREAT_AT and me.yield_hp == 0 and b.can_flee(me):
+		return MoveData.FLEE
 	for id in me.hand:
 		offered[id] = offered.get(id, 0) + 1
 	var best := me.hand[0]

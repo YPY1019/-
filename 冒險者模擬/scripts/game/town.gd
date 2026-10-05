@@ -1,7 +1,7 @@
 class_name Town
 extends RefCounted
 
-## 城鎮的規則：委託、休養、天數和生活費、師傅、戰鬥打完的結算（數值成長、瓶頸、偷學）。
+## 城鎮的規則：委託、休養、天數和生活費、師傅、武器店、戰鬥打完的結算（數值成長、瓶頸、偷學、跟上次比）。
 ## 不碰畫面：每個動作回傳訊息清單 [{"kind", "text"}]，畫面照著顯示。
 ##   kind：info 一般、good 好事、bad 壞事、big 大事
 
@@ -9,18 +9,28 @@ var hero := Adventurer.new()
 
 ## 正在打的委託（結算用）
 var _fight_enemy := ""
+## 開打時的你（跟上次比用）
+var _fight_start := {}
+## 剛打完的這場跟上次比：{"before": 上次的紀錄（第一次打是空的）, "now": 這次的紀錄}
+var last_report := {}
 
 
 # ---------- 委託 ----------
 
 func start_commission(enemy_id: String) -> Battle:
 	_fight_enemy = enemy_id
+	_fight_start = {"day": hero.day, "hp": hero.hp, "max_hp": hero.max_hp(), "realm": hero.realm_text(),
+		"str": hero.stats["str"], "agi": hero.stats["agi"],
+		"weapon": WeaponData.get_def(hero.weapon)["name"], "learned": hero.learned.duplicate()}
 	return Battle.new([hero.to_combatant()], [Combatant.from_enemy(enemy_id)])
 
 
 func finish_commission(battle: Battle) -> Array:
 	var r := battle.result()
 	var id := _fight_enemy
+	var record := _fight_record(battle)
+	last_report = {"before": hero.last_fights.get(id, {}), "now": record}
+	hero.last_fights[id] = record
 	var c: Dictionary = TownData.COMMISSIONS[id]
 	var msgs := []
 	var days: int = c["days"]
@@ -44,15 +54,29 @@ func finish_commission(battle: Battle) -> Array:
 	return msgs
 
 
-## 打贏之後：卡在瓶頸時第一次打贏強敵就衝破瓶頸、師傅的考驗、通關
+## 這場的紀錄：開打時的你 ＋ 打得怎樣
+func _fight_record(battle: Battle) -> Dictionary:
+	var r := battle.result()
+	var foe: Combatant = battle.enemies[0]
+	var used := {}
+	for m in r["used"]:
+		used[m] = used.get(m, 0) + 1
+	var rec := _fight_start.duplicate()
+	rec.merge({"outcome": r["outcome"], "rounds": r["rounds"], "hp_lost": _fight_start["hp"] - r["hp"],
+		"foe_left": float(foe.hp) / foe.max_hp, "used": used})
+	return rec
+
+
+## 打贏之後：卡在瓶頸時打贏強敵就衝破瓶頸、師傅的考驗、通關
 func _after_win(id: String) -> Array:
 	var msgs := []
 	if not hero.beaten.has(id):
 		hero.beaten.append(id)
-		var e: Dictionary = EnemyData.ENEMIES[id]
-		var stronger: bool = maxi(e["str"], e["agi"]) > hero.cap()
-		if stronger and hero.stuck() and hero.can_break_through():
-			msgs.append(_break_through("第一次打贏比自己強的對手。你覺得身體裡有什麼被打通了。"))
+	# 卡在瓶頸時打贏比瓶頸強的對手就衝破。以前打贏過也算，不然先打贏、後卡瓶頸的人會卡死
+	var e: Dictionary = EnemyData.ENEMIES[id]
+	var stronger: bool = maxi(e["str"], e["agi"]) > hero.cap()
+	if stronger and hero.stuck() and hero.can_break_through():
+		msgs.append(_break_through("卡在瓶頸時打贏了比自己強的對手。你覺得身體裡有什麼被打通了。"))
 	msgs.append_array(_check_bear_exam())
 	if id == TownData.GOAL and not hero.cleared:
 		hero.cleared = true
@@ -104,7 +128,7 @@ func _grow(enemy: Dictionary, r: Dictionary) -> Array:
 		if gained > 0:
 			msgs.append(_m("good", "%s +%d（現在 %d）" % [stat_name, gained, hero.stats[s]]))
 			if hero.at_cap(s):
-				msgs.append(_m("info", "%s到了瓶頸（%d）。要再往上，得打贏更強的對手，或找師傅特訓。" % [stat_name, hero.cap()]))
+				msgs.append(_m("info", "%s到了瓶頸（%d）。要再往上，得打贏更強的對手。" % [stat_name, hero.cap()]))
 		else:
 			msgs.append(_m("info", "%s有一點長進。" % stat_name))
 	return msgs
@@ -233,32 +257,31 @@ func finish_spar(battle: Battle) -> Array:
 	return msgs
 
 
-## 特訓過瓶頸：{"available", "ok", "why", "cost", "days", "next"}
-func train_state() -> Dictionary:
-	if hero.realm >= SchoolData.TRAIN.size():
-		return {"available": false}
-	var t: Dictionary = SchoolData.TRAIN[hero.realm]
-	var st := {"available": true, "ok": false, "why": "", "cost": t["cost"], "days": t["days"],
-		"next": GrowthData.CAPS[hero.realm + 1]}
-	if not enrolled():
-		st["why"] = "先入門：學一招基礎招"
-	elif not hero.stuck():
-		st["why"] = "還沒練到瓶頸"
-	elif hero.money < t["cost"]:
-		st["why"] = "錢不夠"
-	else:
-		st["ok"] = true
+# ---------- 武器店 ----------
+
+## 這把劍現在能不能買：{"owned", "ok", "why": [原因]}
+func weapon_state(id: String) -> Dictionary:
+	var w := WeaponData.get_def(id)
+	var st := {"owned": hero.owned_weapons.has(id), "ok": false, "why": []}
+	if st["owned"]:
+		return st
+	if hero.stats["str"] < w["str"]:
+		st["why"].append("力量要 %d" % w["str"])
+	if hero.money < w["cost"]:
+		st["why"].append("錢不夠")
+	st["ok"] = st["why"].is_empty()
 	return st
 
 
-func train() -> Array:
-	var st := train_state()
-	if not st.get("ok", false):
+## 買了就直接換上
+func buy_weapon(id: String) -> Array:
+	if not weapon_state(id)["ok"]:
 		return []
-	hero.money -= st["cost"]
-	var msgs := [_break_through("師傅帶著你苦練了 %d 天。" % st["days"])]
-	msgs.append_array(_pass_days(st["days"]))
-	return msgs
+	var w := WeaponData.get_def(id)
+	hero.money -= w["cost"]
+	hero.owned_weapons.append(id)
+	hero.weapon = id
+	return [_m("good", "你花了 %d 銀買下%s，換上了。" % [w["cost"], w["name"]])]
 
 
 func _m(kind: String, text: String) -> Dictionary:

@@ -23,6 +23,11 @@ var steal_hits := {}
 var approved_tier := 1
 ## 打贏過的敵人
 var beaten: Array[String] = []
+## 每種敵人上次打的結果（跟上次比用）：敵人 id -> Town.fight_record() 的內容
+var last_fights := {}
+## 拿著的武器和買過的武器
+var weapon := WeaponData.START
+var owned_weapons: Array[String] = [WeaponData.START]
 ## 打倒食人魔了沒
 var cleared := false
 
@@ -101,8 +106,11 @@ func to_combatant(full := false) -> Combatant:
 	c.display_name = display_name
 	c.side = Combatant.Side.ALLY
 	c.controlled = true
+	# 自動戰鬥試驗：冒險者自己挑招
+	c.auto = true
 	c.max_hp = max_hp()
 	c.hp = c.max_hp if full else hp
 	c.stats = stats.duplicate()
+	c.attack_mult = WeaponData.get_def(weapon)["power"]
 	c.adventurer = self
 	return c

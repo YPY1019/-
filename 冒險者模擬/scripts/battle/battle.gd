@@ -98,7 +98,10 @@ func play_round(choices: Dictionary) -> Array:
 		if not ally.hand.has(move_id) and not (move_id == MoveData.FLEE and can_flee(ally)):
 			push_error("招式 %s 不能用" % move_id)
 			move_id = ally.hand[0]
-		picks.append("　〔選項：%s → 選了「%s」〕" % ["、".join(ally.hand.map(func(id): return MoveData.MOVES[id]["name"])), MoveData.MOVES[move_id]["name"]])
+		if ally.auto:
+			picks.append("　〔%s〕" % MoveData.MOVES[move_id]["name"])
+		else:
+			picks.append("　〔選項：%s → 選了「%s」〕" % ["、".join(ally.hand.map(func(id): return MoveData.MOVES[id]["name"])), MoveData.MOVES[move_id]["name"]])
 		done[ally] = _player_act(ally, move_id, target, ev)
 
 	# 2. 對手出手
@@ -184,7 +187,8 @@ func _deal_hands() -> void:
 			# 收招慢的招（裂盾斬），用完下回合不能再用
 			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
 				pool.erase(ally.used[-1])
-			var n := mini(pool.size(), HAND_MAX)
+			# 自動戰鬥：會的招全部都能挑（學越多招越強）
+			var n := pool.size() if ally.auto else mini(pool.size(), HAND_MAX)
 			if ally.next_status.has("off_balance"):
 				n -= 1
 				pool.erase("dodge")
@@ -295,10 +299,10 @@ func gap(attacker: Combatant, defender: Combatant, stat: String) -> int:
 	return attacker.stats[stat] - defender.stats[stat]
 
 
-## 我方這招打出去的傷害（還沒算盔甲和浮動）
+## 我方這招打出去的傷害（算了武器，還沒算盔甲和浮動）
 func damage_out(ally: Combatant, move_id: String, foe: Combatant, deal: float) -> float:
 	var s: String = MoveData.MOVES[move_id]["stat"]
-	return GrowthData.BASE_DAMAGE * deal * GrowthData.damage_mult(gap(ally, foe, s))
+	return GrowthData.BASE_DAMAGE * deal * ally.attack_mult * GrowthData.damage_mult(gap(ally, foe, s))
 
 
 ## 對手這招打過來的傷害（還沒算你的應對和浮動）
