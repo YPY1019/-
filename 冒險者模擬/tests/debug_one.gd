@@ -1,7 +1,8 @@
 extends SceneTree
 
 ## 印出一場戰鬥的紀錄（開發用）。會的招全部都學。
-## 執行：Godot.exe --headless --path . --script res://tests/debug_one.gd -- <敵人 id> <力量> <敏捷> <境界 0 起算> <武器 id> <亂數種子>
+## 執行：Godot.exe --headless --path . --script res://tests/debug_one.gd -- <敵人 id> <力量> <敏捷> <境界 0 起算> <武器 id> <亂數種子> [lore]
+## 最後加 lore：絕學只有口訣、還沒悟出來
 
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -9,8 +10,12 @@ func _init() -> void:
 	hero.stats = {"str": int(args[1]), "agi": int(args[2])}
 	hero.realm = int(args[3])
 	hero.weapon = args[4]
-	for m in ["parry", "sweep_kick", "heavy", "redirect", "disarm", "break_free", "vital", "combo", "sunder"]:
+	for m in ["parry", "sweep_kick", "heavy", "redirect", "disarm", "break_free", "vital", "combo"]:
 		hero.learn(m)
+	if args.size() > 6 and args[6] == "lore":
+		hero.lore.append("sunder")
+	else:
+		hero.learn("sunder")
 	var b := Battle.new([hero.to_combatant(true)], [Combatant.from_enemy(args[0])], int(args[5]))
 	AutoPilot.new().play(b)
 	for l in b.record:

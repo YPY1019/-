@@ -128,6 +128,12 @@ func _career(run: int, verbose: bool) -> Dictionary:
 		var r := pilot.play(b)
 		rounds += r["rounds"]
 		town.finish_commission(b)
+		for id in town.loot.duplicate():
+			town.take_loot(id)
+		if h.lore.has(SchoolData.ULT) and not when.has("拿到口訣"):
+			when["拿到口訣"] = fights
+		if h.knows(SchoolData.ULT) and not when.has("悟出絕學"):
+			when["悟出絕學"] = fights
 		fights += 1
 		if r["outcome"] != "win":
 			losses += 1

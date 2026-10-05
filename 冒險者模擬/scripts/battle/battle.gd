@@ -29,6 +29,8 @@ const HOLD_MAX := 2
 ## 怕你的對手：血掉到這裡以下、每挨一下有這個機率逃走
 const FEAR_FLEE_HP := 0.6
 const FEAR_FLEE_CHANCE := 0.5
+## 血掉到這裡以下就算硬仗（見 hard_fight）
+const HARD_FIGHT_HP := 0.5
 
 const ATTACK_TYPES := ["sweep", "thrust", "smash", "grab", "trick", "roar", "hold"]
 const END_TEXT := {"win": "你贏了！", "lose": "你眼前一黑，倒了下去。", "flee": "你逃掉了。", "survive": "你撐過去了。"}
@@ -182,8 +184,12 @@ func _deal_hands() -> void:
 			# 收招慢的招（裂盾斬），用完下回合不能再用
 			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
 				pool.erase(ally.used[-1])
-			# 絕學只有對手露出大破綻時才出得來
+			# 絕學只有對手露出大破綻時才出得來。只有口訣、還沒悟出來的，要在硬仗裡才悟得出來
 			var foe := _first_alive(enemies)
+			if foe != null and big_opening(foe) and hard_fight(ally, foe):
+				for id in ally.adventurer.lore:
+					if not pool.has(id):
+						pool.append(id)
 			if foe == null or not big_opening(foe):
 				pool = pool.filter(func(id): return not MoveData.MOVES[id].get("only_opening", false))
 			# 自動戰鬥：會的招全部都能挑（學越多招越強）
@@ -253,9 +259,16 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 	var e := resolve(ally, move_id, target)
 	var m: Dictionary = MoveData.MOVES[move_id]
 	if m.get("ult", false):
-		# 絕學：先寫起手，喊出招名，再寫結果
-		ev.append(_ev("action", target.fill(_pick(m["pre"]))))
-		ev.append(_ev("ult", "「%s」！" % m["name"]))
+		if ally.adventurer != null and ally.adventurer.knows(move_id):
+			# 絕學：先寫起手，喊出招名，再寫結果
+			ev.append(_ev("action", target.fill(_pick(m["pre"]))))
+			ev.append(_ev("ult", "「%s」！" % m["name"]))
+		elif not ally.used.has(move_id):
+			# 第一次悟出來：想起口訣，還不知道招名
+			ev.append(_ev("lore", target.fill(_pick(m["realize"]))))
+		else:
+			# 同一場再用：還不知道招名，只寫起手
+			ev.append(_ev("action", target.fill(_pick(m["pre"]))))
 	ev.append(_ev("action", target.fill(_pick(e["text"]))))
 	if e.get("failed", false):
 		ev.append(_ev("stat", "（失敗。%s：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
@@ -323,6 +336,11 @@ func outclass(hero: Combatant, foe: Combatant) -> int:
 ## 對手比你弱太多，怕你（會逃）
 func _afraid(foe: Combatant) -> bool:
 	return not foe.enemy_def.get("no_flee", false) and outclass(allies[0], foe) >= GrowthData.OUTCLASS
+
+
+## 硬仗（只有口訣的絕學悟得出來）：你的血掉到一半以下，或對手最強的那項比你高
+func hard_fight(hero: Combatant, foe: Combatant) -> bool:
+	return hero.hp <= hero.max_hp * HARD_FIGHT_HP or outclass(hero, foe) < 0
 
 
 ## 對手這回合露出大破綻（絕學出得來）：被逼出來的破綻（嚇退不算），或自己露出來的（喘氣、卡住、撿武器）
@@ -455,7 +473,7 @@ func _weapon_fx_out(ally: Combatant, enemy: Combatant, dmg: int, ev: Array) -> v
 			enemy.hp = maxi(0, enemy.hp - extra)
 			ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": extra, "note": ally.weapon})
 			if not enemy.is_alive():
-				ev.append(_ev("info", "%s倒下了。" % enemy.display_name))
+				_fell(enemy, ev)
 		"knell":
 			# 下回合露出破綻（斷岳出得來）
 			enemy.forced_next = "stagger"
@@ -483,7 +501,7 @@ func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: flo
 	ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": dmg,
 		"note": "%s %d 對 %d" % [GrowthData.NAMES[s], ally.stats[s], enemy.stats[s]]})
 	if not enemy.is_alive():
-		ev.append(_ev("info", "%s倒下了。" % enemy.display_name))
+		_fell(enemy, ev)
 		return
 	# 差很多時換寫法：你高很多，對手被打飛；對手高很多，砍中了也沒用
 	var pain: Dictionary = enemy.enemy_def["pain"]
@@ -674,3 +692,9 @@ func _hurt_line(target: Combatant, dmg: int) -> String:
 	if rng.randf() < 0.4:
 		return _pick(MoveData.HURT["light"])
 	return ""
+
+
+## 對手倒下：有自己的結尾句（win_text）的，就不另外寫「倒下了」
+func _fell(enemy: Combatant, ev: Array) -> void:
+	if not enemy.enemy_def.has("win_text"):
+		ev.append(_ev("info", "%s倒下了。" % enemy.display_name))

@@ -1,30 +1,30 @@
 class_name Town
 extends RefCounted
 
-## 城鎮的規則：委託、休養、天數和生活費、師傅、武器店、戰鬥打完的結算（數值成長、瓶頸、偷學）。
+## 城鎮的規則：委託、休養、天數和生活費、師傅（考驗、交代的事、口訣）、武器店、戰利品、
+## 戰鬥打完的結算（數值成長、瓶頸、偷學、悟出絕學）。
 ## 不碰畫面：每個動作回傳訊息清單 [{"kind", "text"}]，畫面照著顯示。
-##   kind：info 一般、good 好事、bad 壞事、big 大事、epic 一輩子記得的大事（升境、拿到稀有的劍、學到絕學）
+##   kind：info 一般、good 好事、bad 壞事、big 大事、epic 一輩子記得的大事（升境、師傅傳口訣、悟出絕學）
 
 var hero := Adventurer.new()
+## 剛打贏的對手身上的東西（武器 id）。玩家自己決定拿不拿，離開戰鬥畫面就沒了
+var loot: Array[String] = []
 
 ## 正在打的委託（結算用）
 var _fight_enemy := ""
-## 開打時的血量（算這場掉了多少血）
-var _fight_start_hp := 0
 
 
 # ---------- 委託 ----------
 
 func start_commission(enemy_id: String) -> Battle:
 	_fight_enemy = enemy_id
-	_fight_start_hp = hero.hp
+	loot.clear()
 	return Battle.new([hero.to_combatant()], [Combatant.from_enemy(enemy_id)])
 
 
 func finish_commission(battle: Battle) -> Array:
 	var r := battle.result()
 	var id := _fight_enemy
-	hero.last_fights[id] = _fight_record(battle)
 	var c: Dictionary = TownData.COMMISSIONS[id]
 	var msgs := []
 	var days: int = c["days"]
@@ -32,15 +32,15 @@ func finish_commission(battle: Battle) -> Array:
 		"win":
 			hero.hp = r["hp"]
 			hero.money += c["reward"]
-			msgs.append(_m("good", "委託完成，拿到報酬 %d 銀。" % c["reward"]))
+			msgs.append(_m("good", "報酬 %d 銀。" % c["reward"]))
 		"flee":
 			hero.hp = r["hp"]
-			msgs.append(_m("bad", "你逃回城裡。委託失敗，沒有報酬。"))
 		"lose":
 			hero.hp = maxi(1, roundi(hero.max_hp() * TownData.INJURED_HP))
 			days += TownData.INJURED_DAYS
-			msgs.append(_m("bad", "你重傷倒地，被路過的商隊撿了回來。昏迷了好幾天，醒來時躺在城裡的旅店。"))
+			msgs.append(_m("bad", "路過的商隊把你撿了回來。你昏迷了好幾天，醒來時躺在城裡的旅店。"))
 	msgs.append_array(_pass_days(days))
+	msgs.append_array(_realize(r))
 	if r["outcome"] == "win":
 		msgs.append_array(_after_win(id))
 	msgs.append_array(_grow(EnemyData.ENEMIES[id], r))
@@ -57,57 +57,61 @@ func board() -> Array:
 	return list
 
 
-## 這場打得怎樣（委託板上寫「上次」用）
-func _fight_record(battle: Battle) -> Dictionary:
-	var r := battle.result()
-	var foe: Combatant = battle.enemies[0]
-	return {"outcome": r["outcome"], "rounds": r["rounds"], "hp_lost": _fight_start_hp - r["hp"],
-		"foe_left": float(foe.hp) / foe.max_hp}
-
-
-## 打贏之後：卡在瓶頸時打贏強敵就衝破瓶頸、師傅的考驗、通關
+## 打贏之後：對手身上的東西、卡在瓶頸時打贏強敵就衝破瓶頸、師傅交代的事、通關
 func _after_win(id: String) -> Array:
 	var msgs := []
 	if not hero.beaten.has(id):
 		hero.beaten.append(id)
-	# 卡在瓶頸時打贏比瓶頸強的對手就衝破。以前打贏過也算，不然先打贏、後卡瓶頸的人會卡死
 	var e: Dictionary = EnemyData.ENEMIES[id]
-	msgs.append_array(_loot(e))
+	var drop: String = e.get("loot", "")
+	if drop != "" and not hero.owned_weapons.has(drop):
+		loot.append(drop)
+	# 卡在瓶頸時打贏比瓶頸強的對手就衝破。以前打贏過也算，不然先打贏、後卡瓶頸的人會卡死
 	var stronger: bool = maxi(e["str"], e["agi"]) > hero.cap()
 	if stronger and hero.stuck() and hero.can_break_through():
 		msgs.append_array(_break_through())
-	msgs.append_array(_check_ult())
+	if id == SchoolData.ERRAND["target"] and hero.approved_tier >= 2:
+		msgs.append_array(_give_lore())
 	if id == TownData.GOAL and not hero.cleared:
 		hero.cleared = true
-		msgs.append(_m("big", "★ 你打倒了食人魔！原型通關。（第 %d 天）" % hero.day))
+		msgs.append(_m("big", "★ 原型通關（第 %d 天）" % hero.day))
 	return msgs
 
 
-## 絕學：通過「接住我三招」、又到了第二境，師傅就叫你過去
-func _check_ult() -> Array:
-	if hero.approved_tier == 2 and hero.realm >= SchoolData.ULT_REALM:
-		hero.approved_tier = 3
-		return [_m("big", "道場的學徒跑來找你：「師傅叫你過去一趟。」")]
-	return []
+# ---------- 戰利品 ----------
+
+func take_loot(id: String) -> void:
+	if loot.has(id):
+		loot.erase(id)
+		hero.owned_weapons.append(id)
+
+
+func clear_loot() -> void:
+	loot.clear()
+
+
+# ---------- 絕學：口訣、悟出 ----------
+
+## 師傅傳口訣（辦到他交代的事之後）
+func _give_lore() -> Array:
+	if hero.lore.has(SchoolData.ULT) or hero.knows(SchoolData.ULT):
+		return []
+	hero.lore.append(SchoolData.ULT)
+	return [_m("epic", SchoolData.ERRAND["done"])]
+
+
+## 這場第一次用出了只有口訣的招：從此學會，師傅說出招名
+func _realize(r: Dictionary) -> Array:
+	var msgs := []
+	for id in hero.lore.duplicate():
+		if r["used"].has(id):
+			hero.lore.erase(id)
+			hero.learn(id)
+			msgs.append(_m("epic", SchoolData.ERRAND["named"]))
+	return msgs
 
 
 # ---------- 基礎數值成長 ----------
-
-## 打贏就拿到對手身上的武器（沒有的話）。比手上的好、拿得動就換上
-## 稀有的劍：打贏時的句子已經寫了你撿起它，這裡不另外說
-func _loot(e: Dictionary) -> Array:
-	var id: String = e.get("loot", "")
-	if id == "" or hero.owned_weapons.has(id):
-		return []
-	var w := WeaponData.get_def(id)
-	hero.owned_weapons.append(id)
-	var better: bool = WeaponData.get_def(hero.weapon)["power"] < w["power"] and hero.can_wield(id)
-	if better:
-		hero.weapon = id
-	if w.get("rare", false):
-		return []
-	return [_m("info", "你撿走了%s。" % w["name"])]
-
 
 ## 升境的那一刻（每一境寫法不同）
 const BREAKTHROUGH_TEXT := [
@@ -124,6 +128,7 @@ func _break_through() -> Array:
 
 
 ## 用了哪個數值的招就練到哪個數值。練多少看對手「那一項」比你高多少。
+## 只寫長了幾點、到了瓶頸；練不到、卡住都不寫（看經驗條就知道）
 func _grow(enemy: Dictionary, r: Dictionary) -> Array:
 	var uses := {"str": 0.0, "agi": 0.0}
 	for id in r["used"]:
@@ -134,23 +139,16 @@ func _grow(enemy: Dictionary, r: Dictionary) -> Array:
 
 	var msgs := []
 	for s in GrowthData.STATS:
-		if uses[s] <= 0.0:
-			continue
-		var stat_name: String = GrowthData.NAMES[s]
-		if hero.at_cap(s):
-			msgs.append(_m("info", "%s卡在瓶頸（%d），練不上去了。" % [stat_name, hero.cap()]))
+		if uses[s] <= 0.0 or hero.at_cap(s):
 			continue
 		var grow := GrowthData.grow_mult(enemy[s], hero.stats[s])
 		if grow <= 0.0:
-			msgs.append(_m("info", "%s的%s只有 %d，已經練不到你的%s了。" % [enemy["name"], stat_name, enemy[s], stat_name]))
 			continue
 		var gained := hero.add_exp(s, GrowthData.EXP_PER_USE * uses[s] * grow * mult)
 		if gained > 0:
-			msgs.append(_m("good", "%s +%d（現在 %d）" % [stat_name, gained, hero.stats[s]]))
+			msgs.append(_m("good", "%s +%d" % [GrowthData.NAMES[s], gained]))
 			if hero.at_cap(s):
-				msgs.append(_m("info", "%s到了瓶頸（%d）。要再往上，得打贏更強的對手。" % [stat_name, hero.cap()]))
-		else:
-			msgs.append(_m("info", "%s有一點長進。" % stat_name))
+				msgs.append(_m("info", "%s到了瓶頸。" % GrowthData.NAMES[s]))
 	return msgs
 
 
@@ -163,12 +161,9 @@ func _steal(sig_hits: Dictionary) -> Array:
 			continue
 		var n: int = hero.steal_hits.get(id, 0) + sig_hits[id]
 		hero.steal_hits[id] = n
-		var move_name: String = MoveData.MOVES[id]["name"]
 		if n >= TownData.STEAL_NEED:
 			hero.learn(id)
-			msgs.append(_m("big", "你偷學會了「%s」！（野路子的招，不屬於任何流派）" % move_name))
-		else:
-			msgs.append(_m("info", "你對「%s」越來越有感覺了。（%d/%d）" % [move_name, n, TownData.STEAL_NEED]))
+			msgs.append(_m("big", "你學會了「%s」。" % MoveData.MOVES[id]["name"]))
 	return msgs
 
 
@@ -211,19 +206,19 @@ func enrolled() -> bool:
 	return false
 
 
-## 這招現在能不能學：{"learned", "ok", "why": [原因], "cost", "days"}
+## 這招現在能不能在道場學：{"learned", "ok", "why": [原因], "cost", "days"}。絕學不在道場學（口訣 ＋ 實戰悟出）
 func move_state(id: String) -> Dictionary:
 	var t := SchoolData.tier_def(SchoolData.tier_of(id))
-	var st := {"learned": hero.knows(id), "ok": false, "why": [], "cost": t["cost"], "days": t["days"]}
-	if st["learned"]:
+	var st := {"learned": hero.knows(id), "ok": false, "why": [], "cost": t.get("cost", 0), "days": t.get("days", 0)}
+	if st["learned"] or t["exam"] == "errand":
 		return st
 	if t["tier"] > hero.approved_tier:
-		st["why"].append("要%s" % t["exam_name"] if t["exam"] == "realm" else "要通過考驗「%s」" % t["exam_name"])
+		st["why"].append("要通過「%s」" % t["exam_name"])
 	var req: Dictionary = SchoolData.REQ.get(id, {})
 	for s in req:
 		if hero.stats[s] < req[s]:
 			st["why"].append("%s要 %d" % [GrowthData.NAMES[s], req[s]])
-	if t["cost"] > hero.money:
+	if st["cost"] > hero.money:
 		st["why"].append("錢不夠")
 	st["ok"] = st["why"].is_empty()
 	return st
@@ -235,13 +230,7 @@ func learn_move(id: String) -> Array:
 		return []
 	hero.money -= st["cost"]
 	hero.learn(id)
-	var msgs := []
-	if MoveData.MOVES[id].get("ult", false):
-		msgs.append(_m("epic", SchoolData.ULT_SCENE))
-	elif st["cost"] > 0:
-		msgs.append(_m("good", "你交了 %d 銀學費，師傅教你「%s」。" % [st["cost"], MoveData.MOVES[id]["name"]]))
-	else:
-		msgs.append(_m("good", "師傅教你「%s」。" % MoveData.MOVES[id]["name"]))
+	var msgs := [_m("good", "你學會了「%s」。" % MoveData.MOVES[id]["name"])]
 	msgs.append_array(_pass_days(st["days"]))
 	return msgs
 
@@ -251,7 +240,7 @@ func spar_state() -> Dictionary:
 	var st := {"passed": hero.approved_tier >= 2, "ok": false, "why": ""}
 	if not st["passed"]:
 		if not enrolled():
-			st["why"] = "先入門：學一招基礎招"
+			st["why"] = "先學一招基礎招"
 		else:
 			st["ok"] = true
 	return st
@@ -265,13 +254,16 @@ func start_spar() -> Battle:
 	return b
 
 
+## 通過考驗：師傅交代他的事（已經辦到的話，直接傳口訣）
 func finish_spar(battle: Battle) -> Array:
 	var msgs := []
 	if battle.result()["outcome"] == "survive":
 		hero.approved_tier = 2
-		msgs.append_array(_check_ult())
-	else:
-		msgs.append(_m("bad", "考驗沒過。"))
+		if hero.beaten.has(SchoolData.ERRAND["target"]):
+			msgs.append(_m("info", SchoolData.ERRAND["heard"]))
+			msgs.append_array(_give_lore())
+		else:
+			msgs.append(_m("big", SchoolData.ERRAND["ask"]))
 	msgs.append_array(_pass_days(SchoolData.SPAR_DAYS))
 	return msgs
 

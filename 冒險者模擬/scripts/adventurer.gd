@@ -21,10 +21,10 @@ var learned: Array[String] = []
 var steal_hits := {}
 ## 師傅認可到第幾階（第 1 階交學費就教，所以一開始是 1）
 var approved_tier := 1
+## 拿到口訣的招（還沒悟出來的絕學）
+var lore: Array[String] = []
 ## 打贏過的敵人
 var beaten: Array[String] = []
-## 每種敵人上次打的結果（委託板用）：敵人 id -> Town._fight_record() 的內容
-var last_fights := {}
 ## 拿著的武器和身上有的武器（買的、從人身上拿的）
 var weapon := WeaponData.START
 var owned_weapons: Array[String] = [WeaponData.START]

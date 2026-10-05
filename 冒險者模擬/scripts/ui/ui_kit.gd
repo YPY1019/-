@@ -75,3 +75,11 @@ static func messages_bbcode(msgs: Array) -> String:
 		else:
 			lines.append("[color=%s]%s[/color]" % [MSG_COLOR.get(m["kind"], "#ffffff"), m["text"]])
 	return "\n".join(lines)
+
+
+## 武器的滑鼠提示：說明，加上想查才看的數字
+static func weapon_tooltip(w: Dictionary) -> String:
+	var lines := [w["desc"], "傷害 ×%.1f" % w["power"]]
+	if w["str"] > 0:
+		lines.append("力量 %d 才拿得動" % w["str"])
+	return "\n".join(lines)

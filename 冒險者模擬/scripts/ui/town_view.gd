@@ -127,6 +127,7 @@ func _build_rest() -> void:
 
 
 # ---------- 你 ----------
+# 只放狀態，不放說明。規則和數字放在滑鼠提示（想查才看）
 
 func _build_me() -> void:
 	UiKit.clear(me_box)
@@ -135,16 +136,14 @@ func _build_me() -> void:
 		var c := UiKit.label("★ 原型通關", 22)
 		c.add_theme_color_override("font_color", Color(GOLD))
 		me_box.add_child(c)
-	me_box.add_child(UiKit.heading("身體"))
-	var realm := UiKit.label(h.realm_text(), 22)
+	var realm := _tip(UiKit.label(h.realm_text(), 22), "境界。衝破瓶頸就升一境，血量也跟著變多。")
 	realm.add_theme_color_override("font_color", Color(h.realm_color()))
 	me_box.add_child(realm)
 	for s in GrowthData.STATS:
 		var row := UiKit.hbox(10)
-		var n := UiKit.label(GrowthData.NAMES[s], 18)
+		var n := _tip(UiKit.label(GrowthData.NAMES[s], 18),
+			"跟對手的%s比。比對手低越多，靠%s的招越容易失敗、打得越不痛。" % [GrowthData.NAMES[s], GrowthData.NAMES[s]])
 		n.custom_minimum_size.x = 48
-		n.tooltip_text = "戰鬥時跟對手的%s比。比對手低越多，靠%s的招越容易失敗。" % [GrowthData.NAMES[s], GrowthData.NAMES[s]]
-		n.mouse_filter = Control.MOUSE_FILTER_STOP
 		row.add_child(n)
 		var v := UiKit.label(str(h.stats[s]), 20)
 		v.custom_minimum_size.x = 30
@@ -156,46 +155,40 @@ func _build_me() -> void:
 		bar.value = h.exp[s]
 		row.add_child(bar)
 		if h.at_cap(s):
-			var cap := UiKit.label("瓶頸", 16)
+			var cap := _tip(UiKit.label("瓶頸", 16), "卡住了。打贏比你強的對手才衝得破。")
 			cap.add_theme_color_override("font_color", Color(GOLD))
 			row.add_child(cap)
 		me_box.add_child(row)
-	if h.stuck() and h.can_break_through():
-		var hint := UiKit.label("卡在瓶頸：打贏 %s 的對手就能突破" % "★".repeat(h.realm + 2), 16, 1.0, true)
-		hint.add_theme_color_override("font_color", Color(GOLD))
-		me_box.add_child(hint)
 	var w := WeaponData.get_def(h.weapon)
-	me_box.add_child(UiKit.label("武器：%s（傷害 ×%.1f）" % [w["name"], w["power"]], 18))
+	me_box.add_child(_tip(UiKit.label(w["name"], 18), UiKit.weapon_tooltip(w)))
 
 	me_box.add_child(UiKit.heading("會的招"))
-	_move_line("一般", MoveData.BASIC)
+	_move_flow(MoveData.BASIC)
 	var school := []
 	for t in SchoolData.TIERS:
 		for id in t["moves"]:
 			if h.knows(id):
 				school.append(id)
-	_move_line(SchoolData.NAME, school)
+	_move_flow(school)
 	var wild := []
 	for id in h.learned:
 		if SchoolData.tier_of(id) == 0:
 			wild.append(id)
-	_move_line("野路子", wild)
-
-	var stealing := []
-	for id in h.steal_hits:
-		if not h.knows(id):
-			stealing.append("%s %d/%d" % [MoveData.MOVES[id]["name"], h.steal_hits[id], TownData.STEAL_NEED])
-	if not stealing.is_empty():
-		me_box.add_child(UiKit.label("快偷學會了：" + "、".join(stealing), 16, 0.8, true))
+	_move_flow(wild)
+	if not h.lore.is_empty():
+		me_box.add_child(UiKit.label(SchoolData.ERRAND["lore"], 16, 0.7, true))
 
 
-func _move_line(title: String, ids: Array) -> void:
+## 一排招式名字，滑鼠移上去看說明
+func _move_flow(ids: Array) -> void:
 	if ids.is_empty():
 		return
-	var names := []
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 14)
 	for id in ids:
-		names.append(MoveData.MOVES[id]["name"])
-	me_box.add_child(UiKit.label("%s：%s" % [title, "、".join(names)], 17, 0.9, true))
+		var m: Dictionary = MoveData.MOVES[id]
+		flow.add_child(_tip(UiKit.label(m["name"], 17, 0.9), m["desc"]))
+	me_box.add_child(flow)
 
 
 # ---------- 委託板 ----------
@@ -203,17 +196,6 @@ func _move_line(title: String, ids: Array) -> void:
 func _build_board() -> void:
 	UiKit.clear(board_box)
 	var h := town.hero
-	if h.hp < h.max_hp() * 0.7:
-		var warn := UiKit.label("你現在帶著傷（血量 %d / %d）。血量會帶進下一場戰鬥。" % [h.hp, h.max_hp()], 17, 1.0, true)
-		warn.add_theme_color_override("font_color", Color(BAD))
-		board_box.add_child(warn)
-	# 危險度的星數對應境界
-	var legend := UiKit.hbox(14)
-	for i in GrowthData.REALM_NAMES.size():
-		var l := UiKit.label("%s %s" % ["★".repeat(i + 1), GrowthData.REALM_NAMES[i]], 15)
-		l.add_theme_color_override("font_color", Color(GrowthData.REALM_COLORS[i]))
-		legend.add_child(l)
-	board_box.add_child(legend)
 	var header_done := false
 	for id in town.board():
 		var c: Dictionary = TownData.COMMISSIONS[id]
@@ -231,23 +213,17 @@ func _build_board() -> void:
 		var title_row := UiKit.hbox(12)
 		title_row.add_child(UiKit.label(("%s %s" % [e.get("title", ""), e["name"]]).strip_edges(), 20))
 		# 人標境界，怪物標危險度
-		var stars := UiKit.label(dg["text"] if named else "%s %s" % [dg["stars"], dg["stage"]], 20)
+		var stars := _tip(UiKit.label(dg["text"] if named else "%s %s" % [dg["stars"], dg["stage"]], 20),
+			"境界" if named else "危險度：大約是%s的人打得贏的" % dg["text"])
 		stars.add_theme_color_override("font_color", Color(dg["color"]))
-		stars.tooltip_text = "境界" if named else "危險度：大約是%s的人打得贏的" % dg["text"]
-		stars.mouse_filter = Control.MOUSE_FILTER_STOP
 		title_row.add_child(stars)
 		if h.beaten.has(id):
-			title_row.add_child(UiKit.label("（打贏過）", 18, 0.7))
+			title_row.add_child(UiKit.label("打贏過", 16, 0.5))
 		info.add_child(title_row)
 		info.add_child(UiKit.label(e["blurb"], 16, 0.75, true))
 		if named:
-			var w := WeaponData.get_def(e["loot"])
-			var carry := UiKit.label("帶著一把" + w["look"], 16, 1.0, true)
-			carry.add_theme_color_override("font_color", Color(GOLD))
-			info.add_child(carry)
-		info.add_child(UiKit.label("報酬 %d 銀・來回 %d 天" % [c["reward"], c["days"]], 15, 0.6))
-		if h.last_fights.has(id):
-			info.add_child(UiKit.label("上次：" + _last_text(h.last_fights[id]), 15, 0.85))
+			info.add_child(UiKit.label("帶著一把" + WeaponData.get_def(e["loot"])["look"], 16, 0.75, true))
+		info.add_child(UiKit.label("%d 銀・來回 %d 天" % [c["reward"], c["days"]], 15, 0.6))
 		info.tooltip_text = c["text"]
 		info.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(info)
@@ -263,66 +239,62 @@ func _build_board() -> void:
 
 func _build_dojo() -> void:
 	UiKit.clear(dojo_box)
+	var h := town.hero
 	for t in SchoolData.TIERS:
-		dojo_box.add_child(UiKit.heading(t["name"]))
 		match t["exam"]:
 			"spar":
+				dojo_box.add_child(UiKit.heading(t["name"]))
 				var st := town.spar_state()
-				_exam_line(t, st["passed"])
 				if not st["passed"]:
-					var b := UiKit.button("接受考驗（%d 天）" % SchoolData.SPAR_DAYS, 200)
+					dojo_box.add_child(UiKit.label("師傅：" + t["exam_quote"], 17, 0.8, true))
+					var b := UiKit.button("過招（%d 天）" % SchoolData.SPAR_DAYS, 160)
 					b.disabled = not st["ok"]
 					b.tooltip_text = st["why"]
 					b.pressed.connect(func(): spar_requested.emit())
-					var row := UiKit.hbox(12)
+					var row := UiKit.hbox(0)
 					row.add_child(b)
-					if st["why"] != "":
-						row.add_child(UiKit.label(st["why"], 16, 0.7))
 					dojo_box.add_child(row)
+			"errand":
+				# 絕學：師傅交代事情之後才出現。不在道場學（口訣 ＋ 實戰悟出），悟出來之後才列出招名
+				if h.approved_tier < 2:
+					continue
+				dojo_box.add_child(UiKit.heading(t["name"]))
+				if not h.knows(SchoolData.ULT):
+					var line: String = SchoolData.ERRAND["lore"] if h.lore.has(SchoolData.ULT) else SchoolData.ERRAND["reminder"]
+					dojo_box.add_child(UiKit.label(line, 17, 0.8, true))
+					dojo_box.add_child(HSeparator.new())
+					continue
+			_:
+				dojo_box.add_child(UiKit.heading(t["name"]))
 		for id in t["moves"]:
 			_move_row(id)
 		dojo_box.add_child(HSeparator.new())
 
 
-func _exam_line(t: Dictionary, passed: bool) -> void:
-	var l := UiKit.label("考驗「%s」：%s" % [t["exam_name"], "已通過" if passed else t["exam_desc"]], 17, 1.0, true)
-	l.add_theme_color_override("font_color", Color("#9be39b") if passed else Color(GOLD))
-	dojo_box.add_child(l)
-
-
 func _move_row(id: String) -> void:
+	var h := town.hero
 	var m: Dictionary = MoveData.MOVES[id]
 	var st := town.move_state(id)
 	var row := UiKit.hbox(12)
-	var info := UiKit.vbox(0)
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var title: String = m["name"]
-	var req: Dictionary = SchoolData.REQ.get(id, {})
-	for s in req:
-		title += "　（%s %d）" % [GrowthData.NAMES[s], req[s]]
-	var name_label := UiKit.label(title, 19, 1.0 if st["learned"] or st["ok"] else 0.5)
-	info.add_child(name_label)
-	info.add_child(UiKit.label(m["desc"], 15, 0.6, true))
-	row.add_child(info)
+	var name_label := _tip(UiKit.label(m["name"], 19, 1.0 if st["learned"] or st["ok"] else 0.5), m["desc"])
 	if st["learned"]:
-		var done := UiKit.label("已學會", 17)
-		done.add_theme_color_override("font_color", Color("#9be39b"))
-		row.add_child(done)
-	else:
-		var price := "%d 銀、%d 天" % [st["cost"], st["days"]] if st["cost"] > 0 else "%d 天" % st["days"]
+		name_label.add_theme_color_override("font_color", Color("#9be39b"))
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(name_label)
+	if not st["learned"]:
+		# 數值門檻：不夠的標紅
+		var req: Dictionary = SchoolData.REQ.get(id, {})
+		for s in req:
+			var tag := UiKit.label("%s %d" % [GrowthData.NAMES[s], req[s]], 15, 0.6)
+			if h.stats[s] < req[s]:
+				tag.add_theme_color_override("font_color", Color(BAD))
+			row.add_child(tag)
+		var price := "%d 銀・%d 天" % [st["cost"], st["days"]] if st["cost"] > 0 else "%d 天" % st["days"]
 		var b := UiKit.button("學（%s）" % price, 170)
-		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		b.disabled = not st["ok"]
 		b.tooltip_text = "、".join(st["why"])
 		b.pressed.connect(func(): _act(town.learn_move(id)))
-		var col := UiKit.vbox(2)
-		col.add_child(b)
-		if not st["ok"]:
-			var why := UiKit.label("、".join(st["why"]), 14, 0.7)
-			why.custom_minimum_size.x = 170
-			why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			col.add_child(why)
-		row.add_child(col)
+		row.add_child(b)
 	dojo_box.add_child(row)
 
 
@@ -335,22 +307,18 @@ func _build_shop() -> void:
 	for id in h.owned_weapons:
 		var w := WeaponData.get_def(id)
 		var row := UiKit.hbox(12)
-		var info := _weapon_info(w, h.can_wield(id))
-		row.add_child(info)
+		row.add_child(_weapon_name(w, h.can_wield(id)))
 		if h.weapon == id:
 			var using := UiKit.label("用著", 17)
 			using.add_theme_color_override("font_color", Color("#9be39b"))
 			row.add_child(using)
-		elif not h.can_wield(id):
-			row.add_child(UiKit.label("拿不動", 17, 0.6))
-		else:
+		elif h.can_wield(id):
 			var b := UiKit.button("換上", 120)
-			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			b.pressed.connect(func(): _act(town.equip(id)))
 			row.add_child(b)
 		shop_box.add_child(row)
-		shop_box.add_child(HSeparator.new())
 
+	shop_box.add_child(HSeparator.new())
 	shop_box.add_child(UiKit.heading("武器店"))
 	for id in WeaponData.SHOP:
 		var w := WeaponData.get_def(id)
@@ -358,43 +326,32 @@ func _build_shop() -> void:
 		if st["owned"]:
 			continue
 		var row := UiKit.hbox(12)
-		row.add_child(_weapon_info(w, st["ok"]))
+		row.add_child(_weapon_name(w, st["ok"]))
 		var b := UiKit.button("買（%d 銀）" % w["cost"], 170)
-		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		b.disabled = not st["ok"]
+		b.tooltip_text = "、".join(st["why"])
 		b.pressed.connect(func(): _act(town.buy_weapon(id)))
-		var col := UiKit.vbox(2)
-		col.add_child(b)
-		if not st["ok"]:
-			col.add_child(UiKit.label("、".join(st["why"]), 14, 0.7))
-		row.add_child(col)
+		row.add_child(b)
 		shop_box.add_child(row)
-		shop_box.add_child(HSeparator.new())
 
 
-## 武器的名字、傷害、門檻、說明。稀有的劍名字是金色的
-func _weapon_info(w: Dictionary, usable: bool) -> VBoxContainer:
-	var info := UiKit.vbox(0)
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var title := "%s　傷害 ×%.1f" % [w["name"], w["power"]]
-	if w["str"] > 0:
+## 武器的名字（稀有的金色），拿不動的寫門檻。說明和數字在滑鼠提示
+func _weapon_name(w: Dictionary, usable: bool) -> Label:
+	var title: String = w["name"]
+	if w["str"] > 0 and not usable:
 		title += "　（力量 %d）" % w["str"]
-	var name_label := UiKit.label(title, 19, 1.0 if usable else 0.5)
+	var l := _tip(UiKit.label(title, 19, 1.0 if usable else 0.5), UiKit.weapon_tooltip(w))
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if w.get("rare", false):
-		name_label.add_theme_color_override("font_color", Color(GOLD))
-	info.add_child(name_label)
-	info.add_child(UiKit.label(w["desc"], 15, 0.6, true))
-	return info
+		l.add_theme_color_override("font_color", Color(GOLD))
+	return l
 
 
-## 委託板上的「上次：贏・5 回合・掉 25 血」
-func _last_text(r: Dictionary) -> String:
-	match r["outcome"]:
-		"win":
-			return "贏・%d 回合・掉 %d 血" % [r["rounds"], r["hp_lost"]]
-		"flee":
-			return "撤退・打掉對手 %d%% 的血" % roundi((1.0 - r["foe_left"]) * 100)
-	return "輸・打掉對手 %d%% 的血" % roundi((1.0 - r["foe_left"]) * 100)
+## 加上滑鼠提示
+func _tip(l: Label, text: String) -> Label:
+	l.tooltip_text = text
+	l.mouse_filter = Control.MOUSE_FILTER_STOP
+	return l
 
 
 # ---------- 小工具 ----------

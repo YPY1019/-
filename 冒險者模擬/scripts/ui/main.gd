@@ -34,6 +34,8 @@ func _ready() -> void:
 	battle_view = BattleView.new()
 	battle_view.ended.connect(_on_battle_ended)
 	battle_view.closed.connect(_back_to_town)
+	battle_view.loot_taken.connect(_take_loot)
+	battle_view.equip_requested.connect(_equip)
 	margin.add_child(battle_view)
 
 	town_view.add_messages([
@@ -63,8 +65,7 @@ func _start_spar() -> void:
 	fight_kind = "spar"
 	battle = town.start_spar()
 	play_log.battle_start("師傅的考驗：接住我三招", battle)
-	var me: Combatant = battle.allies[0]
-	_show_battle("（木劍過招：撐過 %d 回合就通過。血量掉到 %d 就算輸。）" % [SchoolData.SPAR_ROUNDS, me.yield_hp])
+	_show_battle("")
 
 
 func _show_battle(note: String) -> void:
@@ -77,9 +78,23 @@ func _on_battle_ended() -> void:
 	play_log.battle_end(battle)
 	_settled = town.finish_commission(battle) if fight_kind == "commission" else town.finish_spar(battle)
 	battle_view.show_settlement(_settled)
+	if not town.loot.is_empty():
+		battle_view.show_loot(town.hero, town.loot)
+
+
+func _take_loot(id: String) -> void:
+	town.take_loot(id)
+	play_log.write(["拿走了%s" % WeaponData.get_def(id)["name"]])
+	battle_view.refresh_loot(town.hero, town.loot)
+
+
+func _equip(id: String) -> void:
+	play_log.messages(town.equip(id))
+	battle_view.refresh_loot(town.hero, town.loot)
 
 
 func _back_to_town() -> void:
+	town.clear_loot()
 	battle_view.visible = false
 	town_view.visible = true
 	town_view.add_messages(_settled)

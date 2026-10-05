@@ -11,6 +11,9 @@ extends VBoxContainer
 
 signal ended
 signal closed
+## 戰利品：拿走對方身上的東西、換上自己的武器
+signal loot_taken(id: String)
+signal equip_requested(id: String)
 
 ## 播放速度：圖示、每回合幾秒
 const SPEEDS := [["▶", 1.4], ["▶▶", 0.8], ["▶▶▶", 0.3]]
@@ -24,6 +27,7 @@ const COLOR := {
 	"status": "#c9b8a6",
 	"ult": "#ffe9a8",
 	"big": "#ffd479",
+	"lore": "#ffe9a8",
 }
 
 var battle: Battle
@@ -51,6 +55,11 @@ var play_box: HBoxContainer
 var speed_buttons: Array[Button] = []
 var flee_button: Button
 var end_box: HBoxContainer
+## 打贏後的戰利品：左邊你的武器、右邊對方身上的
+var loot_box: HBoxContainer
+var mine_list: VBoxContainer
+var drop_list: VBoxContainer
+var drop_title: Label
 
 
 func _init() -> void:
@@ -103,6 +112,18 @@ func _init() -> void:
 	play_box.add_child(flee_button)
 	add_child(play_box)
 
+	# 打贏後的戰利品（有東西才出現）
+	loot_box = UiKit.hbox(16)
+	loot_box.visible = false
+	var mine := _loot_column("你的武器")
+	mine_list = mine["list"]
+	loot_box.add_child(mine["box"])
+	var drop := _loot_column("")
+	drop_list = drop["list"]
+	drop_title = drop["title"]
+	loot_box.add_child(drop["box"])
+	add_child(loot_box)
+
 	end_box = UiKit.hbox(10)
 	var back := UiKit.button("回到城裡", 170, 52)
 	back.pressed.connect(func(): closed.emit())
@@ -121,6 +142,7 @@ func begin(p_battle: Battle, note := "") -> void:
 	flee_requested = false
 	log_label.clear()
 	_para.clear()
+	loot_box.visible = false
 	# 人標境界，怪物標危險度，都用境界的顏色
 	var a := hero_c.adventurer
 	hero_name_label.text = "你　%s　%s" % [a.realm_text(), WeaponData.get_def(a.weapon)["name"]]
@@ -273,6 +295,64 @@ func _condition(c: Combatant, is_hero: bool) -> String:
 	if r >= 0.25:
 		return c.fill("{name}傷得不輕，動作慢了下來。")
 	return c.fill("{name}快撐不住了。")
+
+
+# ---------- 戰利品 ----------
+
+## 打贏後，對方身上有東西才打開。drops：還沒拿的武器 id
+func show_loot(hero: Adventurer, drops: Array) -> void:
+	loot_box.visible = true
+	drop_title.text = "%s身上" % foe_c.display_name
+	refresh_loot(hero, drops)
+
+
+func refresh_loot(hero: Adventurer, drops: Array) -> void:
+	UiKit.clear(mine_list)
+	for id in hero.owned_weapons:
+		var right: Control
+		if hero.weapon == id:
+			right = UiKit.label("用著", 16, 0.6)
+		elif not hero.can_wield(id):
+			right = UiKit.label("拿不動", 16, 0.6)
+		else:
+			var b := UiKit.button("換上", 90, 36)
+			b.pressed.connect(func(): equip_requested.emit(id))
+			right = b
+		mine_list.add_child(_loot_row(id, right))
+	UiKit.clear(drop_list)
+	for id in drops:
+		var b := UiKit.button("拿", 90, 36)
+		b.pressed.connect(func(): loot_taken.emit(id))
+		drop_list.add_child(_loot_row(id, b))
+	if drops.is_empty():
+		drop_list.add_child(UiKit.label("（空了）", 16, 0.5))
+
+
+## 一把武器一行：名字（滑鼠移上去看說明）＋右邊的按鈕
+func _loot_row(id: String, right: Control) -> HBoxContainer:
+	var w := WeaponData.get_def(id)
+	var row := UiKit.hbox(8)
+	var n := UiKit.label(w["name"], 18)
+	n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	n.tooltip_text = UiKit.weapon_tooltip(w)
+	n.mouse_filter = Control.MOUSE_FILTER_STOP
+	if w.get("rare", false):
+		n.add_theme_color_override("font_color", Color(COLOR["big"]))
+	row.add_child(n)
+	row.add_child(right)
+	return row
+
+
+func _loot_column(title: String) -> Dictionary:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var box := UiKit.vbox(6)
+	var t := UiKit.label(title, 18, 0.8)
+	box.add_child(t)
+	var list := UiKit.vbox(4)
+	box.add_child(list)
+	panel.add_child(box)
+	return {"box": panel, "list": list, "title": t}
 
 
 func _hp_column(name_text: String, fill_color: Color) -> Dictionary:
