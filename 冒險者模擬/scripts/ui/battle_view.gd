@@ -234,7 +234,9 @@ func _append(events: Array) -> void:
 				_flush(damage)
 				log_label.append_text("[color=%s]%s[/color]\n" % [COLOR["big"], text])
 			"damage_in", "damage_out":
-				damage.append("[color=%s]%s −%d[/color]" % [COLOR[e["kind"]], text, e["amount"]])
+				# 劍的特效多砍的那一下，標出是哪把劍（不然看起來像莫名多打了一次）
+				var src: String = "（%s）" % e["src"] if e.has("src") else ""
+				damage.append("[color=%s]%s −%d%s[/color]" % [COLOR[e["kind"]], text, e["amount"], src])
 			"action", "fx":
 				_para.append(text)
 			_:

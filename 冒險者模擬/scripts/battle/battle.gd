@@ -519,7 +519,8 @@ func _weapon_fx_in(enemy: Combatant, target: Combatant, dmg: int, ev: Array) -> 
 		"twin":
 			var extra := WeaponData.twin_extra(dmg)
 			target.hp = maxi(0, target.hp - extra)
-			ev.append({"kind": "damage_in", "text": "你", "amount": extra, "note": "紅鬃之牙"})
+			var src: String = WeaponData.get_def(enemy.enemy_def["loot"])["name"]
+			ev.append({"kind": "damage_in", "text": "你", "amount": extra, "note": src, "src": src})
 		"knell":
 			if not target.next_status.has("off_balance"):
 				target.next_status.append("off_balance")
@@ -535,7 +536,7 @@ func _weapon_fx_out(ally: Combatant, enemy: Combatant, dmg: int, ev: Array) -> v
 		"twin":
 			var extra := WeaponData.twin_extra(dmg)
 			enemy.hp = maxi(0, enemy.hp - extra)
-			ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": extra, "note": ally.weapon})
+			ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": extra, "note": ally.weapon, "src": ally.weapon})
 			if not enemy.is_alive():
 				_fell(enemy, ev)
 		"knell":
