@@ -63,7 +63,7 @@ func _after_win(id: String) -> Array:
 func _check_bear_exam() -> Array:
 	if hero.approved_tier == 2 and hero.beaten.has("bear"):
 		hero.approved_tier = 3
-		return [_m("big", "師傅的考驗「去打倒熊」完成了。回道場就能學第 3 階的招。")]
+		return [_m("big", "師傅的考驗「去打倒熊」完成了。回道場就能學絕學。")]
 	return []
 
 
@@ -205,7 +205,7 @@ func spar_state() -> Dictionary:
 	var st := {"passed": hero.approved_tier >= 2, "ok": false, "why": ""}
 	if not st["passed"]:
 		if not enrolled():
-			st["why"] = "先入門：學一招第 1 階的招"
+			st["why"] = "先入門：學一招基礎招"
 		else:
 			st["ok"] = true
 	return st
@@ -223,9 +223,9 @@ func finish_spar(battle: Battle) -> Array:
 	var msgs := []
 	if battle.result()["outcome"] == "survive":
 		hero.approved_tier = 2
-		msgs.append(_m("big", "通過考驗「接住我三招」！第 2 階的招可以學了（數值也要夠）。"))
+		msgs.append(_m("big", "通過考驗「接住我三招」！進階招可以學了（數值也要夠）。"))
 		if hero.beaten.has("bear"):
-			msgs.append(_m("info", "師傅：「聽說你打倒過熊？那第 3 階的考驗也算你過了。」"))
+			msgs.append(_m("info", "師傅：「聽說你打倒過熊？那絕學的考驗也算你過了。」"))
 			msgs.append_array(_check_bear_exam())
 	else:
 		msgs.append(_m("bad", "考驗沒過。"))
@@ -241,7 +241,7 @@ func train_state() -> Dictionary:
 	var st := {"available": true, "ok": false, "why": "", "cost": t["cost"], "days": t["days"],
 		"next": GrowthData.CAPS[hero.realm + 1]}
 	if not enrolled():
-		st["why"] = "先入門：學一招第 1 階的招"
+		st["why"] = "先入門：學一招基礎招"
 	elif not hero.stuck():
 		st["why"] = "還沒練到瓶頸"
 	elif hero.money < t["cost"]:

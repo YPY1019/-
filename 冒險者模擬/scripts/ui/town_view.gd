@@ -137,6 +137,8 @@ func _build_me() -> void:
 		var row := UiKit.hbox(10)
 		var n := UiKit.label(GrowthData.NAMES[s], 18)
 		n.custom_minimum_size.x = 48
+		n.tooltip_text = "戰鬥時跟對手的%s比。低 %d 點以上，靠%s的招一定失敗。" % [GrowthData.NAMES[s], GrowthData.FAIL_GAP, GrowthData.NAMES[s]]
+		n.mouse_filter = Control.MOUSE_FILTER_STOP
 		row.add_child(n)
 		var v := UiKit.label(str(h.stats[s]), 20)
 		v.custom_minimum_size.x = 30
@@ -152,8 +154,10 @@ func _build_me() -> void:
 			cap.add_theme_color_override("font_color", Color(GOLD))
 			row.add_child(cap)
 		me_box.add_child(row)
-	me_box.add_child(UiKit.label("瓶頸：%d　卡在瓶頸時，打贏比自己強的對手，或找師傅特訓，就能升一境（血量也會變多）。" % h.cap(), 15, 0.6, true))
-	me_box.add_child(UiKit.label("戰鬥時同一項跟同一項比：比對手低 %d 點以上，靠這項的招一定失敗。用哪項的招就練到哪項，對手那項太低練不到。" % GrowthData.FAIL_GAP, 15, 0.6, true))
+	if h.stuck() and h.can_break_through():
+		var hint := UiKit.label("卡在瓶頸：打贏 %s 的對手，或去道場特訓" % "★".repeat(h.realm + 2), 16, 1.0, true)
+		hint.add_theme_color_override("font_color", Color(GOLD))
+		me_box.add_child(hint)
 
 	me_box.add_child(UiKit.heading("會的招"))
 	_move_line("一般", MoveData.BASIC)
@@ -195,16 +199,12 @@ func _build_board() -> void:
 		var warn := UiKit.label("你現在帶著傷（血量 %d / %d）。血量會帶進下一場戰鬥。" % [h.hp, h.max_hp()], 17, 1.0, true)
 		warn.add_theme_color_override("font_color", Color(BAD))
 		board_box.add_child(warn)
-	board_box.add_child(UiKit.label("只有討伐委託。可以越級接，但自負風險。打輸會重傷，被救回城裡要躺好幾天。", 16, 0.6, true))
+	# 危險度的星數對應境界
 	var legend := UiKit.hbox(14)
-	legend.add_child(UiKit.label("危險度對應境界：", 16, 0.6))
 	for i in GrowthData.REALM_NAMES.size():
-		var l := UiKit.label("%s %s" % ["★".repeat(i + 1), GrowthData.REALM_NAMES[i]], 16)
+		var l := UiKit.label("%s %s" % ["★".repeat(i + 1), GrowthData.REALM_NAMES[i]], 15)
 		l.add_theme_color_override("font_color", Color(GrowthData.REALM_COLORS[i]))
 		legend.add_child(l)
-	var you := UiKit.label("（你：%s）" % h.realm_text(), 16)
-	you.add_theme_color_override("font_color", Color(h.realm_color()))
-	legend.add_child(you)
 	board_box.add_child(legend)
 	for id in EnemyData.ORDER:
 		var c: Dictionary = TownData.COMMISSIONS[id]
@@ -223,8 +223,10 @@ func _build_board() -> void:
 		if h.beaten.has(id):
 			title_row.add_child(UiKit.label("（打贏過）", 18, 0.7))
 		info.add_child(title_row)
-		info.add_child(UiKit.label(c["text"], 16, 0.75, true))
-		info.add_child(UiKit.label("%s　報酬 %d 銀・來回 %d 天" % [e["blurb"], c["reward"], c["days"]], 15, 0.6, true))
+		info.add_child(UiKit.label(e["blurb"], 16, 0.75, true))
+		info.add_child(UiKit.label("報酬 %d 銀・來回 %d 天" % [c["reward"], c["days"]], 15, 0.6))
+		info.tooltip_text = c["text"]
+		info.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(info)
 		var b := UiKit.button("接下", 110, 52)
 		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -240,10 +242,8 @@ func _build_dojo() -> void:
 	UiKit.clear(dojo_box)
 	var h := town.hero
 	for t in SchoolData.TIERS:
-		dojo_box.add_child(UiKit.heading("第 %d 階" % t["tier"]))
+		dojo_box.add_child(UiKit.heading(t["name"]))
 		match t["exam"]:
-			"":
-				dojo_box.add_child(UiKit.label("交學費就教。每招 %d 銀，學 %d 天。" % [t["cost"], t["days"]], 16, 0.7, true))
 			"spar":
 				var st := town.spar_state()
 				_exam_line(t, st["passed"])
@@ -259,20 +259,17 @@ func _build_dojo() -> void:
 					dojo_box.add_child(row)
 			"bear":
 				_exam_line(t, h.approved_tier >= 3)
-		if t["tier"] > 1:
-			dojo_box.add_child(UiKit.label("錢沒用。通過考驗、數值夠了，學一招 %d 天。" % t["days"], 16, 0.7, true))
 		for id in t["moves"]:
 			_move_row(id)
 		dojo_box.add_child(HSeparator.new())
 
-	dojo_box.add_child(UiKit.heading("特訓：過瓶頸"))
+	dojo_box.add_child(UiKit.heading("特訓"))
 	var tr := town.train_state()
 	if not tr["available"]:
 		dojo_box.add_child(UiKit.label("師傅：「我能帶你的，已經都帶了。」", 16, 0.7, true))
 		return
-	dojo_box.add_child(UiKit.label("現在的瓶頸是 %d。請師傅帶你苦練：%d 銀、%d 天 → 瓶頸 %d。" % [h.cap(), tr["cost"], tr["days"], tr["next"]], 16, 0.7, true))
 	var row := UiKit.hbox(12)
-	var b := UiKit.button("特訓", 120)
+	var b := UiKit.button("過瓶頸，升%s（%d 銀、%d 天）" % [GrowthData.REALM_NAMES[h.realm + 1], tr["cost"], tr["days"]], 320)
 	b.disabled = not tr["ok"]
 	b.tooltip_text = tr["why"]
 	b.pressed.connect(func(): _act(town.train()))

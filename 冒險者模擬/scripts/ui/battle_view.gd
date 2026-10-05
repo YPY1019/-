@@ -190,6 +190,11 @@ func _refresh() -> void:
 	UiKit.clear(move_row)
 	for opt in battle.hand_options(hero_c):
 		var b := UiKit.button(opt["name"], 150, 52)
+		if opt["weak"] != "":
+			# 數值差太多，這回合用了一定失敗
+			b.text = "%s\n%s" % [opt["name"], opt["weak"]]
+			b.add_theme_font_size_override("font_size", 17)
+			b.add_theme_color_override("font_color", Color(COLOR["damage_in"]))
 		b.tooltip_text = opt["desc"]
 		b.pressed.connect(_on_move.bind(opt["id"]))
 		b.mouse_entered.connect(_show_hint.bind(opt["id"]))

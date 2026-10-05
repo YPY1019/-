@@ -3,22 +3,23 @@ extends RefCounted
 
 ## 流派：北境劍術。只有資料。
 ##
-## 第 1 階：交學費就教。
-## 第 2、3 階：錢沒用，要師傅認可（通過考驗），而且數值要到門檻。
+## 招式分三階，畫面上叫基礎招、進階招、絕學（暫定，跟「第二境」分開）。
+## 基礎招：交學費就教。
+## 進階招、絕學：錢沒用，要師傅認可（通過考驗），而且數值要到門檻。
 ## 特訓：付錢請師傅帶你過瓶頸（加快，不是買）。
 
 const NAME := "北境劍術"
 const MASTER_ENEMY := "master"
 
 const TIERS := [
-	{"tier": 1, "moves": ["parry", "sweep_kick", "heavy"], "cost": 60, "days": 3,
+	{"tier": 1, "name": "基礎招", "moves": ["parry", "sweep_kick", "heavy"], "cost": 60, "days": 3,
 		"exam": "", "exam_name": ""},
-	{"tier": 2, "moves": ["redirect", "disarm", "break_free"], "cost": 0, "days": 5,
+	{"tier": 2, "name": "進階招", "moves": ["redirect", "disarm", "break_free"], "cost": 0, "days": 5,
 		"exam": "spar", "exam_name": "接住我三招",
-		"exam_desc": "跟師傅用木劍過招三回合。撐過三回合、血掉不到三成就算通過。師傅的力量、敏捷都是 15，差太多的話擋不住也閃不掉。花 1 天，不會真的受傷。"},
-	{"tier": 3, "moves": ["vital", "combo"], "cost": 0, "days": 7,
+		"exam_desc": "跟師傅木劍過招三回合，血掉不到四成就過。"},
+	{"tier": 3, "name": "絕學", "moves": ["vital", "combo"], "cost": 0, "days": 7,
 		"exam": "bear", "exam_name": "去打倒熊",
-		"exam_desc": "接熊的委託，打贏一次。"},
+		"exam_desc": "打贏熊一次。"},
 ]
 
 ## 招式的數值門檻（沒寫的 = 沒有門檻）
@@ -33,8 +34,8 @@ const REQ := {
 ## 過招考驗
 const SPAR_DAYS := 1
 const SPAR_ROUNDS := 3
-## 血掉到這個比例以下就算輸（掉超過三成）
-const SPAR_YIELD := 0.7
+## 血掉到這個比例以下就算輸（掉超過四成）
+const SPAR_YIELD := 0.6
 
 ## 特訓過瓶頸：第 i 個是從 CAPS[i] 練到 CAPS[i+1]
 const TRAIN := [

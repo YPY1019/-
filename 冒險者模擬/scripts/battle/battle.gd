@@ -62,12 +62,16 @@ func start() -> Array:
 	return ev
 
 
-## 給畫面用：這回合手上的招
+## 給畫面用：這回合手上的招。weak = 這回合會因為數值差太多而失敗（寫哪一項不足）
 func hand_options(actor: Combatant) -> Array:
 	var list := []
+	var foe := _first_alive(enemies)
 	for id in actor.hand:
 		var m: Dictionary = MoveData.MOVES[id]
-		list.append({"id": id, "name": m["name"], "desc": m["desc"], "basic": MoveData.is_basic(id)})
+		var weak := ""
+		if foe != null and resolve(actor, id, foe).get("failed", false):
+			weak = GrowthData.NAMES[m["stat"]] + "不足"
+		list.append({"id": id, "name": m["name"], "desc": m["desc"], "basic": MoveData.is_basic(id), "weak": weak})
 	return list
 
 
@@ -177,6 +181,9 @@ func _deal_hands() -> void:
 		else:
 			# 一般招和學來的招放在同一個池子裡抽，沒有永遠都在的招
 			var pool: Array = MoveData.BASIC + ally.adventurer.learned
+			# 收招慢的招（裂盾斬），用完下回合不能再用
+			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
+				pool.erase(ally.used[-1])
 			var n := mini(pool.size(), HAND_MAX)
 			if ally.next_status.has("off_balance"):
 				n -= 1
