@@ -42,6 +42,7 @@ func _career(run: int, verbose: bool) -> Dictionary:
 	var town := Town.new()
 	var h := town.hero
 	var pilot := AutoPilot.new()
+	pilot.retreat_at = 0.2  # 代替玩家按撤退
 	var fights := 0
 	var losses := 0
 	var rounds := 0

@@ -25,15 +25,9 @@ var approved_tier := 1
 var beaten: Array[String] = []
 ## 每種敵人上次打的結果（委託板用）：敵人 id -> Town._fight_record() 的內容
 var last_fights := {}
-## 自動撤退線：血剩最大血量的這個比例（含）以下就撤。0 = 不自動撤
-var retreat_at := 0.2
 ## 拿著的武器和身上有的武器（買的、從人身上拿的）
 var weapon := WeaponData.START
 var owned_weapons: Array[String] = [WeaponData.START]
-## 挨過哪些武器特效（委託板上才寫得出那把劍多可怕）
-var felt_fx: Array[String] = []
-## 用過的招（第一次用出絕學時有專屬的一句）
-var used_ever: Array[String] = []
 ## 打倒食人魔了沒
 var cleared := false
 

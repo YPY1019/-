@@ -143,7 +143,7 @@ func _build_me() -> void:
 		var row := UiKit.hbox(10)
 		var n := UiKit.label(GrowthData.NAMES[s], 18)
 		n.custom_minimum_size.x = 48
-		n.tooltip_text = "戰鬥時跟對手的%s比。低 %d 點以上，靠%s的招一定失敗。" % [GrowthData.NAMES[s], GrowthData.FAIL_GAP, GrowthData.NAMES[s]]
+		n.tooltip_text = "戰鬥時跟對手的%s比。比對手低越多，靠%s的招越容易失敗。" % [GrowthData.NAMES[s], GrowthData.NAMES[s]]
 		n.mouse_filter = Control.MOUSE_FILTER_STOP
 		row.add_child(n)
 		var v := UiKit.label(str(h.stats[s]), 20)
@@ -221,16 +221,15 @@ func _build_board() -> void:
 		var named: bool = EnemyData.NAMED.has(id)
 		if named and not header_done:
 			header_done = true
-			var head := UiKit.heading("懸賞：有名有姓的強者")
+			var head := UiKit.heading("懸賞")
 			head.add_theme_color_override("font_color", Color(GOLD))
 			board_box.add_child(head)
-			board_box.add_child(UiKit.label("打倒他們，身上的東西就是你的。只有一次機會——打倒了就不會再出現。", 15, 0.7, true))
 		var row := UiKit.hbox(16)
 		var info := UiKit.vbox(2)
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var dg := EnemyData.danger(id)
 		var title_row := UiKit.hbox(12)
-		title_row.add_child(UiKit.label("%s %s" % [e["title"], e["name"]] if named else e["name"], 20))
+		title_row.add_child(UiKit.label(("%s %s" % [e.get("title", ""), e["name"]]).strip_edges(), 20))
 		# 人標境界，怪物標危險度
 		var stars := UiKit.label(dg["text"] if named else "%s %s" % [dg["stars"], dg["stage"]], 20)
 		stars.add_theme_color_override("font_color", Color(dg["color"]))
@@ -243,13 +242,9 @@ func _build_board() -> void:
 		info.add_child(UiKit.label(e["blurb"], 16, 0.75, true))
 		if named:
 			var w := WeaponData.get_def(e["loot"])
-			var carry := UiKit.label("身上帶著「%s」：%s" % [w["name"], w["look"]], 16, 1.0, true)
+			var carry := UiKit.label("帶著一把" + w["look"], 16, 1.0, true)
 			carry.add_theme_color_override("font_color", Color(GOLD))
 			info.add_child(carry)
-			if h.felt_fx.has(w["fx"]):
-				var felt := UiKit.label("你挨過它：%s" % w["fx_desc"], 16, 1.0, true)
-				felt.add_theme_color_override("font_color", Color(BAD))
-				info.add_child(felt)
 		info.add_child(UiKit.label("報酬 %d 銀・來回 %d 天" % [c["reward"], c["days"]], 15, 0.6))
 		if h.last_fights.has(id):
 			info.add_child(UiKit.label("上次：" + _last_text(h.last_fights[id]), 15, 0.85))
@@ -268,7 +263,6 @@ func _build_board() -> void:
 
 func _build_dojo() -> void:
 	UiKit.clear(dojo_box)
-	var h := town.hero
 	for t in SchoolData.TIERS:
 		dojo_box.add_child(UiKit.heading(t["name"]))
 		match t["exam"]:
@@ -285,8 +279,6 @@ func _build_dojo() -> void:
 					if st["why"] != "":
 						row.add_child(UiKit.label(st["why"], 16, 0.7))
 					dojo_box.add_child(row)
-			"bear":
-				_exam_line(t, h.approved_tier >= 3)
 		for id in t["moves"]:
 			_move_row(id)
 		dojo_box.add_child(HSeparator.new())
@@ -344,8 +336,6 @@ func _build_shop() -> void:
 		var w := WeaponData.get_def(id)
 		var row := UiKit.hbox(12)
 		var info := _weapon_info(w, h.can_wield(id))
-		if w.has("fx_desc"):
-			info.add_child(UiKit.label(w["fx_desc"], 15, 0.9, true))
 		row.add_child(info)
 		if h.weapon == id:
 			var using := UiKit.label("用著", 17)
@@ -362,7 +352,6 @@ func _build_shop() -> void:
 		shop_box.add_child(HSeparator.new())
 
 	shop_box.add_child(UiKit.heading("武器店"))
-	shop_box.add_child(UiKit.label("店裡只有普通貨。好劍不在店裡——在強者手上。", 16, 0.7, true))
 	for id in WeaponData.SHOP:
 		var w := WeaponData.get_def(id)
 		var st := town.weapon_state(id)

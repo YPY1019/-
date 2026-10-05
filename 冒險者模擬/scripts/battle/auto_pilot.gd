@@ -1,10 +1,12 @@
 class_name AutoPilot
 extends RefCounted
 
-## 自動戰鬥：冒險者自己挑招。每回合從手上挑「眼前最划算」的招。
-## 它不懂對手的習慣，也不會想下一步。血掉到冒險者設的撤退線就撤退（被抱住時撤不了）。
+## 自動戰鬥：冒險者自己挑招。每回合從手上挑「眼前最划算」的招（成功、失敗的結果按機率算平均）。
+## 它不懂對手的習慣，也不會想下一步。不會自己撤退（撤退是玩家按的）；模擬可以設 retreat_at 代替玩家按。
 ## 模擬（tests/）也用它。
 
+## 血剩最大血量的這個比例（含）以下就撤（模擬用）。0 = 不撤
+var retreat_at := 0.0
 ## 每招「能挑」和「被挑中」的次數（模擬看平衡用）
 var offered := {}
 var picked := {}
@@ -21,8 +23,7 @@ func play(b: Battle) -> Dictionary:
 
 
 func choose(b: Battle, me: Combatant, foe: Combatant) -> String:
-	var line: float = me.adventurer.retreat_at if me.adventurer != null else 0.2
-	if me.hp <= me.max_hp * line and me.yield_hp == 0 and b.can_flee(me):
+	if retreat_at > 0.0 and me.hp <= me.max_hp * retreat_at and me.yield_hp == 0 and b.can_flee(me):
 		return MoveData.FLEE
 	for id in me.hand:
 		offered[id] = offered.get(id, 0) + 1
@@ -37,9 +38,17 @@ func choose(b: Battle, me: Combatant, foe: Combatant) -> String:
 	return best
 
 
+## 這招的期望值：成功、失敗按機率平均
 func value(b: Battle, me: Combatant, foe: Combatant, id: String) -> float:
+	var p := b.fail_chance(me, id, foe)
+	var v := _value_of(b, me, foe, id, b.move_result(me, id, foe, false))
+	if p > 0.0:
+		v = (1.0 - p) * v + p * _value_of(b, me, foe, id, b.move_result(me, id, foe, true))
+	return v
+
+
+func _value_of(b: Battle, me: Combatant, foe: Combatant, id: String, e: Dictionary) -> float:
 	var it: Dictionary = foe.intent
-	var e := b.resolve(me, id, foe)
 	var m: Dictionary = MoveData.MOVES[id]
 	var deal := b.damage_out(me, id, foe, e.get("deal", 0.0))
 	if not m.get("pierce", false):

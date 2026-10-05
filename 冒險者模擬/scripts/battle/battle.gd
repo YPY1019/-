@@ -2,7 +2,7 @@ class_name Battle
 extends RefCounted
 
 ## 一場戰鬥的規則。不碰畫面：收指令，吐出「事件清單」給畫面顯示。
-## 事件的 kind 是 "stat"、或傷害事件的 note（雙方數值）：只寫進試玩紀錄，畫面不顯示（show don't tell）。
+## 事件的 kind 是 "stat"、"intent"（對手一般出手的架勢）、或傷害事件的 note（雙方數值）：只寫進試玩紀錄，畫面不顯示。
 ##
 ## 進口：Battle.new(我方, 敵方)，我方是從 Adventurer.to_combatant() 來的。
 ## 出口：result() —— 勝負或撤退、剩多少血、打了幾回合、用了哪些招、被招牌招打中幾次。
@@ -66,19 +66,6 @@ func start() -> Array:
 	_deal_hands()
 	_record(ev)
 	return ev
-
-
-## 給畫面用：這回合手上的招。weak = 這回合會因為數值差太多而失敗（寫哪一項不足）
-func hand_options(actor: Combatant) -> Array:
-	var list := []
-	var foe := _first_alive(enemies)
-	for id in actor.hand:
-		var m: Dictionary = MoveData.MOVES[id]
-		var weak := ""
-		if foe != null and resolve(actor, id, foe).get("failed", false):
-			weak = GrowthData.NAMES[m["stat"]] + "不足"
-		list.append({"id": id, "name": m["name"], "desc": m["desc"], "basic": MoveData.is_basic(id), "weak": weak})
-	return list
 
 
 ## 撤退不是招式，永遠可以選，除非被抱住
@@ -147,14 +134,14 @@ func _record(ev: Array) -> void:
 		match e["kind"]:
 			"round":
 				record.append("── %s ──" % e["text"])
-			"tell":
+			"tell", "intent":
 				record.append("▶ " + e["text"])
 			"damage_in", "damage_out":
 				record.append("　%s −%d（%s）" % [e["text"], e["amount"], e["note"]])
 			_:
 				record.append(e["text"])
 	for ally in allies:
-		if ally.controlled and ally.hand_note != "" and not ev.is_empty() and ev[-1]["kind"] == "tell":
+		if ally.controlled and ally.hand_note != "" and not ev.is_empty() and ev[-1]["kind"] in ["tell", "intent"]:
 			record.append("　（%s）" % ally.hand_note)
 
 
@@ -165,7 +152,7 @@ func is_over() -> bool:
 func result() -> Dictionary:
 	var hero := allies[0]
 	return {"outcome": outcome, "rounds": round_no, "hp": hero.hp, "max_hp": hero.max_hp,
-		"used": hero.used, "sig_hits": hero.sig_hits, "felt_fx": hero.felt_fx}
+		"used": hero.used, "sig_hits": hero.sig_hits}
 
 
 ## 結束的句子，敵人資料裡有寫就用敵人的
@@ -244,7 +231,7 @@ func _weighted_pick(ally: Combatant, candidates: Array, foe: Combatant) -> Strin
 	for id in candidates:
 		var w := 1.0
 		if foe != null and not MoveData.is_basic(id):
-			var e := resolve(ally, id, foe)
+			var e := move_result(ally, id, foe, false)
 			if e.get("good", false):
 				w = GOOD_WEIGHT
 			elif (e.get("deal", 0.0) <= 0.0 and not e.has("effect")) \
@@ -270,11 +257,8 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 		ev.append(_ev("action", target.fill(_pick(m["pre"]))))
 		ev.append(_ev("ult", "「%s」！" % m["name"]))
 	ev.append(_ev("action", target.fill(_pick(e["text"]))))
-	if m.get("ult", false) and ally.adventurer != null and not ally.adventurer.used_ever.has(move_id) \
-			and not ally.used.has(move_id):
-		ev.append(_ev("big", MoveData.ULT_FIRST))
 	if e.get("failed", false):
-		ev.append(_ev("stat", "（%s差太多：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
+		ev.append(_ev("stat", "（失敗。%s：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
 
 	if move_id != MoveData.FLEE:
 		ally.used.append(move_id)
@@ -298,19 +282,31 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 	return {"move": move_id, "entry": e}
 
 
-## 這招碰上對手這回合的動作，結果是什麼（數值差太多就換成失敗的版本，加上 failed）。
-## 招有效果（掃倒、破防、掙脫…）或能少挨打時，才有成不成功的問題；單純砍下去只差在痛不痛。
+## 這招碰上對手這回合的動作，結果是什麼：擲一次成不成功（失敗就換成失敗的版本，加上 failed）。
 func resolve(actor: Combatant, move_id: String, foe: Combatant) -> Dictionary:
-	var type: String = foe.intent["type"]
-	var e := MoveData.entry(move_id, type, foe.traits)
+	return move_result(actor, move_id, foe, rng.randf() < fail_chance(actor, move_id, foe))
+
+
+## 這招失敗的機率。招有效果（掃倒、破防、掙脫…）或能少挨打時，才有成不成功的問題；單純砍下去只差在痛不痛。
+func fail_chance(actor: Combatant, move_id: String, foe: Combatant) -> float:
 	var m: Dictionary = MoveData.MOVES[move_id]
 	if not m.has("fail"):
-		return e
+		return 0.0
+	var type: String = foe.intent["type"]
+	var e := MoveData.entry(move_id, type, foe.traits)
 	var can_fail: bool = e.has("effect") or (ATTACK_TYPES.has(type) and e.get("take", 1.0) < 1.0)
-	if can_fail and gap(actor, foe, m["stat"]) <= -m.get("fail_gap", GrowthData.FAIL_GAP):
-		e = m["fail"].duplicate()
+	if not can_fail:
+		return 0.0
+	return 1.0 - GrowthData.success_chance(gap(actor, foe, m["stat"]), m.get("odds", 0.0))
+
+
+## 這招成功或失敗時的結果
+func move_result(actor: Combatant, move_id: String, foe: Combatant, failed: bool) -> Dictionary:
+	if failed:
+		var e: Dictionary = MoveData.MOVES[move_id]["fail"].duplicate()
 		e["failed"] = true
-	return e
+		return e
+	return MoveData.entry(move_id, foe.intent["type"], foe.traits)
 
 
 ## 同一項比：出手的人 − 被打的人
@@ -416,8 +412,8 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 		if hurt != "":
 			ev.append(_ev("pain", hurt))
 		_weapon_fx_in(enemy, target, dmg, ev)
-	# 你那一項比對手高太多，附加效果沒用
-	if on_hit != "" and GrowthData.fails(gap(enemy, target, stat)):
+	# 附加效果也看差距：你那一項比對手高越多，越常沒用
+	if on_hit != "" and rng.randf() >= GrowthData.success_chance(gap(enemy, target, stat)):
 		ev.append(_ev("action", enemy.fill(_pick(EnemyData.RESIST[on_hit]))))
 		on_hit = ""
 	match on_hit:
@@ -437,13 +433,11 @@ func _weapon_fx_in(enemy: Combatant, target: Combatant, dmg: int, ev: Array) -> 
 	if enemy.weapon_fx == "" or not target.is_alive() or rng.randf() >= WeaponData.FX_CHANCE:
 		return
 	ev.append(_ev("fx", enemy.fill(_pick(WeaponData.FX_TEXT[enemy.weapon_fx]["in"]))))
-	if not target.felt_fx.has(enemy.weapon_fx):
-		target.felt_fx.append(enemy.weapon_fx)
 	match enemy.weapon_fx:
 		"twin":
 			var extra := maxi(1, roundi(dmg * WeaponData.TWIN_DAMAGE))
 			target.hp = maxi(0, target.hp - extra)
-			ev.append({"kind": "damage_in", "text": "你", "amount": extra, "note": "赤牙"})
+			ev.append({"kind": "damage_in", "text": "你", "amount": extra, "note": "紅鬃之牙"})
 		"knell":
 			if not target.next_status.has("off_balance"):
 				target.next_status.append("off_balance")
@@ -495,7 +489,10 @@ func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: flo
 	var pain: Dictionary = enemy.enemy_def["pain"]
 	var g := gap(ally, enemy, s)
 	if enemy.hp <= enemy.max_hp * 0.25:
-		ev.append(_ev("pain", enemy.fill(_pick(pain["dying"]))))
+		# 快撐不住的樣子第一次一定寫，之後偶爾寫，不然每回合都一樣
+		if not enemy.said_dying or rng.randf() < 0.3:
+			ev.append(_ev("pain", enemy.fill(_pick(pain["dying"]))))
+		enemy.said_dying = true
 	elif g >= GrowthData.OUTCLASS and dmg >= 15:
 		ev.append(_ev("pain", enemy.fill(_pick(EnemyData.OVERWHELMED))))
 	elif g <= -GrowthData.OUTCLASS and dmg < 20:
@@ -560,7 +557,9 @@ func _choose_intents(ev: Array) -> void:
 				intent.merge({"action": id, "type": a["type"], "phase": "do", "text": enemy.fill(text)})
 				_remember(enemy, id)
 		enemy.intent = intent
-		ev.append(_ev("tell", intent["text"]))
+		# 一般的出手不單獨寫一行（只進試玩紀錄）；蓄勢、破綻、被抱住這些才寫進戰報
+		var quiet: bool = intent["phase"] == "do" and intent["type"] != "opening"
+		ev.append(_ev("intent" if quiet else "tell", intent["text"]))
 
 
 func _remember(enemy: Combatant, id: String) -> void:
@@ -666,6 +665,9 @@ func _hurt_line(target: Combatant, dmg: int) -> String:
 	if not target.is_alive():
 		return ""
 	if target.hp <= target.max_hp * 0.25:
+		if target.said_dying and rng.randf() >= 0.3:
+			return ""
+		target.said_dying = true
 		return _pick(MoveData.HURT["critical"])
 	if dmg >= 20:
 		return _pick(MoveData.HURT["heavy"])

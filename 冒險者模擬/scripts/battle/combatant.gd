@@ -47,8 +47,6 @@ var held := false
 var used: Array[String] = []
 ## 這場被敵人招牌招打中幾次：你偷學的招 id -> 次數
 var sig_hits := {}
-## 這場挨過的武器特效
-var felt_fx: Array[String] = []
 
 ## ---- 敵人 ----
 ## 這回合要做的事：{"action", "type", "phase": windup/strike/do/forced/hold, "text", "target"}
@@ -65,6 +63,8 @@ var blinded := false
 var raging := false
 ## 怕了、逃走了（算你贏）
 var fled := false
+## 寫過「快撐不住了」的樣子（之後少寫，不然每回合都一樣）
+var said_dying := false
 var recent_actions: Array[String] = []
 ## 對手上回合用的招（習慣會看這個）
 var last_player_move := ""

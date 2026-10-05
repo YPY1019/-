@@ -8,7 +8,7 @@ extends RefCounted
 ##
 ## 戰鬥：同一項跟同一項比。你用力量的招，比雙方的力量；對手用力量的招打你，也比雙方的力量。
 ##   差距 = 出手的人 − 被打的人。
-##   差距到 -FAIL_GAP 以下，招一定失敗（掙不開、擋不住、閃不掉、破不了防）。
+##   差距決定招成功的機率（success_chance）：差越多越容易失敗（掙不開、擋不住、閃不掉、破不了防），但不是一刀切。
 ##   差距也改變傷害：每差 1 點約 10%。
 ##
 ## 怎麼長：冒險打怪。用了哪個數值的招，就練到哪個數值。
@@ -37,8 +37,11 @@ const REALM_HP := [100, 150, 220]
 # ---- 戰鬥時的比較 ----
 ## 招式打出去、對手打過來的基本傷害（再乘招式倍率、差距倍率）
 const BASE_DAMAGE := 18.0
-## 比對手低這麼多（含）就一定失敗
-const FAIL_GAP := 3
+## 招成功的機率：差距 0 時 SUCCESS_BASE，每差 1 點加減 SUCCESS_PER_POINT
+const SUCCESS_BASE := 0.85
+const SUCCESS_PER_POINT := 0.1
+const SUCCESS_MIN := 0.05
+const SUCCESS_MAX := 0.97
 ## 每差 1 點，傷害差幾 %
 const DAMAGE_PER_POINT := 0.1
 const DAMAGE_MULT_MIN := 0.3
@@ -63,8 +66,9 @@ static func damage_mult(gap: int) -> float:
 	return clampf(1.0 + gap * DAMAGE_PER_POINT, DAMAGE_MULT_MIN, DAMAGE_MULT_MAX)
 
 
-static func fails(gap: int) -> bool:
-	return gap <= -FAIL_GAP
+## 差距 → 招成功的機率（odds：這招本身難一點或容易一點）
+static func success_chance(gap: int, odds := 0.0) -> float:
+	return clampf(SUCCESS_BASE + gap * SUCCESS_PER_POINT + odds, SUCCESS_MIN, SUCCESS_MAX)
 
 
 ## 對手那一項 vs 你那一項 → 經驗倍率

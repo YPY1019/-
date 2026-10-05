@@ -45,6 +45,7 @@ func _init() -> void:
 			var rounds := 0
 			var ults := 0
 			var pilot := AutoPilot.new()
+			pilot.retreat_at = 0.2
 			for i in N:
 				var b := _battle(s[1], s[2], s[3], s[4], s[5], id, i)
 				var r := pilot.play(b)

@@ -21,7 +21,7 @@ const GOAL := "ogre"
 
 ## 委託板（只有討伐）。危險度從敵人的數值算（EnemyData.danger）；days 來回要幾天；reward 打贏的報酬
 const COMMISSIONS := {
-	"wolf": {"days": 2, "reward": 40,
+	"wolf": {"days": 2, "reward": 60,
 		"text": "村外的野狼咬死了好幾頭羊。牧場主人請人去把牠解決掉。"},
 	"bandit_leader": {"days": 3, "reward": 100,
 		"text": "往南的山道上有盜匪攔路搶劫。商會懸賞他們的頭目。"},

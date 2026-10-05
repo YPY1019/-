@@ -41,22 +41,11 @@ func finish_commission(battle: Battle) -> Array:
 			days += TownData.INJURED_DAYS
 			msgs.append(_m("bad", "你重傷倒地，被路過的商隊撿了回來。昏迷了好幾天，醒來時躺在城裡的旅店。"))
 	msgs.append_array(_pass_days(days))
-	_remember_fight(r)
 	if r["outcome"] == "win":
 		msgs.append_array(_after_win(id))
 	msgs.append_array(_grow(EnemyData.ENEMIES[id], r))
 	msgs.append_array(_steal(r["sig_hits"]))
 	return msgs
-
-
-## 用過的招、挨過的武器特效
-func _remember_fight(r: Dictionary) -> void:
-	for id in r["used"]:
-		if not hero.used_ever.has(id):
-			hero.used_ever.append(id)
-	for fx in r["felt_fx"]:
-		if not hero.felt_fx.has(fx):
-			hero.felt_fx.append(fx)
 
 
 ## 委託板上有哪些對手：一般的都在；有名字的強者打倒了就不會再出現
@@ -86,60 +75,52 @@ func _after_win(id: String) -> Array:
 	msgs.append_array(_loot(e))
 	var stronger: bool = maxi(e["str"], e["agi"]) > hero.cap()
 	if stronger and hero.stuck() and hero.can_break_through():
-		msgs.append_array(_break_through(e))
-	msgs.append_array(_check_bear_exam())
+		msgs.append_array(_break_through())
+	msgs.append_array(_check_ult())
 	if id == TownData.GOAL and not hero.cleared:
 		hero.cleared = true
 		msgs.append(_m("big", "★ 你打倒了食人魔！原型通關。（第 %d 天）" % hero.day))
 	return msgs
 
 
-func _check_bear_exam() -> Array:
-	if hero.approved_tier == 2 and hero.beaten.has("bear"):
+## 絕學：通過「接住我三招」、又到了第二境，師傅就叫你過去
+func _check_ult() -> Array:
+	if hero.approved_tier == 2 and hero.realm >= SchoolData.ULT_REALM:
 		hero.approved_tier = 3
-		return [_m("big", "師傅的考驗「去打倒熊」完成了。回道場就能學絕學。")]
+		return [_m("big", "道場的學徒跑來找你：「師傅叫你過去一趟。」")]
 	return []
 
 
 # ---------- 基礎數值成長 ----------
 
-## 打贏就拿到對手身上的武器（沒有的話）。稀有的劍是大事，直接換上
+## 打贏就拿到對手身上的武器（沒有的話）。比手上的好、拿得動就換上
+## 稀有的劍：打贏時的句子已經寫了你撿起它，這裡不另外說
 func _loot(e: Dictionary) -> Array:
 	var id: String = e.get("loot", "")
 	if id == "" or hero.owned_weapons.has(id):
 		return []
 	var w := WeaponData.get_def(id)
 	hero.owned_weapons.append(id)
-	if w.get("rare", false):
+	var better: bool = WeaponData.get_def(hero.weapon)["power"] < w["power"] and hero.can_wield(id)
+	if better:
 		hero.weapon = id
-		return [_m("epic", "%s\n你拿到了「%s」。" % [w["get"], w["name"]]),
-			_m("info", "（換上了。%s）" % w["fx_desc"])]
-	var msgs := [_m("good", "你從%s身上拿到了%s。" % [e["name"], w["name"]])]
-	if WeaponData.get_def(hero.weapon)["power"] < w["power"]:
-		if hero.can_wield(id):
-			hero.weapon = id
-			msgs.append(_m("info", "比你手上的好，換上了。"))
-		else:
-			msgs.append(_m("info", "比你手上的好，可是太重，你還拿不動（力量要 %d）。" % w["str"]))
-	return msgs
+	if w.get("rare", false):
+		return []
+	return [_m("info", "你撿走了%s。" % w["name"])]
 
 
 ## 升境的那一刻（每一境寫法不同）
 const BREAKTHROUGH_TEXT := [
 	"",
-	"{name}倒下的那一刻，你沒有鬆一口氣——身體裡有什麼東西在翻湧。\n像一道一直關著的門，被人從裡面一腳踹開。血在血管裡奔流，呼吸變得又深又長，手裡的劍突然輕得像一根樹枝。\n你跨過去了。",
-	"這一次你知道會發生什麼。你站在{name}倒下的地方，閉上眼睛，等它來。\n先是一陣耳鳴，接著整個世界變得很安靜。你聽得見自己的心跳，一下、一下，沉得像戰鼓。睜開眼的時候，你看得見風吹過草地的每一道紋路。\n你又跨過去了。",
+	"回城的路上，你走了一整天也不覺得累。呼吸又深又穩，劍拿在手上也輕了。",
+	"這一仗打完，你在原地站了很久。耳朵裡很安靜，只聽得到自己的心跳，又沉又慢。",
 ]
 
 
-## 升一境。回傳訊息
-func _break_through(beaten: Dictionary) -> Array:
-	var old_cap := hero.cap()
-	var old_hp := hero.max_hp()
+## 升一境
+func _break_through() -> Array:
 	hero.break_through()
-	var text: String = BREAKTHROUGH_TEXT[hero.realm].format({"name": beaten["name"]})
-	return [_m("epic", "%s\n—— %s ——" % [text, GrowthData.REALM_NAMES[hero.realm]]),
-		_m("info", "（瓶頸 %d → %d，血量上限 %d → %d）" % [old_cap, hero.cap(), old_hp, hero.max_hp()])]
+	return [_m("epic", "%s\n%s" % [BREAKTHROUGH_TEXT[hero.realm], GrowthData.REALM_NAMES[hero.realm]])]
 
 
 ## 用了哪個數值的招就練到哪個數值。練多少看對手「那一項」比你高多少。
@@ -237,7 +218,7 @@ func move_state(id: String) -> Dictionary:
 	if st["learned"]:
 		return st
 	if t["tier"] > hero.approved_tier:
-		st["why"].append("要通過考驗「%s」" % t["exam_name"])
+		st["why"].append("要%s" % t["exam_name"] if t["exam"] == "realm" else "要通過考驗「%s」" % t["exam_name"])
 	var req: Dictionary = SchoolData.REQ.get(id, {})
 	for s in req:
 		if hero.stats[s] < req[s]:
@@ -256,7 +237,7 @@ func learn_move(id: String) -> Array:
 	hero.learn(id)
 	var msgs := []
 	if MoveData.MOVES[id].get("ult", false):
-		msgs.append(_m("epic", "%s\n你學會了北境劍術的絕學「%s」。" % [SchoolData.ULT_SCENE, MoveData.MOVES[id]["name"]]))
+		msgs.append(_m("epic", SchoolData.ULT_SCENE))
 	elif st["cost"] > 0:
 		msgs.append(_m("good", "你交了 %d 銀學費，師傅教你「%s」。" % [st["cost"], MoveData.MOVES[id]["name"]]))
 	else:
@@ -288,10 +269,7 @@ func finish_spar(battle: Battle) -> Array:
 	var msgs := []
 	if battle.result()["outcome"] == "survive":
 		hero.approved_tier = 2
-		msgs.append(_m("big", "通過考驗「接住我三招」！進階招可以學了（數值也要夠）。"))
-		if hero.beaten.has("bear"):
-			msgs.append(_m("info", "師傅：「聽說你打倒過熊？那絕學的考驗也算你過了。」"))
-			msgs.append_array(_check_bear_exam())
+		msgs.append_array(_check_ult())
 	else:
 		msgs.append(_m("bad", "考驗沒過。"))
 	msgs.append_array(_pass_days(SchoolData.SPAR_DAYS))
