@@ -33,6 +33,10 @@ var enemy_id := ""
 var enemy_def := {}
 ## 冒險者本人（玩家方才有）
 var adventurer: Adventurer
+## 老了身體掉了幾點：數值 -> 點數（只放有掉的）。戰報偶爾寫一句
+var aged := {}
+## 這場寫過幾句老了的樣子
+var aged_said := 0
 
 ## ---- 玩家方 ----
 ## 這回合手上的招（抽到的 + 基本招）

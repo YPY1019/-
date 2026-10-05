@@ -107,6 +107,7 @@ func play_round(choices: Dictionary) -> Array:
 		else:
 			picks.append("　〔選項：%s → 選了「%s」〕" % ["、".join(ally.hand.map(func(id): return MoveData.MOVES[id]["name"])), MoveData.MOVES[move_id]["name"]])
 		done[ally] = _player_act(ally, move_id, target, ev)
+		_show_age(ally, ev)
 
 	# 2. 對手出手
 	for enemy in enemies:
@@ -272,6 +273,21 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 		ev.append(_ev("action", target.fill(_pick(m["pre"]))))
 		ev.append(_ev("ult", "「%s」！" % m["name"]))
 	return _land_player(ally, move_id, e, target, ev)
+
+
+## 老了：偶爾寫一句身體跟不上（不寫數值掉了幾點）。掉越多越常寫，一場最多幾句
+func _show_age(ally: Combatant, ev: Array) -> void:
+	if ally.aged.is_empty() or round_no < 2 or ally.aged_said >= LifeData.AGED_MAX_PER_FIGHT or _all_dead(enemies):
+		return
+	var total := 0
+	var lines := []
+	for s in ally.aged:
+		total += ally.aged[s]
+		lines.append_array(LifeData.AGED_LINES[s])
+	if rng.randf() >= minf(LifeData.AGED_CHANCE_MAX, total * LifeData.AGED_CHANCE_PER_POINT):
+		return
+	ally.aged_said += 1
+	ev.append(_ev("action", _pick(lines)))
 
 
 ## 你這招的結果 e 寫出來、算傷害和效果

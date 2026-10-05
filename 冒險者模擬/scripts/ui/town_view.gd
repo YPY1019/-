@@ -3,18 +3,23 @@ extends VBoxContainer
 
 ## 城鎮畫面：你的狀態、委託板（含懸賞）、北境劍術道場、武器（你的武器和武器店）、休養。只負責顯示和按鈕，規則都在 Town。
 ## 要開打時發出 commission_requested / spar_requested，由 main 切到戰鬥畫面。
+## 花時間的事（學招、讀秘笈、休養）發出 wait_requested，由 main 演等的畫面。
 
 signal commission_requested(enemy_id: String)
 signal spar_requested
+## 花了時間：w 是 Town.take_wait() 那一段，msgs 是這件事的結果
+signal wait_requested(w: Dictionary, msgs: Array)
 ## 城裡發生了事（寫試玩紀錄用）
 signal messages_added(msgs: Array)
 
 const BAD := "#ff8a8a"
 const GOLD := "#ffd479"
+const AGED := "#c9a46a"
 
 var town: Town
 
-var day_label: Label
+var date_label: Label
+var life_label: Label
 var money_label: Label
 var hp_bar: ProgressBar
 var hp_label: Label
@@ -30,11 +35,16 @@ func _init(p_town: Town) -> void:
 	town = p_town
 	add_theme_constant_override("separation", 12)
 
-	# 上：天數、錢、血量、休養
+	# 上：年紀和壽命、錢、血量、休養
 	var top := UiKit.hbox(28)
 	add_child(top)
-	day_label = UiKit.label("", 24)
-	top.add_child(day_label)
+	var date_box := UiKit.vbox(0)
+	date_label = UiKit.label("", 24)
+	date_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	date_box.add_child(date_label)
+	life_label = UiKit.label("", 16)
+	date_box.add_child(life_label)
+	top.add_child(date_box)
 	money_label = UiKit.label("", 24)
 	top.add_child(money_label)
 	var hp_box := UiKit.vbox(2)
@@ -94,7 +104,13 @@ func add_messages(msgs: Array) -> void:
 
 func refresh() -> void:
 	var h := town.hero
-	day_label.text = "第 %d 天" % h.day
+	date_label.text = h.date_text()
+	date_label.tooltip_text = "壽命 %d 歲。\n過了 %d 歲，敏捷開始往下掉；過了 %d 歲，力量也會。" % [
+		LifeData.LIFESPAN, LifeData.DECLINE_AGE["agi"], LifeData.DECLINE_AGE["str"]]
+	life_label.text = "壽命 %d・還剩 %s" % [LifeData.LIFESPAN, LifeData.span_text(h.months_left())]
+	# 剩不到四分之一，字變紅
+	var short := h.months_left() < LifeData.life_months() / 4
+	life_label.add_theme_color_override("font_color", Color(BAD) if short else Color(1, 1, 1, 0.6))
 	money_label.text = "%d 銀" % h.money
 	money_label.add_theme_color_override("font_color", Color(BAD) if h.money < 0 else Color(GOLD))
 	hp_label.text = "血量 %d / %d" % [h.hp, h.max_hp()]
@@ -107,22 +123,27 @@ func refresh() -> void:
 	_build_shop()
 
 
+## 花了時間的就先演等的畫面，演完才寫進紀錄
 func _act(msgs: Array) -> void:
-	add_messages(msgs)
+	var w := town.take_wait()
+	if w.is_empty():
+		add_messages(msgs)
+	else:
+		wait_requested.emit(w, msgs)
 
 
 # ---------- 休養 ----------
 
 func _build_rest() -> void:
 	UiKit.clear(rest_row)
-	var full := town.days_to_full()
-	var one := UiKit.button("休養 1 天", 130)
+	var full := town.months_to_full()
+	var one := UiKit.button("休養 1 個月", 150)
 	one.disabled = full == 0
 	one.pressed.connect(func(): _act(town.rest(1)))
 	rest_row.add_child(one)
-	var all := UiKit.button("休養到痊癒（%d 天）" % full if full > 0 else "不用休養", 210)
+	var all := UiKit.button("休養到痊癒（%s）" % LifeData.span_text(full) if full > 0 else "不用休養", 230)
 	all.disabled = full == 0
-	all.pressed.connect(func(): _act(town.rest(town.days_to_full())))
+	all.pressed.connect(func(): _act(town.rest(town.months_to_full())))
 	rest_row.add_child(all)
 
 
@@ -145,8 +166,12 @@ func _build_me() -> void:
 			"跟對手的%s比。比對手低越多，靠%s的招越容易失敗、打得越不痛。" % [GrowthData.NAMES[s], GrowthData.NAMES[s]])
 		n.custom_minimum_size.x = 48
 		row.add_child(n)
-		var v := UiKit.label(str(h.stats[s]), 20)
+		# 寫現在的身體。老了掉下來的，字變暗黃，滑鼠移上去看最好的時候
+		var v := UiKit.label(str(h.body(s)), 20)
 		v.custom_minimum_size.x = 30
+		if h.decline(s) > 0:
+			v.add_theme_color_override("font_color", Color(AGED))
+			_tip(v, "最好的時候 %d" % h.stats[s])
 		row.add_child(v)
 		var bar := UiKit.bar(Color("#7fa7d9"), 10)
 		bar.custom_minimum_size.x = 140
@@ -187,7 +212,7 @@ func _build_me() -> void:
 			if st["read"]:
 				row.add_child(UiKit.label("讀過", 16, 0.5))
 			else:
-				var b := UiKit.button("讀（%d 天）" % st["days"], 130)
+				var b := UiKit.button("讀（%s）" % LifeData.span_text(st["months"]), 130)
 				b.disabled = not st["ok"]
 				b.pressed.connect(func(): _act(town.read_book(id)))
 				row.add_child(b)
@@ -241,7 +266,7 @@ func _build_board() -> void:
 		for book in e.get("books", []):
 			if not h.books.has(book):
 				info.add_child(UiKit.label("身上還有%s。" % BookData.get_def(book)["look"], 16, 0.75, true))
-		info.add_child(UiKit.label("%d 銀・來回 %d 天" % [c["reward"], c["days"]], 15, 0.6))
+		info.add_child(UiKit.label("%d 銀・%s" % [c["reward"], LifeData.span_text(c["months"])], 15, 0.6))
 		info.tooltip_text = c["text"]
 		info.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(info)
@@ -265,7 +290,7 @@ func _build_dojo() -> void:
 				var st := town.spar_state()
 				if not st["passed"]:
 					dojo_box.add_child(UiKit.label("師傅：" + t["exam_quote"], 17, 0.8, true))
-					var b := UiKit.button("過招（%d 天）" % SchoolData.SPAR_DAYS, 160)
+					var b := UiKit.button("過招（%s）" % LifeData.span_text(SchoolData.SPAR_MONTHS), 170)
 					b.disabled = not st["ok"]
 					b.tooltip_text = st["why"]
 					b.pressed.connect(func(): spar_requested.emit())
@@ -306,10 +331,11 @@ func _move_row(id: String) -> void:
 		var req: Dictionary = SchoolData.REQ.get(id, {})
 		for s in req:
 			var tag := UiKit.label("%s %d" % [GrowthData.NAMES[s], req[s]], 15, 0.6)
-			if h.stats[s] < req[s]:
+			if h.body(s) < req[s]:
 				tag.add_theme_color_override("font_color", Color(BAD))
 			row.add_child(tag)
-		var price := "%d 銀・%d 天" % [st["cost"], st["days"]] if st["cost"] > 0 else "%d 天" % st["days"]
+		var span := LifeData.span_text(st["months"])
+		var price := "%d 銀・%s" % [st["cost"], span] if st["cost"] > 0 else span
 		var b := UiKit.button("學（%s）" % price, 170)
 		b.disabled = not st["ok"]
 		b.tooltip_text = "、".join(st["why"])

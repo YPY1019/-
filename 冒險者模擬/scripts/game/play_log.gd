@@ -42,8 +42,8 @@ func messages(msgs: Array) -> void:
 
 ## 你現在的狀態，一行
 func status(h: Adventurer) -> void:
-	write(["【第 %d 天】%d 銀　血 %d/%d　%s（瓶頸 %d）　力量 %d　敏捷 %d　招：%s" % [
-		h.day, h.money, h.hp, h.max_hp(), h.realm_text(), h.cap(), h.stats["str"], h.stats["agi"],
+	write(["【%s，還剩 %s】%d 銀　血 %d/%d　%s（瓶頸 %d）　力量 %d　敏捷 %d　招：%s" % [
+		h.date_text(), LifeData.span_text(h.months_left()), h.money, h.hp, h.max_hp(), h.realm_text(), h.cap(), h.body("str"), h.body("agi"),
 		"、".join(h.learned.map(func(id): return MoveData.MOVES[id]["name"]))]])
 
 

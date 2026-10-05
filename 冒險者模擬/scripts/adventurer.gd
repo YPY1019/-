@@ -1,15 +1,20 @@
 class_name Adventurer
 extends RefCounted
 
-## 冒險者本人：戰鬥以外也會存在的資料（數值、境界、血量、錢、會的招、跟師傅學到哪）。
+## 冒險者本人：戰鬥以外也會存在的資料（年紀、數值、境界、血量、錢、會的招、跟師傅學到哪）。
 ## 戰鬥時轉成 Combatant 帶進去。
 
 var display_name := "你"
-var day := 1
+## 出道以來過了幾個月（年紀、壽命從這裡算，見 LifeData）
+var month := 0
+## 壽命用完了
+var dead := false
+## 這一輩子發生的事（結局的生平用）：[{"month", "text"}]
+var history: Array = []
 var money := TownData.START_MONEY
 var hp := 0
 
-## 基礎數值和長到一半的經驗
+## 基礎數值（練出來的底子）和長到一半的經驗。老了以後現在的身體會比底子低，見 body()
 var stats := {"str": GrowthData.START, "agi": GrowthData.START}
 var exp := {"str": 0.0, "agi": 0.0}
 ## 境界（從 0 算）。境界就是瓶頸：衝破一次瓶頸就升一境
@@ -38,6 +43,45 @@ func _init() -> void:
 	hp = max_hp()
 
 
+# ---------- 年紀 ----------
+
+func age() -> int:
+	return LifeData.age_at(month)
+
+
+func date_text() -> String:
+	return LifeData.date_text(month)
+
+
+## 離壽命用完還有幾個月
+func months_left() -> int:
+	return maxi(0, LifeData.life_months() - month)
+
+
+## 這一項老了掉幾點
+func decline(stat: String) -> int:
+	return LifeData.decline(stat, age())
+
+
+## 現在的身體：底子減掉老了掉的。戰鬥、成長、學招的門檻都看這個
+func body(stat: String) -> int:
+	return maxi(1, stats[stat] - decline(stat))
+
+
+func body_stats() -> Dictionary:
+	var out := {}
+	for s in GrowthData.STATS:
+		out[s] = body(s)
+	return out
+
+
+## 記一筆生平
+func note(text: String) -> void:
+	history.append({"month": month, "text": text})
+
+
+# ---------- 血量、境界、數值 ----------
+
 ## 血量 = 境界 ＋ 其他加減（之後的裝備、年紀、舊傷）
 func max_hp() -> int:
 	return GrowthData.REALM_HP[realm] + hp_bonus()
@@ -51,6 +95,7 @@ func cap() -> int:
 	return GrowthData.CAPS[realm]
 
 
+## 瓶頸看底子
 func at_cap(stat: String) -> bool:
 	return stats[stat] >= cap()
 
@@ -71,9 +116,9 @@ func break_through() -> void:
 	hp += max_hp() - old_max
 
 
-## 用比較高的那項算前中後段
+## 用比較高的那項算前中後段（看現在的身體）
 func realm_text() -> String:
-	return GrowthData.realm_text(realm, maxi(stats["str"], stats["agi"]))
+	return GrowthData.realm_text(realm, maxi(body("str"), body("agi")))
 
 
 func realm_color() -> String:
@@ -102,7 +147,7 @@ func add_exp(stat: String, amount: float) -> int:
 	return gained
 
 
-## 力量夠才拿得動
+## 力量夠才拿得動。看底子：拿慣的劍，老了也還拿得動
 func can_wield(weapon_id: String) -> bool:
 	return stats["str"] >= WeaponData.get_def(weapon_id)["str"]
 
@@ -117,7 +162,10 @@ func to_combatant(full := false) -> Combatant:
 	c.auto = true
 	c.max_hp = max_hp()
 	c.hp = c.max_hp if full else hp
-	c.stats = stats.duplicate()
+	c.stats = body_stats()
+	for s in GrowthData.STATS:
+		if decline(s) > 0:
+			c.aged[s] = decline(s)
 	c.attack_mult = WeaponData.get_def(weapon)["power"]
 	c.weapon = WeaponData.get_def(weapon)["name"]
 	c.weapon_fx = WeaponData.fx(weapon)

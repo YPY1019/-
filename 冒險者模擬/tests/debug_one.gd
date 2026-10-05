@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## 印出一場戰鬥的紀錄（開發用）。會的招全部都學。
-## 執行：Godot.exe --headless --path . --script res://tests/debug_one.gd -- <敵人 id> <力量> <敏捷> <境界 0 起算> <武器 id> <亂數種子>
+## 執行：Godot.exe --headless --path . --script res://tests/debug_one.gd -- <敵人 id> <力量> <敏捷> <境界 0 起算> <武器 id> <亂數種子> [出道後幾個月]
 
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -9,6 +9,8 @@ func _init() -> void:
 	hero.stats = {"str": int(args[1]), "agi": int(args[2])}
 	hero.realm = int(args[3])
 	hero.weapon = args[4]
+	if args.size() > 6:
+		hero.month = int(args[6])
 	# 數值不到門檻的招學不到（跟道場一樣）
 	for m in ["parry", "sweep_kick", "heavy", "redirect", "disarm", "break_free", "vital", "combo"]:
 		var req: Dictionary = SchoolData.REQ.get(m, {})

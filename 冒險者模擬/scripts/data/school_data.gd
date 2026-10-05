@@ -9,7 +9,7 @@ extends RefCounted
 ## 絕學：高級秘笈（BookData）。不在道場學：
 ##   1. 通過「接住我三招」後，師傅交代一件事（ERRAND：把劍譜從他的仇人身上拿回來）。
 ##   2. 打倒仇人，劍譜在戰利品裡。拿回城，師傅看過之後讓你留著讀。
-##   3. 在城裡花天數讀完就學會（讀秘笈不用等師傅）。
+##   3. 在城裡花時間讀完就學會（讀秘笈不用等師傅）。
 ## 北境劍術給秘笈的方式是替師傅辦事。每個流派給秘笈的方式不一樣。
 ## 高階的招比低階的強：學了高階，角色就改用高階的。
 ## 師傅不能帶你過瓶頸（實力和認可是兩回事）。
@@ -18,8 +18,8 @@ const NAME := "北境劍術"
 const MASTER_ENEMY := "master"
 
 const TIERS := [
-	{"tier": 1, "name": "基礎招", "moves": ["parry", "sweep_kick", "heavy"], "cost": 60, "days": 3, "exam": ""},
-	{"tier": 2, "name": "進階招", "moves": ["redirect", "disarm", "break_free", "vital", "combo"], "cost": 0, "days": 5,
+	{"tier": 1, "name": "基礎招", "moves": ["parry", "sweep_kick", "heavy"], "cost": 60, "months": 3, "exam": ""},
+	{"tier": 2, "name": "進階招", "moves": ["redirect", "disarm", "break_free", "vital", "combo"], "cost": 0, "months": 6,
 		"exam": "spar", "exam_name": "接住我三招", "exam_quote": "「三招。接住了，進階招就教你。」"},
 	{"tier": 3, "name": "絕學", "moves": ["sunder"], "exam": "errand"},
 ]
@@ -50,7 +50,7 @@ const ERRAND := {
 }
 
 ## 過招考驗
-const SPAR_DAYS := 1
+const SPAR_MONTHS := 1
 const SPAR_ROUNDS := 3
 ## 血掉到這個比例以下就算輸（掉超過四成）
 const SPAR_YIELD := 0.6

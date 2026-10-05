@@ -26,22 +26,22 @@ func _init() -> void:
 	tabs.current_tab = 0
 
 	# 自動播放幾回合
-	main._start_commission("bandit_leader")
+	_fight(main, "bandit_leader")
 	await create_timer(2.8).timeout
 	_save(out + "/battle.png")
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/settle_first.png")
-	main._back_to_town()
+	_back(main)
 
 	# 第二次打同一個
 	main.town.hero.hp = main.town.hero.max_hp()
 	main.town.hero.learn("heavy")
-	main._start_commission("bandit_leader")
+	_fight(main, "bandit_leader")
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/settle_again.png")
-	main._back_to_town()
+	_back(main)
 	await _frames(3)
 	_save(out + "/town_after.png")
 
@@ -50,23 +50,23 @@ func _init() -> void:
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/spar.png")
-	main._back_to_town()
+	_back(main)
 
 	# 按撤退
 	main.town.hero.hp = main.town.hero.max_hp()
-	main._start_commission("bear")
+	_fight(main, "bear")
 	main.battle_view._request_flee()
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/flee.png")
-	main._back_to_town()
+	_back(main)
 
 	# 每種委託都打一次，確認不會壞掉
 	for enemy in EnemyData.ORDER:
 		main.town.hero.hp = main.town.hero.max_hp()
-		main._start_commission(enemy)
+		_fight(main, enemy)
 		main.battle_view._skip()
-		main._back_to_town()
+		_back(main)
 	await _frames(3)
 	_save(out + "/end.png")
 	# 有名的強者：用強一點的角色打，看絕學、稀有的劍、升境的寫法
@@ -78,7 +78,7 @@ func _init() -> void:
 	main.town_view.refresh()
 	await _frames(3)
 	_save(out + "/board_before.png")
-	main._start_commission("merc_captain")
+	_fight(main, "merc_captain")
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/named.png")
@@ -87,16 +87,22 @@ func _init() -> void:
 		main._take_loot("sunder_book")
 		await _frames(3)
 		_save(out + "/book_loot.png")
-	main._back_to_town()
+	_back(main)
 	await _frames(3)
 	_save(out + "/book_town.png")
-	main.town_view.add_messages(main.town.read_book("sunder_book"))
+	# 讀秘笈：等的畫面跳到一半、跳完
+	main.town_view._act(main.town.read_book("sunder_book"))
+	await create_timer(2.2).timeout
+	_save(out + "/wait_read.png")
+	await create_timer(3.0).timeout
+	_save(out + "/wait_read_done.png")
+	main._on_wait_finished()
 	await _frames(3)
 	_save(out + "/book_read.png")
 	h.hp = h.max_hp()
-	main._start_commission("black_knight")
+	_fight(main, "black_knight")
 	main.battle_view._skip()
-	main._back_to_town()
+	_back(main)
 	var tabs2: TabContainer = main.town_view.find_children("*", "TabContainer", true, false)[0]
 	tabs2.current_tab = 2
 	await _frames(3)
@@ -104,7 +110,42 @@ func _init() -> void:
 	tabs2.current_tab = 0
 	await _frames(3)
 	_save(out + "/board.png")
+	# 老了：身體掉下來，打一場看戰報
+	h.month = LifeData.life_months() - 30
+	h.hp = h.max_hp()
+	main.town_view.refresh()
+	await _frames(3)
+	_save(out + "/old_town.png")
+	_fight(main, "bear")
+	main.battle_view._skip()
+	await _frames(3)
+	_save(out + "/old_battle.png")
+	_back(main)
+	# 壽命用完：休養到死，看這一生
+	h.month = LifeData.life_months() - 1
+	h.hp = 1
+	main.town_view._act(main.town.rest(3))
+	await create_timer(3.0).timeout
+	_save(out + "/death_wait.png")
+	main._on_wait_finished()
+	await _frames(3)
+	_save(out + "/life.png")
 	quit()
+
+
+## 出發（跳過路上的等）再開打
+func _fight(main: Node, enemy: String) -> void:
+	main.town.depart(enemy)
+	main.town.take_wait()
+	main._start_commission(enemy)
+
+
+## 回城。打輸要躺的那段等，直接跳完
+func _back(main: Node) -> void:
+	main._back_to_town()
+	if main.wait_view.visible:
+		main.wait_view.timer.stop()
+		main._on_wait_finished()
 
 
 func _save(path: String) -> void:
