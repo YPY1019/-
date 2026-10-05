@@ -27,20 +27,20 @@ func _init() -> void:
 
 	# 自動播放幾回合
 	main._start_commission("bandit_leader")
-	await create_timer(BattleView.ROUND_SEC * 3.5).timeout
+	await create_timer(2.8).timeout
 	_save(out + "/battle.png")
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/settle_first.png")
 	main._back_to_town()
 
-	# 第二次打同一個：跟上次比
+	# 第二次打同一個
 	main.town.hero.hp = main.town.hero.max_hp()
 	main.town.hero.learn("heavy")
 	main._start_commission("bandit_leader")
 	main.battle_view._skip()
 	await _frames(3)
-	_save(out + "/settle_compare.png")
+	_save(out + "/settle_again.png")
 	main._back_to_town()
 	await _frames(3)
 	_save(out + "/town_after.png")
@@ -50,6 +50,15 @@ func _init() -> void:
 	main.battle_view._skip()
 	await _frames(3)
 	_save(out + "/spar.png")
+	main._back_to_town()
+
+	# 按撤退
+	main.town.hero.hp = main.town.hero.max_hp()
+	main._start_commission("bear")
+	main.battle_view._request_flee()
+	main.battle_view._skip()
+	await _frames(3)
+	_save(out + "/flee.png")
 	main._back_to_town()
 
 	# 每種委託都打一次，確認不會壞掉

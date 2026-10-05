@@ -1,7 +1,7 @@
 class_name Town
 extends RefCounted
 
-## 城鎮的規則：委託、休養、天數和生活費、師傅、武器店、戰鬥打完的結算（數值成長、瓶頸、偷學、跟上次比）。
+## 城鎮的規則：委託、休養、天數和生活費、師傅、武器店、戰鬥打完的結算（數值成長、瓶頸、偷學）。
 ## 不碰畫面：每個動作回傳訊息清單 [{"kind", "text"}]，畫面照著顯示。
 ##   kind：info 一般、good 好事、bad 壞事、big 大事
 
@@ -9,28 +9,22 @@ var hero := Adventurer.new()
 
 ## 正在打的委託（結算用）
 var _fight_enemy := ""
-## 開打時的你（跟上次比用）
-var _fight_start := {}
-## 剛打完的這場跟上次比：{"before": 上次的紀錄（第一次打是空的）, "now": 這次的紀錄}
-var last_report := {}
+## 開打時的血量（算這場掉了多少血）
+var _fight_start_hp := 0
 
 
 # ---------- 委託 ----------
 
 func start_commission(enemy_id: String) -> Battle:
 	_fight_enemy = enemy_id
-	_fight_start = {"day": hero.day, "hp": hero.hp, "max_hp": hero.max_hp(), "realm": hero.realm_text(),
-		"str": hero.stats["str"], "agi": hero.stats["agi"],
-		"weapon": WeaponData.get_def(hero.weapon)["name"], "learned": hero.learned.duplicate()}
+	_fight_start_hp = hero.hp
 	return Battle.new([hero.to_combatant()], [Combatant.from_enemy(enemy_id)])
 
 
 func finish_commission(battle: Battle) -> Array:
 	var r := battle.result()
 	var id := _fight_enemy
-	var record := _fight_record(battle)
-	last_report = {"before": hero.last_fights.get(id, {}), "now": record}
-	hero.last_fights[id] = record
+	hero.last_fights[id] = _fight_record(battle)
 	var c: Dictionary = TownData.COMMISSIONS[id]
 	var msgs := []
 	var days: int = c["days"]
@@ -54,17 +48,12 @@ func finish_commission(battle: Battle) -> Array:
 	return msgs
 
 
-## 這場的紀錄：開打時的你 ＋ 打得怎樣
+## 這場打得怎樣（委託板上寫「上次」用）
 func _fight_record(battle: Battle) -> Dictionary:
 	var r := battle.result()
 	var foe: Combatant = battle.enemies[0]
-	var used := {}
-	for m in r["used"]:
-		used[m] = used.get(m, 0) + 1
-	var rec := _fight_start.duplicate()
-	rec.merge({"outcome": r["outcome"], "rounds": r["rounds"], "hp_lost": _fight_start["hp"] - r["hp"],
-		"foe_left": float(foe.hp) / foe.max_hp, "used": used})
-	return rec
+	return {"outcome": r["outcome"], "rounds": r["rounds"], "hp_lost": _fight_start_hp - r["hp"],
+		"foe_left": float(foe.hp) / foe.max_hp}
 
 
 ## 打贏之後：卡在瓶頸時打贏強敵就衝破瓶頸、師傅的考驗、通關

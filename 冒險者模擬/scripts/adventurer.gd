@@ -23,8 +23,10 @@ var steal_hits := {}
 var approved_tier := 1
 ## 打贏過的敵人
 var beaten: Array[String] = []
-## 每種敵人上次打的結果（跟上次比用）：敵人 id -> Town.fight_record() 的內容
+## 每種敵人上次打的結果（委託板用）：敵人 id -> Town._fight_record() 的內容
 var last_fights := {}
+## 自動撤退線：血剩最大血量的這個比例（含）以下就撤。0 = 不自動撤
+var retreat_at := 0.2
 ## 拿著的武器和買過的武器
 var weapon := WeaponData.START
 var owned_weapons: Array[String] = [WeaponData.START]

@@ -38,7 +38,7 @@ func _ready() -> void:
 
 	town_view.add_messages([
 		{"kind": "big", "text": "你帶著一把舊鐵劍和 %d 銀來到北境的小城。城裡有冒險者公會的委託板、一間北境劍術的道場，還有武器店。" % town.hero.money},
-		{"kind": "info", "text": "戰鬥會自己打，你只要決定接哪個委託、學什麼、買什麼。血剩兩成會自動撤退。"},
+		{"kind": "info", "text": "戰鬥會自己打，你只要決定接哪個委託、學什麼、買什麼。打的時候可以調速度、隨時撤退，也可以設血剩多少就自動撤退。"},
 		{"kind": "info", "text": "目標：打倒食人魔。每天生活費 %d 銀。" % TownData.LIVING_COST},
 	])
 	_back_to_town()
@@ -76,12 +76,8 @@ func _show_battle(note: String) -> void:
 
 func _on_battle_ended() -> void:
 	play_log.battle_end(battle)
-	if fight_kind == "commission":
-		_settled = town.finish_commission(battle)
-		battle_view.show_settlement(_settled, town.last_report)
-	else:
-		_settled = town.finish_spar(battle)
-		battle_view.show_settlement(_settled)
+	_settled = town.finish_commission(battle) if fight_kind == "commission" else town.finish_spar(battle)
+	battle_view.show_settlement(_settled)
 
 
 func _back_to_town() -> void:

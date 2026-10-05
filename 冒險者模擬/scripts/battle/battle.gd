@@ -2,6 +2,7 @@ class_name Battle
 extends RefCounted
 
 ## 一場戰鬥的規則。不碰畫面：收指令，吐出「事件清單」給畫面顯示。
+## 事件的 kind 是 "stat"、或傷害事件的 note（雙方數值）：只寫進試玩紀錄，畫面不顯示（show don't tell）。
 ##
 ## 進口：Battle.new(我方, 敵方)，我方是從 Adventurer.to_combatant() 來的。
 ## 出口：result() —— 勝負或撤退、剩多少血、打了幾回合、用了哪些招、被招牌招打中幾次。
@@ -255,7 +256,7 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 	var m: Dictionary = MoveData.MOVES[move_id]
 	ev.append(_ev("action", target.fill(_pick(e["text"]))))
 	if e.get("failed", false):
-		ev.append(_ev("info", "（%s差太多：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
+		ev.append(_ev("stat", "（%s差太多：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
 
 	if move_id != MoveData.FLEE:
 		ally.used.append(move_id)

@@ -1,19 +1,21 @@
 class_name BattleView
 extends VBoxContainer
 
-## 戰鬥畫面（自動戰鬥試驗）。只負責顯示，規則都在 Battle，挑招在 AutoPilot。
-## 戰鬥自己打：每隔一下打一回合，戰報一段一段出來；按「看完」一次打完。
-## 戰鬥紀錄參考 CK3 單挑：開場交代場景，每回合把雙方的動作寫成一整段，數字另外放一行小字，
-## 雙方的狀態用文字描述。
-## 打完在右邊並排顯示「上次 vs 這次」。
+## 戰鬥畫面。只負責顯示，規則都在 Battle，挑招在 AutoPilot。
+## 戰鬥自己打：每隔一下打一回合，戰報一段一段出來。
+## 玩家能調的：播放速度、「看完」一次打完、隨時撤退、自動撤退線。
+## 戰鬥紀錄參考 CK3 單挑：開場交代場景，每回合把雙方的動作寫成一整段，傷害數字另外放一行小字，
+## 雙方的狀態用文字描述。不寫雙方的數值（show don't tell）。
 ##
 ## 打完發出 ended（外面結算後呼叫 show_settlement），按「回到城裡」發出 closed。
 
 signal ended
 signal closed
 
-## 每回合間隔幾秒
-const ROUND_SEC := 0.8
+## 播放速度：名字、每回合幾秒
+const SPEEDS := [["慢", 1.4], ["普通", 0.8], ["快", 0.3]]
+## 自動撤退線：名字、血剩幾成
+const RETREAT_LINES := [["不自動撤退", 0.0], ["血剩一成", 0.1], ["血剩兩成", 0.2], ["血剩三成", 0.3], ["血剩一半", 0.5]]
 
 const COLOR := {
 	"round": "#8a8f98",
@@ -26,15 +28,16 @@ const COLOR := {
 	"status": "#c9b8a6",
 	"end": "#ffffff",
 }
-const BETTER := "#9be39b"
-const WORSE := "#ff8a8a"
-const OUTCOME_NAMES := {"win": "贏", "lose": "輸", "flee": "撤退", "survive": "撐過"}
 
 var battle: Battle
 var hero_c: Combatant
 var foe_c: Combatant
 var pilot := AutoPilot.new()
 var timer: Timer
+## 速度選第幾個（換場戰鬥也記得）
+var speed_index := 1
+## 玩家按了撤退，下一回合就撤
+var flee_requested := false
 
 var hero_name_label: Label
 var hero_bar: ProgressBar
@@ -45,9 +48,10 @@ var foe_hp_label: Label
 var foe_name_label: Label
 var foe_status: Label
 var log_label: RichTextLabel
-var report_panel: PanelContainer
-var report_box: VBoxContainer
 var play_box: HBoxContainer
+var speed_buttons: Array[Button] = []
+var retreat_option: OptionButton
+var flee_button: Button
 var end_box: HBoxContainer
 
 
@@ -70,36 +74,44 @@ func _init() -> void:
 	foe_status = foe_col["status"]
 	top.add_child(foe_col["box"])
 
-	# 中：左邊戰鬥紀錄，右邊打完的「上次 vs 這次」
-	var mid := UiKit.hbox(12)
-	mid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(mid)
+	# 中：戰鬥紀錄
 	log_label = RichTextLabel.new()
 	log_label.bbcode_enabled = true
 	log_label.scroll_following = true
 	log_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_label.add_theme_constant_override("line_separation", 6)
 	var log_panel := PanelContainer.new()
-	log_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	log_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	log_panel.add_child(log_label)
-	mid.add_child(log_panel)
-	report_box = UiKit.vbox(6)
-	report_panel = PanelContainer.new()
-	report_panel.custom_minimum_size.x = 430
-	var report_margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		report_margin.add_theme_constant_override("margin_" + side, 12)
-	report_margin.add_child(report_box)
-	report_panel.add_child(report_margin)
-	mid.add_child(report_panel)
+	add_child(log_panel)
 
-	# 下：打的時候「看完」，打完「回到城裡」
+	# 下：打的時候 看完／速度／撤退線／撤退，打完 回到城裡
 	play_box = UiKit.hbox(10)
-	var skip := UiKit.button("看完", 170, 52)
+	var skip := UiKit.button("看完", 120, 52)
 	skip.pressed.connect(_skip)
 	play_box.add_child(skip)
+	play_box.add_child(UiKit.label("速度", 17, 0.7))
+	for i in SPEEDS.size():
+		var b := UiKit.button(SPEEDS[i][0], 70, 52)
+		b.toggle_mode = true
+		b.pressed.connect(_set_speed.bind(i))
+		speed_buttons.append(b)
+		play_box.add_child(b)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	play_box.add_child(spacer)
+	retreat_option = OptionButton.new()
+	retreat_option.custom_minimum_size = Vector2(170, 52)
+	for line in RETREAT_LINES:
+		retreat_option.add_item(line[0])
+	retreat_option.tooltip_text = "血掉到這裡就自動撤退"
+	retreat_option.item_selected.connect(_set_retreat_line)
+	play_box.add_child(retreat_option)
+	flee_button = UiKit.button("撤退", 120, 52)
+	flee_button.pressed.connect(_request_flee)
+	play_box.add_child(flee_button)
 	add_child(play_box)
+
 	end_box = UiKit.hbox(10)
 	var back := UiKit.button("回到城裡", 170, 52)
 	back.pressed.connect(func(): closed.emit())
@@ -107,7 +119,6 @@ func _init() -> void:
 	add_child(end_box)
 
 	timer = Timer.new()
-	timer.wait_time = ROUND_SEC
 	timer.timeout.connect(_play_one)
 	add_child(timer)
 
@@ -116,8 +127,8 @@ func begin(p_battle: Battle, note := "") -> void:
 	battle = p_battle
 	hero_c = battle.allies[0]
 	foe_c = battle.enemies[0]
+	flee_requested = false
 	log_label.clear()
-	report_panel.visible = false
 	# 人標境界，怪物標危險度，都用境界的顏色
 	var a := hero_c.adventurer
 	hero_name_label.text = "你　%s　%s" % [a.realm_text(), WeaponData.get_def(a.weapon)["name"]]
@@ -131,18 +142,24 @@ func begin(p_battle: Battle, note := "") -> void:
 	var hide: bool = foe_c.enemy_def.get("hide_hp", false)
 	foe_bar.visible = not hide
 	foe_hp_label.visible = not hide
+	# 師傅的考驗：撐過幾回合就好，不能撤退（認輸由血量決定）
+	var spar := hero_c.yield_hp > 0
+	retreat_option.visible = not spar
+	flee_button.visible = not spar
+	for i in RETREAT_LINES.size():
+		if is_equal_approx(RETREAT_LINES[i][1], a.retreat_at):
+			retreat_option.select(i)
 	_append(battle.start())
 	if note != "":
 		log_label.append_text("[color=%s]%s[/color]\n" % [COLOR["info"], note])
 	_refresh()
+	_set_speed(speed_index)
 	timer.start()
 
 
-## 打完的結算（拿到多少錢、數值成長…）接在戰鬥紀錄後面；report 是 Town.last_report（空的 = 不比）
-func show_settlement(msgs: Array, report := {}) -> void:
+## 打完的結算（拿到多少錢、數值成長…）接在戰鬥紀錄後面
+func show_settlement(msgs: Array) -> void:
 	log_label.append_text("\n" + UiKit.messages_bbcode(msgs) + "\n")
-	if not report.is_empty():
-		_build_report(report)
 
 
 func _play_one() -> void:
@@ -150,6 +167,8 @@ func _play_one() -> void:
 		timer.stop()
 		return
 	var choice := pilot.choose(battle, hero_c, foe_c)
+	if flee_requested and battle.can_flee(hero_c):
+		choice = MoveData.FLEE
 	_append(battle.play_round({hero_c: {"move": choice, "target": foe_c}}))
 	_refresh()
 	if battle.is_over():
@@ -160,6 +179,24 @@ func _play_one() -> void:
 func _skip() -> void:
 	while battle != null and not battle.is_over():
 		_play_one()
+
+
+func _set_speed(i: int) -> void:
+	speed_index = i
+	timer.wait_time = SPEEDS[i][1]
+	for j in speed_buttons.size():
+		speed_buttons[j].button_pressed = j == i
+
+
+func _set_retreat_line(i: int) -> void:
+	hero_c.adventurer.retreat_at = RETREAT_LINES[i][1]
+
+
+## 撤退：下一回合轉身就跑（被抱住時要等掙脫）
+func _request_flee() -> void:
+	flee_requested = true
+	flee_button.disabled = true
+	flee_button.text = "準備撤退…"
 
 
 ## 把事件排成段落：同一回合的敘述接成一段，傷害數字另外一行小字
@@ -181,7 +218,9 @@ func _append(events: Array) -> void:
 				_flush(para, damage)
 				log_label.append_text("\n[b][font_size=26]%s[/font_size][/b]\n" % text)
 			"damage_in", "damage_out":
-				damage.append("[color=%s]%s −%d[/color][color=%s]（%s）[/color]" % [COLOR[e["kind"]], text, e["amount"], COLOR["round"], e["note"]])
+				damage.append("[color=%s]%s −%d[/color]" % [COLOR[e["kind"]], text, e["amount"]])
+			"stat":
+				pass  # 雙方數值的比較只寫進試玩紀錄
 			"action":
 				para.append(text)
 			_:
@@ -210,102 +249,9 @@ func _refresh() -> void:
 	var over := battle.is_over()
 	play_box.visible = not over
 	end_box.visible = over
-
-
-# ---------- 上次 vs 這次 ----------
-
-func _build_report(report: Dictionary) -> void:
-	UiKit.clear(report_box)
-	report_panel.visible = true
-	var before: Dictionary = report["before"]
-	var now: Dictionary = report["now"]
-	if before.is_empty():
-		report_box.add_child(UiKit.heading("第一次打%s" % foe_c.display_name))
-		report_box.add_child(UiKit.label("下次再打，會跟這次比。", 16, 0.6, true))
-	else:
-		report_box.add_child(UiKit.heading("跟上次比"))
-
-	var grid := GridContainer.new()
-	grid.columns = 3 if not before.is_empty() else 2
-	grid.add_theme_constant_override("h_separation", 16)
-	grid.add_theme_constant_override("v_separation", 6)
-	report_box.add_child(grid)
-	var head := ["", "上次（第 %d 天）" % before.get("day", 0), "這次"] if not before.is_empty() else ["", "這次"]
-	for h in head:
-		grid.add_child(UiKit.label(h, 16, 0.6))
-
-	# 每列：名稱、上次、這次、比較用的 key（見 _score；"" = 不比）
-	var rows := [
-		["結果", _outcome(before), _outcome(now), "outcome"],
-		["回合", str(before.get("rounds", "")), str(now["rounds"]), "rounds"],
-		["你掉的血", "%d / %d" % [before.get("hp_lost", 0), before.get("max_hp", 0)], "%d / %d" % [now["hp_lost"], now["max_hp"]], "hp_lost"],
-		["對手剩的血", "%d%%" % roundi(before.get("foe_left", 0.0) * 100), "%d%%" % roundi(now["foe_left"] * 100), "foe_left"],
-		["境界", before.get("realm", ""), now["realm"], ""],
-		["力量／敏捷", "%d／%d" % [before.get("str", 0), before.get("agi", 0)], "%d／%d" % [now["str"], now["agi"]], "stats"],
-		["武器", before.get("weapon", ""), now["weapon"], ""],
-	]
-	for row in rows:
-		grid.add_child(UiKit.label(row[0], 17, 0.75))
-		if not before.is_empty():
-			grid.add_child(UiKit.label(row[1], 17, 0.75))
-		var cell := UiKit.label(row[2], 18)
-		if not before.is_empty() and row[3] != "":
-			var diff := _score(row[3], now) - _score(row[3], before)
-			# 回合數只在兩次都打贏時比
-			var comparable: bool = row[3] != "rounds" or (now["outcome"] == "win" and before["outcome"] == "win")
-			if comparable and absf(diff) > 0.001:
-				cell.add_theme_color_override("font_color", Color(BETTER if diff > 0 else WORSE))
-		grid.add_child(cell)
-
-	# 多了什麼新東西
-	if not before.is_empty():
-		var news := []
-		if now["weapon"] != before["weapon"]:
-			news.append("換了%s" % now["weapon"])
-		for id in now["learned"]:
-			if not before["learned"].has(id):
-				news.append("學會「%s」" % MoveData.MOVES[id]["name"])
-		if not news.is_empty():
-			var l := UiKit.label("這次多了：" + "、".join(news), 17, 1.0, true)
-			l.add_theme_color_override("font_color", Color(COLOR["tell"]))
-			report_box.add_child(l)
-
-	# 這場用了哪些招，用得多的排前面
-	var used: Dictionary = now["used"]
-	var ids := used.keys()
-	ids.sort_custom(func(a, b): return used[a] > used[b])
-	var parts := []
-	for id in ids:
-		var s := "%s ×%d" % [MoveData.MOVES[id]["name"], used[id]]
-		if not before.is_empty() and not before["learned"].has(id) and not MoveData.is_basic(id):
-			s = "★" + s
-		parts.append(s)
-	report_box.add_child(UiKit.label("這場用了：" + "、".join(parts), 16, 0.8, true))
-
-
-func _outcome(r: Dictionary) -> String:
-	if r.is_empty():
-		return ""
-	var text: String = OUTCOME_NAMES[r["outcome"]]
-	if r["outcome"] == "flee":
-		text += "（第 %d 回合）" % r["rounds"]
-	return text
-
-
-## 比較用的分數，越大越好
-func _score(key: String, r: Dictionary) -> float:
-	match key:
-		"outcome":
-			return {"lose": 0, "flee": 1, "win": 2}.get(r["outcome"], 0)
-		"rounds":
-			return -r["rounds"]
-		"hp_lost":
-			return -float(r["hp_lost"]) / r["max_hp"]
-		"foe_left":
-			return -r["foe_left"]
-		"stats":
-			return r["str"] + r["agi"]
-	return 0.0
+	if not flee_requested:
+		flee_button.disabled = false
+		flee_button.text = "撤退"
 
 
 ## 用文字描述狀態，不只看血條
@@ -314,6 +260,8 @@ func _condition(c: Combatant, is_hero: bool) -> String:
 	if is_hero:
 		if not c.is_alive():
 			return "你倒在地上。" if c.yield_hp == 0 else "你撐不住了。"
+		if c.held:
+			return "你被抱住了，掙脫之前跑不掉。"
 		if r >= 0.8:
 			return "你呼吸平穩，握劍的手很穩。"
 		if r >= 0.5:
