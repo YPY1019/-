@@ -16,9 +16,10 @@ const START := "old_sword"
 ## 武器店賣的
 const SHOP := ["steel_sword"]
 
-## 特效發動的機率、twin 多咬一口的傷害比例
+## 特效發動的機率、twin 多咬一口的傷害比例和上限（不然碰上絕學會多咬一百多）
 const FX_CHANCE := 0.35
 const TWIN_DAMAGE := 0.5
+const TWIN_MAX := 15
 
 const WEAPONS := {
 	"old_sword": {"name": "舊鐵劍", "power": 1.0, "cost": 0, "str": 0,
@@ -32,7 +33,7 @@ const WEAPONS := {
 	"red_fang": {"name": "紅鬃之牙", "power": 1.7, "cost": 0, "str": 0, "rare": true, "fx": "twin",
 		"look": "暗紅色的劍，刃口有一排鋸齒。",
 		"desc": "傭兵團「紅鬃」歷代隊長傳下來的劍，刃口有一排鋸齒。"},
-	"knell": {"name": "喪鐘", "power": 2.1, "cost": 0, "str": 0, "rare": true, "fx": "knell",
+	"knell": {"name": "喪鐘", "power": 1.8, "cost": 0, "str": 0, "rare": true, "fx": "knell",
 		"look": "黑色的大劍，劍身很寬，揮起來會嗡嗡響。",
 		"desc": "黑騎士的大劍。劍身很寬，揮起來會嗡嗡響。"},
 }
@@ -54,6 +55,11 @@ const FX_TEXT := {
 
 static func get_def(id: String) -> Dictionary:
 	return WEAPONS[id]
+
+
+## twin 多咬一口的傷害
+static func twin_extra(dmg: int) -> int:
+	return clampi(roundi(dmg * TWIN_DAMAGE), 1, TWIN_MAX)
 
 
 static func fx(id: String) -> String:

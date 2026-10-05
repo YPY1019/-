@@ -40,6 +40,7 @@ func finish_commission(battle: Battle) -> Array:
 			days += TownData.INJURED_DAYS
 			msgs.append(_m("bad", "路過的商隊把你撿了回來。你昏迷了好幾天，醒來時躺在城裡的旅店。"))
 	msgs.append_array(_pass_days(days))
+	hero.lore_misses += r["lore_misses"]
 	msgs.append_array(_realize(r))
 	if r["outcome"] == "win":
 		msgs.append_array(_after_win(id))

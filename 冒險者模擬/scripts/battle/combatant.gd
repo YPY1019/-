@@ -47,6 +47,8 @@ var held := false
 var used: Array[String] = []
 ## 這場被敵人招牌招打中幾次：你偷學的招 id -> 次數
 var sig_hits := {}
+## 這場想起口訣、劍卻還是砍到對手兵器上幾次（打完加到 Adventurer.lore_misses）
+var lore_misses := 0
 
 ## ---- 敵人 ----
 ## 這回合要做的事：{"action", "type", "phase": windup/strike/do/forced/hold, "text", "target"}
@@ -65,6 +67,8 @@ var raging := false
 var fled := false
 ## 寫過「快撐不住了」的樣子（之後少寫，不然每回合都一樣）
 var said_dying := false
+## 劍的特效在你身上發動過了（第一次砍中一定發動，你才知道它多可怕）
+var fx_shown := false
 var recent_actions: Array[String] = []
 ## 對手上回合用的招（習慣會看這個）
 var last_player_move := ""

@@ -31,6 +31,17 @@ const FEAR_FLEE_HP := 0.6
 const FEAR_FLEE_CHANCE := 0.5
 ## 血掉到這裡以下就算硬仗（見 hard_fight）
 const HARD_FIGHT_HP := 0.5
+## 先吃虧：對手露出破綻時，你一般的砍法砍到他及時擋過來的兵器上的機率。
+## 看你這招的數值比對手低多少：差距 0 時 GUARD_BASE，每低 1 點多 GUARD_PER_POINT
+const GUARD_BASE := 0.25
+const GUARD_PER_POINT := 0.1
+const GUARD_MAX := 0.7
+## 砍到兵器上，傷害剩這個比例
+const GUARDED_DEAL := 0.35
+## 先差一點：拿到口訣後，想起口訣、劍還是砍到兵器上幾次，才悟得出來（跨場累計）
+const LORE_MISSES := 2
+## 你的反應句：對手那一項比你高很多、而且這一下掉了這個比例以上的血，才寫「被打飛」
+const CRUSHED_HP := 0.15
 
 const ATTACK_TYPES := ["sweep", "thrust", "smash", "grab", "trick", "roar", "hold"]
 const END_TEXT := {"win": "你贏了！", "lose": "你眼前一黑，倒了下去。", "flee": "你逃掉了。", "survive": "你撐過去了。"}
@@ -45,6 +56,8 @@ var outcome := ""
 var rng := RandomNumberGenerator.new()
 ## 整場的文字紀錄（試玩紀錄檔用）：發生的事，加上每回合有哪些選項、選了什麼
 var record: Array[String] = []
+## 這場每一句用過幾次（同一場不重複同一句，見 _pick）
+var line_uses := {}
 
 
 func _init(p_allies: Array, p_enemies: Array, rng_seed := -1) -> void:
@@ -154,7 +167,7 @@ func is_over() -> bool:
 func result() -> Dictionary:
 	var hero := allies[0]
 	return {"outcome": outcome, "rounds": round_no, "hp": hero.hp, "max_hp": hero.max_hp,
-		"used": hero.used, "sig_hits": hero.sig_hits}
+		"used": hero.used, "sig_hits": hero.sig_hits, "lore_misses": hero.lore_misses}
 
 
 ## 結束的句子，敵人資料裡有寫就用敵人的
@@ -184,9 +197,11 @@ func _deal_hands() -> void:
 			# 收招慢的招（裂盾斬），用完下回合不能再用
 			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
 				pool.erase(ally.used[-1])
-			# 絕學只有對手露出大破綻時才出得來。只有口訣、還沒悟出來的，要在硬仗裡才悟得出來
+			# 絕學只有對手露出大破綻時才出得來。只有口訣、還沒悟出來的，要在硬仗裡才悟得出來；
+			# 還沒差一點夠次數的，要對手拿得起兵器擋（不然沒有「砍到兵器上」這回事）
 			var foe := _first_alive(enemies)
-			if foe != null and big_opening(foe) and hard_fight(ally, foe):
+			if foe != null and big_opening(foe) and hard_fight(ally, foe) \
+					and (_lore_misses_left(ally) <= 0 or can_parry(foe)):
 				for id in ally.adventurer.lore:
 					if not pool.has(id):
 						pool.append(id)
@@ -256,10 +271,24 @@ func _weighted_pick(ally: Combatant, candidates: Array, foe: Combatant) -> Strin
 # ---- 玩家出手 ----
 
 func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array) -> Dictionary:
-	var e := resolve(ally, move_id, target)
 	var m: Dictionary = MoveData.MOVES[move_id]
+	if m.get("ult", false) and not _knows(ally, move_id) and not ally.used.has(move_id) and _lore_misses_left(ally) > 0:
+		# 先差一點：想起口訣，手還是照老習慣砍向對手的兵器（算一般的攻擊）
+		var n: int = LORE_MISSES - _lore_misses_left(ally)
+		ally.lore_misses += 1
+		var lines: Array = m["lore_miss"][mini(n, m["lore_miss"].size() - 1)]
+		move_id = "attack"
+		m = MoveData.MOVES[move_id]
+		var miss := {"deal": MoveData.entry(move_id, "opening", target.traits)["deal"] * GUARDED_DEAL, "text": lines}
+		return _land_player(ally, move_id, miss, target, ev)
+
+	var e := resolve(ally, move_id, target)
+	# 先吃虧：對手露出破綻，還拿得起兵器擋，你的劍常常砍到兵器上（絕學不會）
+	if not m.get("ult", false) and e.get("deal", 0.0) > 0.0 and big_opening(target) and can_parry(target) \
+			and rng.randf() < guard_chance(ally, move_id, target):
+		e = {"deal": e["deal"] * GUARDED_DEAL, "text": target.enemy_def["parry"]}
 	if m.get("ult", false):
-		if ally.adventurer != null and ally.adventurer.knows(move_id):
+		if _knows(ally, move_id):
 			# 絕學：先寫起手，喊出招名，再寫結果
 			ev.append(_ev("action", target.fill(_pick(m["pre"]))))
 			ev.append(_ev("ult", "「%s」！" % m["name"]))
@@ -269,6 +298,12 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 		else:
 			# 同一場再用：還不知道招名，只寫起手
 			ev.append(_ev("action", target.fill(_pick(m["pre"]))))
+	return _land_player(ally, move_id, e, target, ev)
+
+
+## 你這招的結果 e 寫出來、算傷害和效果
+func _land_player(ally: Combatant, move_id: String, e: Dictionary, target: Combatant, ev: Array) -> Dictionary:
+	var m: Dictionary = MoveData.MOVES[move_id]
 	ev.append(_ev("action", target.fill(_pick(e["text"]))))
 	if e.get("failed", false):
 		ev.append(_ev("stat", "（失敗。%s：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
@@ -351,6 +386,31 @@ func big_opening(foe: Combatant) -> bool:
 	return it.get("type", "") == "opening"
 
 
+## 對手露出破綻時，還拿得起兵器擋你（沒被繳械、兵器沒卡住、資料裡有擋的寫法）
+func can_parry(foe: Combatant) -> bool:
+	if not foe.enemy_def.has("parry") or foe.disarmed:
+		return false
+	var id: String = foe.intent.get("action", "")
+	return id == "" or not foe.action_def(id).get("no_parry", false)
+
+
+## 先吃虧：對手露出破綻時，你這招砍到他兵器上的機率。你這招的數值比他低越多越常發生
+func guard_chance(ally: Combatant, move_id: String, foe: Combatant) -> float:
+	var g := gap(ally, foe, MoveData.MOVES[move_id]["stat"])
+	return clampf(GUARD_BASE - g * GUARD_PER_POINT, 0.0, GUARD_MAX)
+
+
+func _knows(ally: Combatant, move_id: String) -> bool:
+	return ally.adventurer != null and ally.adventurer.knows(move_id)
+
+
+## 還要差一點幾次才悟得出來
+func _lore_misses_left(ally: Combatant) -> int:
+	if ally.adventurer == null:
+		return 0
+	return LORE_MISSES - ally.adventurer.lore_misses - ally.lore_misses
+
+
 ## 我方這招打出去的傷害（算了武器，還沒算盔甲和浮動）
 func damage_out(ally: Combatant, move_id: String, foe: Combatant, deal: float) -> float:
 	var m: Dictionary = MoveData.MOVES[move_id]
@@ -423,7 +483,7 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 		ev.append({"kind": "damage_in", "text": "你", "amount": dmg,
 			"note": "%s %d 對 %d" % [GrowthData.NAMES[stat], target.stats[stat], enemy.stats[stat]]})
 		var hurt := ""
-		if g >= GrowthData.OUTCLASS and dmg >= 15 and target.is_alive() and rng.randf() < 0.5:
+		if g >= GrowthData.OUTCLASS and dmg >= target.max_hp * CRUSHED_HP and target.is_alive() and rng.randf() < 0.5:
 			hurt = _pick(MoveData.HURT["crushed"])
 		elif not shrug:
 			hurt = _hurt_line(target, dmg)
@@ -448,12 +508,16 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 
 ## 對手拿著稀有的劍：砍中你時也會發動特效（你先挨過，才知道它多可怕）
 func _weapon_fx_in(enemy: Combatant, target: Combatant, dmg: int, ev: Array) -> void:
-	if enemy.weapon_fx == "" or not target.is_alive() or rng.randf() >= WeaponData.FX_CHANCE:
+	if enemy.weapon_fx == "" or not target.is_alive():
 		return
+	# 第一次砍中一定發動
+	if enemy.fx_shown and rng.randf() >= WeaponData.FX_CHANCE:
+		return
+	enemy.fx_shown = true
 	ev.append(_ev("fx", enemy.fill(_pick(WeaponData.FX_TEXT[enemy.weapon_fx]["in"]))))
 	match enemy.weapon_fx:
 		"twin":
-			var extra := maxi(1, roundi(dmg * WeaponData.TWIN_DAMAGE))
+			var extra := WeaponData.twin_extra(dmg)
 			target.hp = maxi(0, target.hp - extra)
 			ev.append({"kind": "damage_in", "text": "你", "amount": extra, "note": "紅鬃之牙"})
 		"knell":
@@ -469,7 +533,7 @@ func _weapon_fx_out(ally: Combatant, enemy: Combatant, dmg: int, ev: Array) -> v
 	ev.append(_ev("fx", enemy.fill(text.replace("{weapon}", ally.weapon))))
 	match ally.weapon_fx:
 		"twin":
-			var extra := maxi(1, roundi(dmg * WeaponData.TWIN_DAMAGE))
+			var extra := WeaponData.twin_extra(dmg)
 			enemy.hp = maxi(0, enemy.hp - extra)
 			ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": extra, "note": ally.weapon})
 			if not enemy.is_alive():
@@ -516,8 +580,10 @@ func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: flo
 	elif g <= -GrowthData.OUTCLASS and dmg < 20:
 		ev.append(_ev("pain", enemy.fill(_pick(EnemyData.UNFAZED))))
 	elif dmg >= 15:
-		ev.append(_ev("pain", enemy.fill(_pick(pain["heavy"]))))
-	elif rng.randf() < 0.5:
+		# 每下都寫會很吵：重傷常寫、輕傷偶爾寫
+		if rng.randf() < 0.6:
+			ev.append(_ev("pain", enemy.fill(_pick(pain["heavy"]))))
+	elif rng.randf() < 0.35:
 		ev.append(_ev("pain", enemy.fill(_pick(pain["light"]))))
 	_weapon_fx_out(ally, enemy, dmg, ev)
 	if not enemy.is_alive():
@@ -648,8 +714,15 @@ func _habit_matches(enemy: Combatant, h: Dictionary) -> bool:
 
 # ---- 小工具 ----
 
+## 隨機挑一句。同一場先挑還沒用過（用得最少）的，全部用過才會重複
 func _pick(list: Array) -> String:
-	return list[rng.randi_range(0, list.size() - 1)]
+	var least := INF
+	for s in list:
+		least = minf(least, line_uses.get(s, 0))
+	var fresh := list.filter(func(s): return line_uses.get(s, 0) == least)
+	var s: String = fresh[rng.randi_range(0, fresh.size() - 1)]
+	line_uses[s] = line_uses.get(s, 0) + 1
+	return s
 
 
 func _spread() -> float:
@@ -688,8 +761,8 @@ func _hurt_line(target: Combatant, dmg: int) -> String:
 		target.said_dying = true
 		return _pick(MoveData.HURT["critical"])
 	if dmg >= 20:
-		return _pick(MoveData.HURT["heavy"])
-	if rng.randf() < 0.4:
+		return _pick(MoveData.HURT["heavy"]) if rng.randf() < 0.6 else ""
+	if rng.randf() < 0.3:
 		return _pick(MoveData.HURT["light"])
 	return ""
 

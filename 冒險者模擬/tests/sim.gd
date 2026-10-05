@@ -34,8 +34,17 @@ func _init() -> void:
 		["20/17 二境 斷岳 赤牙", 20, 17, 1, T1 + T2 + ULT + WILD, "red_fang"],
 		["20/17 二境 斷岳 喪鐘", 20, 17, 1, T1 + T2 + ULT + WILD, "knell"],
 		["20/17 三境 斷岳 喪鐘", 20, 17, 2, T1 + T2 + ULT + WILD, "knell"],
+		# 只練力量（2026-10-05 第三次試玩的路線）
+		["17/10 二境 基礎 騎士", 17, 10, 1, T1, "knight_sword"],
+		["18/10 二境 進階 騎士", 18, 10, 1, T1 + T2, "knight_sword"],
+		["19/10 二境 斷岳 赤牙", 19, 10, 1, T1 + T2 + ULT, "red_fang"],
+		["20/10 二境 斷岳 喪鐘", 20, 10, 1, T1 + T2 + ULT, "knell"],
 	]
 	var ids := ["wolf", "bandit_leader", "deserter", "bear", "merc_captain", "black_knight", "ogre", "master"]
+	# 加參數只跑名字裡有這段字的組合：-- "/10"
+	var only := OS.get_cmdline_user_args()
+	if not only.is_empty():
+		setups = setups.filter(func(s): return s[0].contains(only[0]))
 	for s in setups:
 		var line := "%-18s" % s[0]
 		for id in ids:
@@ -69,8 +78,11 @@ func _battle(str_v: int, agi_v: int, realm: int, moves: Array, weapon: String, e
 	hero.stats = {"str": str_v, "agi": agi_v}
 	hero.realm = realm
 	hero.weapon = weapon
+	# 數值不到門檻的招學不到（跟道場一樣）
 	for m in moves:
-		hero.learn(m)
+		var req: Dictionary = SchoolData.REQ.get(m, {})
+		if req.keys().all(func(s): return hero.stats[s] >= req[s]):
+			hero.learn(m)
 	var me := hero.to_combatant(true)
 	var b := Battle.new([me], [Combatant.from_enemy(enemy_id)], rng_seed)
 	if enemy_id == SchoolData.MASTER_ENEMY:

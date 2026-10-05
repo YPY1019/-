@@ -10,8 +10,11 @@ func _init() -> void:
 	hero.stats = {"str": int(args[1]), "agi": int(args[2])}
 	hero.realm = int(args[3])
 	hero.weapon = args[4]
+	# 數值不到門檻的招學不到（跟道場一樣）
 	for m in ["parry", "sweep_kick", "heavy", "redirect", "disarm", "break_free", "vital", "combo"]:
-		hero.learn(m)
+		var req: Dictionary = SchoolData.REQ.get(m, {})
+		if req.keys().all(func(s): return hero.stats[s] >= req[s]):
+			hero.learn(m)
 	if args.size() > 6 and args[6] == "lore":
 		hero.lore.append("sunder")
 	else:
