@@ -80,7 +80,7 @@ func _init() -> void:
 	move_row = UiKit.hbox(10)
 	add_child(move_row)
 
-	hint_label = UiKit.label("", 16, 0.6)
+	hint_label = UiKit.label("", 16, 0.6, true)
 	add_child(hint_label)
 
 	# 結束後的按鈕
