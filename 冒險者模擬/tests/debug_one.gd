@@ -16,7 +16,8 @@ func _init() -> void:
 		var req: Dictionary = SchoolData.REQ.get(m, {})
 		if req.keys().all(func(s): return hero.stats[s] >= req[s]):
 			hero.learn(m)
-	hero.learn("sunder")
+	for u in ["sunder", "falcon", "bastion"]:
+		hero.learn(u)
 	var b := Battle.new([hero.to_combatant(true)], [Combatant.from_enemy(args[0])], int(args[5]))
 	AutoPilot.new().play(b)
 	for l in b.record:

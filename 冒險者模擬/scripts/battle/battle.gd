@@ -589,7 +589,9 @@ func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: flo
 			ev.append(_ev("pain", enemy.fill(_pick(pain["heavy"]))))
 	elif rng.randf() < 0.35:
 		ev.append(_ev("pain", enemy.fill(_pick(pain["light"]))))
-	_weapon_fx_out(ally, enemy, dmg, ev)
+	# 絕學砍中不會再震出破綻（不然喪鐘＋北境裁決會一直接下去）
+	if not (m.get("ult", false) and ally.weapon_fx == "knell"):
+		_weapon_fx_out(ally, enemy, dmg, ev)
 	if not enemy.is_alive():
 		return
 	# 比你弱太多的對手，挨痛了會逃

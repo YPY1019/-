@@ -50,8 +50,8 @@ const DAMAGE_MULT_MAX := 1.4
 const OUTCLASS := 4
 
 # ---- 成長 ----
-## 長 1 點要多少經驗
-const EXP_PER_POINT := 100.0
+## 第 i 境長 1 點要多少經驗（境界越高越難長）
+const EXP_PER_POINT := [100.0, 200.0, 350.0]
 ## 每用一次招給的經驗（再乘上成長倍率）
 const EXP_PER_USE := 15.0
 ## 對手那一項比你低 GROW_OFFSET 點時練不到；跟你一樣時 = 1 倍

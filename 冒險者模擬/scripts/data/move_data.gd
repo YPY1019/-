@@ -377,20 +377,20 @@ const MOVES := {
 		"vs": {},
 	},
 	"falcon": {
-		"name": "隼之一刺", "stat": "agi", "desc": "南方決鬥家的絕學。對手縮在防守後面、或正在蓄力時才用得出來：從縫裡一劍刺進去，盔甲和盾都擋不住。刺中蓄力的人，那一下就使不出來了。",
-		"ult": true, "when": "closed", "pierce": true,
+		"name": "隼之一刺", "stat": "agi", "desc": "南方決鬥家的絕學。對手縮在防守後面、或正在蓄力時才用得出來：從縫裡一劍刺進去，盾和兵器都擋不住（盔甲還是擋得住一些）。刺中蓄力的人，那一下就使不出來了。",
+		"ult": true, "when": "closed",
 		"pre": [
 			"你看準了那道縫。",
 			"你的腳尖往前一滑，身子壓得很低。",
 			"你把劍收到腰側，劍尖對著{name}。",
 		],
-		"default": {"deal": 3.2, "text": [
+		"default": {"deal": 2.2, "text": [
 			"劍尖從{guard}的邊上鑽進去，刺進{name}的肩窩，又拔了出來。",
 			"{name}還沒看清你的劍，劍尖已經從{pron}腋下刺了進去。",
 			"這一刺又快又直，正好刺進{name}護不到的那道縫。",
 		]},
 		"vs": {
-			"windup": {"deal": 3.2, "effect": "interrupt", "text": [
+			"windup": {"deal": 2.2, "effect": "interrupt", "text": [
 				"{name}的力還沒蓄滿，你的劍尖已經刺進{pron}的手臂。{pron}這一下使不出來了。",
 				"{name}舉起{weapon}的那一刻，胸口全空了。你一劍刺進去，{pron}的手垂了下來。",
 			]},

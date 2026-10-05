@@ -435,7 +435,7 @@ const ENEMIES := {
 	"old_captain": {
 		"name": "葛雷森", "title": "老衛隊長",
 		"blurb": "以前王都衛隊的隊長，現在替人收債。頭髮白了，劍還是很穩。",
-		"hp": 380, "str": 23, "agi": 21, "armor": "light", "traits": ["disarmable"], "pron": "他",
+		"hp": 620, "str": 27, "agi": 26, "armor": "light", "traits": ["disarmable"], "pron": "他",
 		"weapon": "長劍", "guard": "護手", "loot": "nightwatch", "no_flee": true,
 		"parry": ["葛雷森腳下一錯，長劍已經回到身前。你的劍砍在寬寬的護手上，滑了開去。", "你搶上去出劍，葛雷森不慌不忙地一擋，像是早就知道你會砍哪裡。"],
 		"scene": ["碼頭邊的倉庫，空氣裡都是魚腥味。", "下雨的巷子，水從屋簷一直滴下來。"],
@@ -468,7 +468,7 @@ const ENEMIES := {
 	"rebel_lord": {
 		"name": "瓦倫", "title": "叛將",
 		"blurb": "背叛了領主、佔了山口要塞的將軍。左手一面塔盾，右手一把戰錘。",
-		"hp": 480, "str": 25, "agi": 20, "armor": "heavy", "traits": [], "pron": "他",
+		"hp": 960, "str": 31, "agi": 24, "armor": "heavy", "traits": [], "pron": "他",
 		"weapon": "戰錘", "guard": "塔盾", "books": ["bastion_book"], "no_flee": true,
 		"parry": ["瓦倫還沒站穩，塔盾已經擋在身前。你的劍砍在盾面上，震得手腕發麻。", "你搶上去出劍，瓦倫把盾一推，連你帶劍一起推開。"],
 		"scene": ["山口的舊要塞，城牆上的旗子早就燒掉了。", "要塞的中庭，地上的石板裂了好幾道縫。"],

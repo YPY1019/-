@@ -9,6 +9,8 @@ const N := 150
 const T1 := ["parry", "sweep_kick", "heavy"]
 const T2 := ["redirect", "disarm", "break_free", "vital", "combo"]
 const ULT := ["sunder"]
+const ULT2 := ["sunder", "falcon"]
+const ULT3 := ["sunder", "falcon", "bastion"]
 const WILD := ["sand", "shout"]
 
 
@@ -39,6 +41,14 @@ func _init() -> void:
 		["18/10 二境 進階 騎士", 18, 10, 1, T1 + T2, "knight_sword"],
 		["19/10 二境 斷岳 赤牙", 19, 10, 1, T1 + T2 + ULT, "red_fang"],
 		["20/10 二境 斷岳 喪鐘", 20, 10, 1, T1 + T2 + ULT, "knell"],
+		# 第三境：拿到後面的武器和秘笈
+		["21/19 三境 斷岳 喪鐘", 21, 19, 2, T1 + T2 + ULT + WILD, "knell"],
+		["21/19 三境 二絕 喪鐘", 21, 19, 2, T1 + T2 + ULT2 + WILD, "knell"],
+		["21/19 三境 二絕 碎門", 21, 19, 2, T1 + T2 + ULT2 + WILD, "gatebreaker"],
+		["23/21 三境 斷岳 喪鐘", 23, 21, 2, T1 + T2 + ULT + WILD, "knell"],
+		["23/21 三境 二絕 喪鐘", 23, 21, 2, T1 + T2 + ULT2 + WILD, "knell"],
+		["23/21 三境 二絕 守夜", 23, 21, 2, T1 + T2 + ULT2 + WILD, "nightwatch"],
+		["25/23 三境 二絕 守夜", 25, 23, 2, T1 + T2 + ULT2 + WILD, "nightwatch"],
 	]
 	var ids := ["merc_captain", "raider", "duelist", "black_knight", "ogre", "old_captain", "rebel_lord"]
 	# 加參數只跑名字裡有這段字的組合：-- "/10"
@@ -59,7 +69,8 @@ func _init() -> void:
 				var b := _battle(s[1], s[2], s[3], s[4], s[5], id, i)
 				var r := pilot.play(b)
 				rounds += r["rounds"]
-				ults += r["used"].count("sunder")
+				for u in ULT3:
+					ults += r["used"].count(u)
 				if r["outcome"] in ["win", "survive"]:
 					wins += 1
 					hp_sum += r["hp"]

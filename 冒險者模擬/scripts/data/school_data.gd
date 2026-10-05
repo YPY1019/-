@@ -18,8 +18,8 @@ const NAME := "北境劍術"
 const MASTER_ENEMY := "master"
 
 const TIERS := [
-	{"tier": 1, "name": "基礎招", "moves": ["parry", "sweep_kick", "heavy"], "cost": 60, "months": 3, "exam": ""},
-	{"tier": 2, "name": "進階招", "moves": ["redirect", "disarm", "break_free", "vital", "combo"], "cost": 0, "months": 6,
+	{"tier": 1, "name": "基礎招", "moves": ["parry", "sweep_kick", "heavy"], "cost": 60, "months": 6, "exam": ""},
+	{"tier": 2, "name": "進階招", "moves": ["redirect", "disarm", "break_free", "vital", "combo"], "cost": 0, "months": 12,
 		"exam": "spar", "exam_name": "接住我三招", "exam_quote": "「三招。接住了，進階招就教你。」"},
 	{"tier": 3, "name": "絕學", "moves": ["sunder"], "exam": "errand"},
 ]
@@ -50,7 +50,7 @@ const ERRAND := {
 }
 
 ## 過招考驗
-const SPAR_MONTHS := 1
+const SPAR_MONTHS := 2
 const SPAR_ROUNDS := 3
 ## 血掉到這個比例以下就算輸（掉超過四成）
 const SPAR_YIELD := 0.6

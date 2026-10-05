@@ -220,7 +220,7 @@ func _build_me() -> void:
 		var bar := UiKit.bar(Color("#7fa7d9"), 10)
 		bar.custom_minimum_size.x = 140
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		bar.max_value = GrowthData.EXP_PER_POINT
+		bar.max_value = h.exp_need()
 		bar.value = h.exp[s]
 		row.add_child(bar)
 		if h.at_cap(s):

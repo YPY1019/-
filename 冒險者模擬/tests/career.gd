@@ -6,6 +6,7 @@ extends SceneTree
 ## 委託挑「還沒打贏過的最弱對手」，在目前實力下連輸兩次就回去打打得贏的。戰鬥是自動的（AutoPilot）。
 ## 真人大約比電腦玩家快一倍（2026-10-06 試玩：真人 22 歲 10 月打倒食人魔，電腦玩家約 30 歲），
 ## 所以也印出「照真人速度」的估算（月數減半）。
+## 電腦玩家花的時間是真人的兩倍，老化也照「真人那時候幾歲」算（HumanAged），不然電腦玩家會老得太早。
 ## 執行：Godot.exe --headless --path . --script res://tests/career.gd
 
 const RUNS := 30
@@ -19,6 +20,12 @@ const PRIZES := ["打贏羅德里克", "打贏烏爾夫", "打贏伊薇特", "�
 const HUMAN_SPEED := 2.0
 ## 估算「死在幾歲」
 const DEATH_AGES := [26, 28, 30, 32, 34, 36, 38, 40]
+
+
+## 老化照真人的年紀算（電腦玩家過了 n 個月，真人才過了 n / HUMAN_SPEED 個月）
+class HumanAged extends Adventurer:
+	func decline(stat: String) -> int:
+		return LifeData.decline(stat, LifeData.age_at(int(month / HUMAN_SPEED)))
 
 
 func _init() -> void:
@@ -38,6 +45,9 @@ func _init() -> void:
 		v.sort()
 		var med: int = v[v.size() / 2]
 		print("　%s：電腦 %s，真人約 %s（%d/%d 輪）" % [k, LifeData.date_text(med), LifeData.date_text(int(med / HUMAN_SPEED)), v.size(), RUNS])
+	var fights := all.map(func(r): return r["fights"])
+	fights.sort()
+	print("\n全部拿完（或打不動）要打幾場：中位數 %d" % fights[fights.size() / 2])
 	print("\n死在幾歲時，拿得到幾樣（共 %d 樣，中位數）：" % PRIZES.size())
 	for age in DEATH_AGES:
 		var end: int = (age - LifeData.START_AGE) * 12 - (LifeData.START_MONTH - 1)
@@ -49,6 +59,15 @@ func _init() -> void:
 		bot.sort()
 		human.sort()
 		print("　%d 歲：電腦 %d 樣，真人約 %d 樣" % [age, bot[bot.size() / 2], human[human.size() / 2]])
+	# 照遊戲裡的隨機壽命，每輪擲一次
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	var got := []
+	for r in all:
+		got.append(_count(r["when"], LifeData.roll_life_months(rng) * HUMAN_SPEED))
+	got.sort()
+	print("\n照遊戲的隨機壽命（%d～%d 歲），真人一輩子拿到幾樣：最少 %d、四分之一 %d、中位數 %d、四分之三 %d、最多 %d" % [
+		LifeData.LIFESPAN_MIN, LifeData.LIFESPAN_MAX, got[0], got[got.size() / 4], got[got.size() / 2], got[got.size() * 3 / 4], got[-1]])
 	quit()
 
 
@@ -62,6 +81,7 @@ func _count(when: Dictionary, end: float) -> int:
 
 func _career(run: int, verbose: bool) -> Dictionary:
 	var town := Town.new()
+	town.hero = HumanAged.new()
 	var h := town.hero
 	h.life_months = 99999
 	var pilot := AutoPilot.new()

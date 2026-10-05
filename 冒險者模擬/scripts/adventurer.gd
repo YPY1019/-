@@ -137,12 +137,17 @@ func learn(move_id: String) -> void:
 		learned.append(move_id)
 
 
+## 長 1 點要多少經驗（看境界）
+func exp_need() -> float:
+	return GrowthData.EXP_PER_POINT[realm]
+
+
 ## 加經驗，回傳長了幾點。到瓶頸就停住。
 func add_exp(stat: String, amount: float) -> int:
 	var gained := 0
 	exp[stat] += amount
-	while exp[stat] >= GrowthData.EXP_PER_POINT and not at_cap(stat):
-		exp[stat] -= GrowthData.EXP_PER_POINT
+	while exp[stat] >= exp_need() and not at_cap(stat):
+		exp[stat] -= exp_need()
 		stats[stat] += 1
 		gained += 1
 	if at_cap(stat):

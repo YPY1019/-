@@ -14,8 +14,8 @@ const START_AGE := 16
 ## 出道那年的幾月
 const START_MONTH := 3
 ## 壽命（歲）的範圍，含頭含尾。死在那一歲的隨機一個月
-const LIFESPAN_MIN := 34
-const LIFESPAN_MAX := 38
+const LIFESPAN_MIN := 30
+const LIFESPAN_MAX := 34
 
 ## 過了這個年紀，這一項每 DECLINE_YEARS 年掉 1 點
 const DECLINE_AGE := {"agi": 28, "str": 30}
