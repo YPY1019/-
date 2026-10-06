@@ -76,13 +76,33 @@ const FX_TEXT := {
 	},
 	"rend": {
 		"out": ["斧刃連甲帶肉劈了進去。", "{name}的甲片被劈開，斧頭砍進了肉裡。"],
-		"in": ["你舉劍去擋，斧頭連你的劍一起壓了下來。", "斧頭劈在你的劍上，力道沒卸掉多少。"],
+		"in": ["你舉起{my}去擋，斧頭連你的{my}一起壓了下來。", "斧頭劈在你的{my}上，力道沒卸掉多少。"],
 	},
 	"ward": {
 		"out": ["你用寬寬的護手架住這一下，力道滑了開去。", "你手腕一翻，護手接住了{name}的攻擊。"],
-		"in": ["{name}手腕一翻，寬寬的護手接住了你的劍。", "你的劍砍在{name}的護手上，滑了開去。"],
+		"in": ["{name}手腕一翻，寬寬的護手接住了你的{my}。", "你的{my}砍在{name}的護手上，滑了開去。"],
 	},
 }
+
+
+## 你拿著哪一類武器，戰報裡你的武器怎麼寫（見 MoveData 的 {my} 那些）
+const KIND_WORDS := {
+	"sword": {"my_stroke": "劍", "my_tip": "劍尖", "my_edge": "劍鋒", "my_blade": "劍刃", "my_flat": "劍身", "my_hilt": "劍柄"},
+	"greatsword": {"my_stroke": "劍", "my_tip": "劍尖", "my_edge": "劍鋒", "my_blade": "劍刃", "my_flat": "劍身", "my_hilt": "劍柄"},
+	"rapier": {"my_stroke": "劍", "my_tip": "劍尖", "my_edge": "劍鋒", "my_blade": "劍刃", "my_flat": "劍身", "my_hilt": "護手"},
+	"blade": {"my_stroke": "刀", "my_tip": "刀尖", "my_edge": "刀鋒", "my_blade": "刀刃", "my_flat": "刀背", "my_hilt": "刀柄"},
+	"axe": {"my_stroke": "斧", "my_tip": "斧角", "my_edge": "斧刃", "my_blade": "斧刃", "my_flat": "斧面", "my_hilt": "斧柄"},
+	"hammer": {"my_stroke": "錘", "my_tip": "錘頭", "my_edge": "錘頭", "my_blade": "錘頭", "my_flat": "錘柄", "my_hilt": "錘柄"},
+	"fist": {"my_stroke": "拳", "my_tip": "拳頭", "my_edge": "拳頭", "my_blade": "拳頭", "my_flat": "手臂", "my_hilt": "手肘"},
+}
+
+
+## 戰報裡你的武器的寫法：{"my": 武器的叫法, "my_stroke"…}
+static func words(id: String) -> Dictionary:
+	var w := get_def(id)
+	var d: Dictionary = KIND_WORDS[w["kind"]].duplicate()
+	d["my"] = w.get("noun", w["name"])
+	return d
 
 
 static func get_def(id: String) -> Dictionary:

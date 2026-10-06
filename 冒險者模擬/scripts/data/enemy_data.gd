@@ -66,7 +66,7 @@ const OVERWHELMED := [
 	"{name}兩腿一軟，差點跪下去。",
 ]
 const UNFAZED := [
-	"你的劍砍在{name}身上，{pron}晃都沒晃。",
+	"你的{my}砍在{name}身上，{pron}晃都沒晃。",
 	"{name}低頭看了一眼傷口，沒當一回事。",
 	"你這一下砍得結結實實，{name}卻像沒感覺。",
 ]
@@ -120,7 +120,7 @@ const ENEMIES := {
 		"blurb": "在路上攔人搶劫的盜匪頭目，大刀使得很兇，手段也很髒。",
 		"hp": 150, "str": 12, "agi": 12, "armor": "light", "traits": ["disarmable"], "kinds": ["blade", "sword"], "pron": "他",
 		"weapon": "大刀", "guard": "架勢", "loot": "bandit_blade", "moves": ["knee"],
-		"parry": ["{name}身子還歪著，大刀卻慌忙橫了過來。你的劍砍在刀背上，震得手腕發麻。", "你搶上去出劍，{name}把大刀往身前一擋，噹的一聲架住了。"],
+		"parry": ["{name}身子還歪著，大刀卻慌忙橫了過來。你的{my}砍在刀背上，震得手腕發麻。", "你搶上去出手，{name}把大刀往身前一擋，噹的一聲架住了。"],
 		"fear": ["{name}的笑容僵在臉上，握刀的手緊了又鬆：「……喂，有話好說。」"],
 		"fear_flee": ["{name}把大刀一扔，連滾帶爬地逃上了山。"],
 		"scene": ["荒涼的山道，兩邊都是岩壁。", "官道旁的破廟前，地上還散著被搶過的行李。"],
@@ -166,7 +166,7 @@ const ENEMIES := {
 		"blurb": "從戰場逃出來的騎士，一身鐵甲，盾牌很難打穿。",
 		"hp": 120, "str": 14, "agi": 10, "armor": "heavy", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
 		"weapon": "長劍", "guard": "盾牌", "loot": "knight_sword", "moves": ["lh_cross", "lh_advance"],
-		"parry": ["你搶上去出劍，{name}把盾牌往上一甩，你的劍砍在盾邊上滑開了。", "你的劍砍過去，{name}的長劍橫過來一格，兩把劍撞在一起。"],
+		"parry": ["你搶上去出手，{name}把盾牌往上一甩，你的{my}砍在盾邊上滑開了。", "你的{my}砍過去，{name}的長劍橫過來一格，兩把劍撞在一起。"],
 		"fear": ["{name}停下腳步，頭盔後面傳來一聲很輕的吸氣。"],
 		"fear_flee": ["{name}丟下盾牌，鐵甲叮噹作響地逃過了石橋。"],
 		"scene": ["戰場邊緣的焦土，烏鴉在遠處的屍堆上盤旋。", "下著細雨的石橋，雨水順著橋面往下流。"],
@@ -189,7 +189,7 @@ const ENEMIES := {
 		},
 		"habits": [
 			# 你砍在盾上，他從盾後反刺
-			{"last": "shield_wall", "player": ["attack", "needle", "lh_half", "triple", "knee", "fb_whirl", "lh_pommel"], "then": "thrust", "tell": "你的劍還卡在盾牌上，{name}已經從盾後壓低身子，劍尖對準你的胸口。"},
+			{"last": "shield_wall", "player": ["attack", "needle", "lh_half", "triple", "knee", "fb_whirl", "lh_pommel"], "then": "thrust", "tell": "你的{my}還卡在盾牌上，{name}已經從盾後壓低身子，劍尖對準你的胸口。"},
 		],
 		"pain": {
 			"light": ["劍刃在鐵甲上刮出一道白痕。", "{name}悶哼一聲，腳步沒停。"],
@@ -222,7 +222,7 @@ const ENEMIES := {
 					"hit": ["你聽見自己的骨頭在響。", "你被勒得眼前發黑，肺裡的空氣一點一點被擠出去。"]}},
 			"roar": {"type": "roar", "w": 15, "power": 0.0, "on_hit": "shaken",
 				"tell": ["熊張開大嘴，胸口一鼓，朝你吼了出來。"],
-				"hit": ["咆哮聲直衝你的臉，你腿一軟，腦中一片空白。", "吼聲震得你耳朵嗡嗡響，劍差點握不住。"]},
+				"hit": ["咆哮聲直衝你的臉，你腿一軟，腦中一片空白。", "吼聲震得你耳朵嗡嗡響，{my}差點握不住。"]},
 			"rest": {"type": "opening", "w": 0,
 				"tell": ["熊落回四腳，甩著頭喘氣，動作慢了下來。", "熊重重落地，大口喘氣。"]},
 		},
@@ -249,7 +249,7 @@ const ENEMIES := {
 		"blurb": "兩個人高的怪物，拖著一根大木棍。力氣大得能把人抓起來摔。",
 		"hp": 520, "str": 23, "agi": 8, "armor": "none", "traits": ["big"], "pron": "牠",
 		"weapon": "木棍", "guard": "架勢", "no_flee": true,
-		"parry": ["食人魔胡亂把木棍往身前一擋，你的劍砍進木頭裡，拔了一下才拔出來。", "你搶上去出劍，砍在橫過來的木棍上，木屑亂飛。"],
+		"parry": ["食人魔胡亂把木棍往身前一擋，你的{my}砍進木頭裡，拔了一下才拔出來。", "你搶上去出手，砍在橫過來的木棍上，木屑亂飛。"],
 		"scene": ["倒塌的城牆下，到處都是被砸爛的木箱和碎石。", "下著大雨的沼澤邊，泥水沒過了你的腳踝。"],
 		"start": ["地面一陣震動。食人魔拖著一根大木棍走過來，咧開滿是爛牙的嘴。"],
 		"actions": {
@@ -278,7 +278,7 @@ const ENEMIES := {
 			"heavy": ["食人魔痛得大吼。", "食人魔往後晃了一下，伸手摸傷口，一手的血。"],
 			"dying": ["食人魔的腳步越來越沉，喘氣聲很重。"],
 		},
-		"win_text": "食人魔往後倒了下去，地面跟著一跳。你拄著劍站了好一會兒。",
+		"win_text": "食人魔往後倒了下去，地面跟著一跳。你拄著{my}站了好一會兒。",
 	},
 
 	# ---------- 有名字的強者（懸賞） ----------
@@ -287,7 +287,7 @@ const ENEMIES := {
 		"blurb": "傭兵團「紅鬃」的隊長。獨眼。",
 		"hp": 260, "str": 18, "agi": 18, "armor": "light", "traits": [], "kinds": ["sword"], "pron": "他",
 		"weapon": "鋸齒劍", "guard": "架勢", "loot": "red_fang", "books": ["verdict_book"], "no_flee": true,
-		"parry": ["{name}腳下還沒站穩，劍卻已經橫在身前。你砍上去，{pron}的劍卡住了你的劍刃。", "你搶上一步出劍，{name}的劍往上一挑，把你的劍架開了。"],
+		"parry": ["{name}腳下還沒站穩，劍卻已經橫在身前。你砍上去，{pron}的劍卡住了你的{my_blade}。", "你搶上一步出手，{name}的劍往上一挑，把你的{my}架開了。"],
 		"scene": ["傭兵營地外的空地，篝火還在冒煙。十幾個傭兵圍成一圈等著看。"],
 		"start": ["一個獨眼的高個子從人群裡走出來，拔出一把暗紅色的劍：「就是你要拿我的人頭？」"],
 		"actions": {
@@ -325,7 +325,7 @@ const ENEMIES := {
 		"blurb": "全身黑甲的騎士，被騎士團趕了出來。背著一把很寬的大劍。",
 		"hp": 360, "str": 22, "agi": 20, "armor": "heavy", "traits": [], "kinds": ["greatsword", "sword"], "pron": "他",
 		"weapon": "大劍", "guard": "劍身", "loot": "knell", "no_flee": true,
-		"parry": ["你的劍砍在{name}豎起來的大劍上，嗡的一聲，虎口都麻了。", "{name}還沒站穩，大劍卻已經擋在身前。你的劍砍在寬寬的劍身上，滑了開去。"],
+		"parry": ["你的{my}砍在{name}豎起來的大劍上，嗡的一聲，虎口都麻了。", "{name}還沒站穩，大劍卻已經擋在身前。你的{my}砍在寬寬的劍身上，滑了開去。"],
 		"scene": ["廢棄的驛站。屋頂破了一個大洞，夕陽照在地上。"],
 		"start": ["驛站中間坐著一個穿黑甲的騎士，膝上橫著一把黑色的大劍。他站起來的時候，劍身嗡嗡地響。"],
 		"actions": {
@@ -344,7 +344,7 @@ const ENEMIES := {
 		},
 		"habits": [
 			# 你砍在劍身上，他順勢刺回來
-			{"last": "wall", "player": ["attack", "needle", "lh_half", "triple", "knee", "fb_whirl", "lh_pommel"], "then": "pierce", "tell": "{name}把擋住你的劍身一翻，劍尖對準了你的胸口。"},
+			{"last": "wall", "player": ["attack", "needle", "lh_half", "triple", "knee", "fb_whirl", "lh_pommel"], "then": "pierce", "tell": "{name}把擋住你的{my}身一翻，劍尖對準了你的胸口。"},
 		],
 		"pain": {
 			"light": ["劍刃在黑甲上刮出一串火星。", "{name}沒有出聲。"],
@@ -359,7 +359,7 @@ const ENEMIES := {
 		"blurb": "從北邊海上來的劫掠者，扛著一把雙刃斧。打起來不要命。",
 		"hp": 300, "str": 19, "agi": 13, "armor": "light", "traits": ["disarmable"], "kinds": ["axe"], "pron": "他",
 		"weapon": "雙刃斧", "guard": "斧柄", "loot": "gatebreaker", "no_flee": true,
-		"parry": ["{name}還沒站穩，就把斧柄往身前一橫。你的劍砍在斧柄的鐵箍上，彈了回來。", "你搶上去出劍，{name}用斧柄硬擋，木屑飛了起來。"],
+		"parry": ["{name}還沒站穩，就把斧柄往身前一橫。你的{my}砍在斧柄的鐵箍上，彈了回來。", "你搶上去出手，{name}用斧柄硬擋，木屑飛了起來。"],
 		"scene": ["燒焦的漁村，海風把灰吹得到處都是。", "海邊的礁石灘，浪一直打上來。"],
 		"start": ["一個滿臉紅鬍子的大漢把斧頭從木樁上拔出來，咧嘴一笑：「又一個。」"],
 		"actions": {
@@ -400,7 +400,7 @@ const ENEMIES := {
 		"blurb": "南方來的決鬥家，右手細劍，左手短劍。據說沒輸過。",
 		"hp": 240, "str": 15, "agi": 21, "armor": "none", "traits": ["disarmable"], "kinds": ["rapier"], "pron": "她",
 		"weapon": "細劍", "guard": "短劍", "books": ["rain_book"], "no_flee": true,
-		"parry": ["{name}還沒站穩，左手的短劍已經架了過來，把你的劍撥開。", "你搶上去出劍，{name}用短劍一擋，細劍跟著點向你的手腕，你只好收劍。"],
+		"parry": ["{name}還沒站穩，左手的短劍已經架了過來，把你的{my}撥開。", "你搶上去出手，{name}用短劍一擋，細劍跟著點向你的手腕，你只好收手。"],
 		"scene": ["城外的墓園，墓碑之間的草剛割過。", "清晨的廣場，噴水池邊一個人都沒有。"],
 		"start": ["一個穿深色外套的女人等在那裡，右手細劍，左手短劍。她把劍尖往地上點了點：「你是來決鬥的？」"],
 		"actions": {
@@ -433,7 +433,7 @@ const ENEMIES := {
 		"blurb": "以前王都衛隊的隊長，現在替人收債。頭髮白了，劍還是很穩。",
 		"hp": 620, "str": 27, "agi": 26, "armor": "light", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
 		"weapon": "長劍", "guard": "護手", "loot": "nightwatch", "no_flee": true,
-		"parry": ["{name}腳下一錯，長劍已經回到身前。你的劍砍在{pron}的護手上，滑了開去。", "你搶上去出劍，{name}不慌不忙地一擋，像是早就知道你會砍哪裡。"],
+		"parry": ["{name}腳下一錯，長劍已經回到身前。你的{my}砍在{pron}的護手上，滑了開去。", "你搶上去出手，{name}不慌不忙地一擋，像是早就知道你會砍哪裡。"],
 		"scene": ["碼頭邊的倉庫，空氣裡都是魚腥味。", "下雨的巷子，水從屋簷一直滴下來。"],
 		"start": ["一個頭髮花白的男人靠在牆邊，慢慢拔出一把長劍：「我年輕的時候，也是這樣一個人去找別人麻煩。」"],
 		"actions": {
@@ -451,8 +451,8 @@ const ENEMIES := {
 				"hit": ["這一劍劈在你肩頭，你兩腿一軟，跪了一下才站起來。"]},
 		},
 		"habits": [
-			# 你砍在他的劍上，他順著你的劍刃刺回來
-			{"last": "guard", "player": ["attack", "fallstone", "fb_cleave", "triple", "fb_whirl", "needle", "lh_half"], "then": "thrust", "tell": "{name}架開你的劍，順著你的劍刃滑進來，劍尖對準你的胸口。"},
+			# 你砍在他的劍上，他順著你的{my_blade}刺回來
+			{"last": "guard", "player": ["attack", "fallstone", "fb_cleave", "triple", "fb_whirl", "needle", "lh_half"], "then": "thrust", "tell": "{name}架開你的{my}，順著你的{my_blade}滑進來，劍尖對準你的胸口。"},
 		],
 		"pain": {
 			"light": ["{name}沒有出聲，換了一口氣。", "{name}退了一步。"],
@@ -466,7 +466,7 @@ const ENEMIES := {
 		"blurb": "背叛了領主、佔了山口要塞的將軍。左手一面塔盾，右手一把戰錘。",
 		"hp": 960, "str": 31, "agi": 24, "armor": "heavy", "traits": [], "kinds": ["hammer"], "pron": "他",
 		"weapon": "戰錘", "guard": "塔盾", "books": ["siege_book"], "no_flee": true,
-		"parry": ["{name}還沒站穩，塔盾已經擋在身前。你的劍砍在盾面上，震得手腕發麻。", "你搶上去出劍，{name}把盾一推，連你帶劍一起推開。"],
+		"parry": ["{name}還沒站穩，塔盾已經擋在身前。你的{my}砍在盾面上，震得手腕發麻。", "你搶上去出手，{name}把盾一推，連你帶{my}一起推開。"],
 		"scene": ["山口的舊要塞，城牆上的旗子早就燒掉了。", "要塞的中庭，地上的石板裂了好幾道縫。"],
 		"start": ["一個穿全身鎧甲的男人從城門走出來，左手的塔盾比你還寬。他把戰錘往地上一頓：「一個人來？」"],
 		"actions": {
@@ -485,7 +485,7 @@ const ENEMIES := {
 		},
 		"habits": [
 			# 你砍在盾上，他舉盾撞過來
-			{"last": "wall", "player": ["attack", "fallstone", "fb_cleave", "triple", "fb_whirl", "needle", "lh_half"], "then": "bash", "tell": "你的劍還卡在盾面上，{name}已經舉著盾撞了過來。"},
+			{"last": "wall", "player": ["attack", "fallstone", "fb_cleave", "triple", "fb_whirl", "needle", "lh_half"], "then": "bash", "tell": "你的{my}還卡在盾面上，{name}已經舉著盾撞了過來。"},
 		],
 		"rage": {
 			"hp_below": 0.3,
@@ -506,19 +506,19 @@ const ENEMIES := {
 		"blurb": "",
 		"hp": 120, "str": 11, "agi": 11, "armor": "none", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他", "no_flee": true,
 		"weapon": "劍", "guard": "架勢", "moves": ["knee"],
-		"parry": ["你搶上去出劍，{name}慌忙把劍橫過來，擋住了。"],
+		"parry": ["你搶上去出手，{name}慌忙把劍橫過來，擋住了。"],
 		"scene": ["城牆根下的空地，地上的沙被踩得很實。"],
 		"start": ["{name}握著劍，朝你點了點頭。"],
 		"actions": {
 			"cut": {"type": "sweep", "w": 35, "power": 1.0,
 				"tell": ["{name}腳下一錯，木劍從身側橫掃過來。"],
-				"hit": ["木劍抽在你的肋下，你彎下了腰。", "啪的一聲，木劍掃在你的手臂上，整條手臂都麻了。"]},
+				"hit": ["{weapon}抽在你的肋下，你彎下了腰。", "啪的一聲，{weapon}掃在你的手臂上，整條手臂都麻了。"]},
 			"thrust": {"type": "thrust", "w": 30, "power": 1.0,
 				"tell": ["{name}往前踏了半步，劍尖直刺你的胸口。"],
 				"hit": ["劍尖戳在你的胸口，你一口氣差點喘不上來。", "劍尖點在你的肩窩，整條手臂一軟。"]},
 			"cleave": {"type": "smash", "w": 35, "power": 1.1,
 				"tell": ["{name}雙手把木劍舉過頭頂，重心沉了下去，一劍劈下。"],
-				"hit": ["木劍劈在你的肩膀上，你膝蓋一軟，差點跪下去。", "木劍敲在你的額頭上，咚的一聲。"]},
+				"hit": ["{weapon}劈在你的肩膀上，你膝蓋一軟，差點跪下去。", "{weapon}敲在你的額頭上，咚的一聲。"]},
 		},
 		"habits": [
 			# 你閃避完腳步還沒站穩，他就劈下來
@@ -536,11 +536,11 @@ const ENEMIES := {
 		"blurb": "",
 		"hp": 170, "str": 13, "agi": 13, "armor": "light", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
 		"weapon": "長劍", "guard": "盾牌", "moves": ["knee", "dust", "fallstone"],
-		"parry": ["你搶上去出劍，{name}把盾往上一甩，擋住了。"],
+		"parry": ["你搶上去出手，{name}把盾往上一甩，擋住了。"],
 		"fear": ["{name}的眼睛往村口瞄了一下。"],
 		"fear_flee": ["{name}丟下盾，翻過籬笆跑了。"],
 		"scene": ["村裡的穀倉前，幾個孩子拿著木棍排成一排。"],
-		"start": ["{name}看見你的劍，臉色變了一下，又笑了：「同門？來，讓孩子們看看。」"],
+		"start": ["{name}看見你的{my}，臉色變了一下，又笑了：「同門？來，讓孩子們看看。」"],
 		"actions": {
 			"cut": {"type": "sweep", "w": 35, "power": 1.0, "armed": true,
 				"tell": ["{name}把劍往旁邊一拉，橫斬過來。"],
@@ -570,7 +570,7 @@ const ENEMIES := {
 		"hp": 190, "str": 16, "agi": 16, "armor": "light", "traits": [], "kinds": ["sword"], "pron": "他", "no_flee": true,
 		"moves": ["lh_cross", "lh_pommel", "lh_half"],
 		"weapon": "長劍", "guard": "盾牌",
-		"parry": ["你搶上去出劍，{name}把盾一斜，你的劍滑了開去。"],
+		"parry": ["你搶上去出手，{name}把盾一斜，你的{my}滑了開去。"],
 		"scene": ["劍庭的中庭，學徒們圍成一圈。"],
 		"start": ["一個熟手提著盾和劍走進場子，向你點了點頭。"],
 		"actions": {
@@ -601,7 +601,7 @@ const ENEMIES := {
 		"hp": 320, "str": 21, "agi": 21, "armor": "light", "traits": [], "kinds": ["sword"], "pron": "他", "no_flee": true,
 		"moves": ["lh_cross", "lh_pommel", "lh_half", "lh_advance", "lh_bind"],
 		"weapon": "長劍", "guard": "架勢",
-		"parry": ["你搶上去出劍，{name}的劍輕輕一搭，就把你的劍帶偏了。", "你砍過去，{name}側身讓開半步，劍刃擦著他的衣服過去。"],
+		"parry": ["你搶上去出手，{name}的劍輕輕一搭，就把你的{my}帶偏了。", "你砍過去，{name}側身讓開半步，劍刃擦著他的衣服過去。"],
 		"scene": ["劍庭的中庭。人站滿了，連街上的人都擠在門口看。"],
 		"start": ["{name}換下木劍，拿起一把真的長劍：「這次，我不讓你。」"],
 		"actions": {

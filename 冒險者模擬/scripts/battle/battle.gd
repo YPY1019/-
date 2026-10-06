@@ -56,11 +56,15 @@ var rng := RandomNumberGenerator.new()
 var record: Array[String] = []
 ## 這場每一句用過幾次（同一場不重複同一句，見 _pick）
 var line_uses := {}
+## 戰報裡你的武器的寫法（WeaponData.words）
+var _my_words := {}
 
 
 func _init(p_allies: Array, p_enemies: Array, rng_seed := -1) -> void:
 	allies.assign(p_allies)
 	enemies.assign(p_enemies)
+	var me: Combatant = allies[0]
+	_my_words = WeaponData.words(me.weapon_id if me.weapon_id != "" else WeaponData.START)
 	if rng_seed >= 0:
 		rng.seed = rng_seed
 	else:
@@ -301,7 +305,7 @@ func _show_age(ally: Combatant, ev: Array) -> void:
 ## 你這招的結果 e 寫出來、算傷害和效果
 func _land_player(ally: Combatant, move_id: String, e: Dictionary, target: Combatant, ev: Array) -> Dictionary:
 	var m: Dictionary = MoveData.MOVES[move_id]
-	var line := _ev("action", target.fill(_pick(_text_for(ally, e))).replace("{my}", _noun(ally)))
+	var line := _ev("action", target.fill(_pick(_text_for(ally, e))))
 	# 學來的招：戰報前面標出招名（絕學另外大字喊出來）
 	if not MoveData.is_basic(move_id) and not m.get("ult", false):
 		line["move"] = move_id
@@ -796,16 +800,13 @@ func _all_dead(list: Array[Combatant]) -> bool:
 	return list.all(func(c): return not c.is_alive())
 
 
+## 每一句都在這裡把你的武器換上（{my}、{my_stroke}…，見 WeaponData.KIND_WORDS）
 func _ev(kind: String, text: String) -> Dictionary:
+	if text.contains("{my"):
+		text = text.format(_my_words)
 	return {"kind": kind, "text": text}
 
 
-## 自己武器的叫法（斧頭、大刀…）
-func _noun(c: Combatant) -> String:
-	if c.weapon_id == "":
-		return c.weapon
-	var w := WeaponData.get_def(c.weapon_id)
-	return w.get("noun", w["name"])
 
 
 ## 試玩紀錄：有招名的句子前面標出招名
