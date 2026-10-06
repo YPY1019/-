@@ -151,18 +151,59 @@ func _answer_comer(choice: String) -> void:
 ## 走到別的地方：路上的時間先跳，到了打開地圖
 func _travel(place: String) -> void:
 	var msgs := town.travel(place)
-	if msgs.is_empty():
+	if msgs.is_empty() and town.road.is_empty():
 		return
-	_wait(town.take_wait(), func():
+	_walk_then(msgs)
+
+
+## 走路的時間跳完：路上碰上事就跳出來；不然到了
+func _walk_then(msgs: Array) -> void:
+	var w := town.take_wait()
+	var after := func():
 		town_view.add_messages(msgs)
-		if not town.hero.dying() and not town.hero.dead:
-			town_view.show_map()
-		_after_time()
-		# 走到接了委託的地方：碰上了（有人找上門的話，先處理那邊）
-		if town_view.visible and not encounter.visible and not town.hero.dying() and not town.hero.dead:
-			var jobs := town.jobs_here()
-			if not jobs.is_empty():
-				_meet_monster(jobs[0]))
+		if not town.road.is_empty() and not town.hero.dying() and not town.hero.dead:
+			_road_dialog()
+		else:
+			_arrived()
+	if w.is_empty():
+		after.call()
+	else:
+		_wait(w, after)
+
+
+## 到了：打開地圖；有人找上門先處理；走到接了委託的地方，碰上了
+func _arrived() -> void:
+	if not town.hero.dying() and not town.hero.dead:
+		town_view.show_map()
+	_after_time()
+	if town_view.visible and not encounter.visible and not town.hero.dying() and not town.hero.dead:
+		var jobs := town.jobs_here()
+		if not jobs.is_empty():
+			_meet_monster(jobs[0])
+
+
+## 路上碰上的事
+func _road_dialog() -> void:
+	_show(town_view)
+	var ev := town.road_event()
+	encounter.show_choice(ev["title"], Color.WHITE, ev["text"], ev["options"], _answer_road)
+
+
+func _answer_road(choice: String) -> void:
+	var r := town.answer_road(choice)
+	town_view.add_messages(r["msgs"])
+	var fight: String = r["fight"]
+	if fight.begins_with("enemy:"):
+		_start_monster(fight.substr(6))
+	elif fight.begins_with("person:"):
+		_start_person(fight.substr(7), "路上")
+	else:
+		_continue_road(r["extra"])
+
+
+## 路上的事處理完，走完剩下的路
+func _continue_road(extra := 0) -> void:
+	_walk_then(town.continue_travel(extra))
 
 
 ## 走到委託的地方、或在地圖上按「去找」：先跳出看到的情況，再決定打不打
@@ -268,6 +309,12 @@ func _close_battle() -> void:
 	var msgs := _settled + town.after_fight()
 	_settled = []
 	var w := town.take_wait()
+	# 路上打完（沒被打倒）：接著走
+	if w.is_empty() and not town.road.is_empty():
+		town_view.add_messages(msgs)
+		_show(town_view)
+		_continue_road()
+		return
 	if w.is_empty():
 		town_view.add_messages(msgs)
 		_after_time()

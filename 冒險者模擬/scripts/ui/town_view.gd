@@ -210,7 +210,7 @@ func _pick_line(list: Array) -> String:
 func refresh() -> void:
 	var h := town.hero
 	date_label.text = h.date_text()
-	place_label.text = MapData.place_name(h.location)
+	place_label.text = "往%s的路上" % MapData.place_name(h.location) if h.travel_left > 0 else MapData.place_name(h.location)
 	var home := MapData.distance(h.location, MapData.HOME)
 	home_button.visible = home > 0 and not h.dying()
 	home_button.text = "回城"

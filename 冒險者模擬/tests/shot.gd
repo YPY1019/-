@@ -19,6 +19,8 @@ func _init() -> void:
 	var town: Town = main.town
 	var w: World = town.world
 	var h: Person = town.hero
+	# 路上的事另外截一張，其他時候不要碰上（不然會擋住流程）
+	town.road_chance = 0.0
 
 	# 委託板、地圖、人物
 	tv.tabs.current_tab = 0
@@ -87,6 +89,15 @@ func _init() -> void:
 	main._travel("pasture")
 	await _idle()
 	_save("05b_wolf_event")
+	main.encounter.visible = false
+	town.road = {"id": "caravan", "place": "pasture"}
+	main._road_dialog()
+	await _frames(3)
+	_save("05a_road_event")
+	main.encounter.visible = false
+	town.road = {}
+	main._meet_monster("wolf")
+	await _frames(3)
 	main.encounter.visible = false
 	main._answer_monster("fight", "wolf")
 	await _until(func(): return main.battle_view.visible)

@@ -48,6 +48,7 @@ func _init() -> void:
 
 func _career(run: int) -> Dictionary:
 	var town := Town.new(run + 1)
+	town.road_chance = float(OS.get_environment("ROAD") if OS.get_environment("ROAD") != "" else str(RoadData.CHANCE_PER_MONTH))
 	var w := town.world
 	var h := town.hero
 	var pilot := AutoPilot.new()
@@ -69,13 +70,13 @@ func _career(run: int) -> Dictionary:
 		# 傷了就回城休養
 		if h.hp < h.max_hp() * 0.6:
 			if not town.in_city():
-				town.travel(MapData.HOME)
+				_go(town, pilot, rng, got, MapData.HOME)
 			else:
 				town.rest(town.months_to_full())
 			continue
 		# 城裡有事可做（學得起的招、能讀的秘笈、能考的考驗）就回城
 		if not town.in_city() and _city_wanted(town):
-			town.travel(MapData.HOME)
+			_go(town, pilot, rng, got, MapData.HOME)
 			continue
 		if town.in_city() and _city_chores(town, pilot, rng, spar_tries):
 			spar_tries += 1 if town.spar_state()["ok"] or town.trial_state()["ok"] else 0
@@ -91,7 +92,7 @@ func _career(run: int) -> Dictionary:
 		if target != "":
 			if not town.took_bounty(target):
 				if not town.in_city():
-					town.travel(MapData.HOME)
+					_go(town, pilot, rng, got, MapData.HOME)
 					continue
 				town.accept_bounty(target)
 			var p := w.person(target)
@@ -99,7 +100,7 @@ func _career(run: int) -> Dictionary:
 				town.rest(1) if town.in_city() and h.hp < h.max_hp() else town._pass_months(1)
 				continue
 			if p.location != h.location:
-				town.travel(p.location)
+				_go(town, pilot, rng, got, p.location)
 				continue
 			var r := _fight(town, pilot, rng, func(): return town.start_person(target), "person", got, h)
 			if r != "win":
@@ -124,11 +125,11 @@ func _career(run: int) -> Dictionary:
 		var place: String = w.monster_place(mon)
 		if not town.took_job(mon):
 			if not town.in_city():
-				town.travel(MapData.HOME)
+				_go(town, pilot, rng, got, MapData.HOME)
 				continue
 			town.accept_job(mon)
 		if h.location != place:
-			town.travel(place)
+			_go(town, pilot, rng, got, place)
 			continue
 		var r2 := _fight(town, pilot, rng, func(): return town.start_monster(mon), "monster", got, h)
 		if r2 != "win":
@@ -215,6 +216,27 @@ func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar
 		town.finish_trial(tb)
 		return true
 	return false
+
+
+## 走路；路上碰上事：攔路的打得過就打、不然給錢；跟在後面的就回頭打；其他選第一個
+func _go(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, got: Dictionary, place: String) -> void:
+	town.travel(place)
+	while not town.road.is_empty() and not town.hero.dying():
+		var id: String = town.road["id"]
+		var choice: String = RoadData.EVENTS[id]["options"][0][0]
+		if id == "robbers" and (town.hero.power() < 12.0 or town.hero.hp < town.hero.max_hp() * 0.5):
+			choice = "pay"
+		if id == "traveler":
+			choice = "greet"
+		if id == "stalked" and town.hero.hp < town.hero.max_hp() * 0.5:
+			choice = "hurry"
+		var r := town.answer_road(choice)
+		var fight: String = r["fight"]
+		if fight.begins_with("enemy:"):
+			var eid := fight.substr(6)
+			_fight(town, pilot, rng, func(): return town.start_monster(eid), "monster", got, town.hero)
+		if not town.road.is_empty():
+			town.continue_travel(r["extra"])
 
 
 ## 打一場、拿光戰利品、結算。回傳勝負

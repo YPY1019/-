@@ -27,6 +27,10 @@ var _fight_person: Person
 var _fight_lethal := true
 ## 打的是同門
 var _fight_kin := false
+## 路上碰上、還沒處理完的事：{"id", "place": 要去的地方, "who"}。空的 = 沒有
+var road := {}
+## 每走一個月碰上事的機率（測試可以改成 0）
+var road_chance := RoadData.CHANCE_PER_MONTH
 ## 打的怪物有沒有接委託
 var _fight_has_job := false
 ## 剛打贏、還沒決定殺不殺的人
@@ -55,15 +59,51 @@ func in_city() -> bool:
 # ---------- 走路 ----------
 
 ## 走到別的地方。路上的時間先花掉；路上病倒了就被送回城裡
+## 走路：路上可能碰上一件事（RoadData），停在半路（road 不是空的），處理完再 continue_travel 走完剩下的路
 func travel(place: String) -> Array:
 	var h := hero
 	var months := MapData.distance(h.location, place)
 	if months <= 0 or h.dying():
 		return []
-	var title := "回%s" % MapData.place_name(place) if MapData.is_city(place) else "往%s去" % MapData.place_name(place)
 	h.location = place
 	h.travel_left = months
-	var msgs := _pass_months(months, "travel_back" if MapData.is_city(place) else "travel", title)
+	var ev := _roll_road(months)
+	if not ev.is_empty():
+		# 走到半路碰上
+		var before: int = world.rng.randi_range(0, months - 1)
+		var msgs := _pass_months(before, _travel_kind(place), _travel_title(place))
+		if h.dying():
+			h.travel_left = 0
+			return msgs
+		h.travel_left = months - before
+		ev["place"] = place
+		road = ev
+		return msgs
+	return _walk(place, months)
+
+
+## 處理完路上的事，走完剩下的路（多走幾個月：extra）
+func continue_travel(extra := 0) -> Array:
+	if road.is_empty():
+		return []
+	var place: String = road["place"]
+	road = {}
+	return _walk(place, hero.travel_left + extra)
+
+
+func _travel_kind(place: String) -> String:
+	return "travel_back" if MapData.is_city(place) else "travel"
+
+
+func _travel_title(place: String) -> String:
+	return "回%s" % MapData.place_name(place) if MapData.is_city(place) else "往%s去" % MapData.place_name(place)
+
+
+## 走完 months 個月，到了
+func _walk(place: String, months: int) -> Array:
+	var h := hero
+	h.travel_left = months
+	var msgs := _pass_months(months, _travel_kind(place), _travel_title(place))
 	h.travel_left = 0
 	if h.dying():
 		return msgs
@@ -76,6 +116,112 @@ func travel(place: String) -> Array:
 		if not claims("school").is_empty():
 			msgs.append(_m("info", "劍庭門口的學徒看見你，進去通報了。"))
 	return msgs
+
+
+# ---------- 路上的事 ----------
+
+## 擲路上碰不碰得上事：{"id", "who"}（碰上的人，traveler 才有），碰不上是空的
+func _roll_road(months: int) -> Dictionary:
+	if world.rng.randf() >= 1.0 - pow(1.0 - road_chance, months):
+		return {}
+	var walkers := world.others().filter(func(p): return p.travel_left > 0)
+	var total := 0
+	for id in RoadData.EVENTS:
+		if id != "traveler" or not walkers.is_empty():
+			total += RoadData.EVENTS[id]["w"]
+	var roll := world.rng.randi_range(1, total)
+	for id in RoadData.EVENTS:
+		if id == "traveler" and walkers.is_empty():
+			continue
+		roll -= RoadData.EVENTS[id]["w"]
+		if roll <= 0:
+			var ev := {"id": id}
+			if id == "traveler":
+				ev["who"] = walkers[world.rng.randi_range(0, walkers.size() - 1)].id
+			return ev
+	return {}
+
+
+## 路上碰上的事：{"title", "text", "options"}
+func road_event() -> Dictionary:
+	var d: Dictionary = RoadData.EVENTS[road["id"]]
+	var text: String = d["text"].replace("{my}", WeaponData.get_def(hero.weapon).get("noun", "兵器"))
+	var title: String = d["title"]
+	if road.has("who"):
+		var p := world.person(road["who"])
+		text = text.replace("{name}", p.display_name).replace("{pron}", p.pron)
+		title = ("%s %s" % [p.title, p.display_name]).strip_edges()
+		world.hear(p.id)
+	return {"title": title, "text": text, "options": d["options"]}
+
+
+## 回應路上的事：{"fight": 空的 = 不打；enemy:怪物 id 或 person:人 id, "msgs", "extra": 多走幾個月}
+func answer_road(choice: String) -> Dictionary:
+	var R := RoadData.RESULT
+	var rng := world.rng
+	var out := {"fight": "", "msgs": [], "extra": 0}
+	match road["id"] + ":" + choice:
+		"robbers:fight":
+			out["fight"] = "enemy:highwayman"
+		"robbers:pay":
+			if hero.money <= 0:
+				out["msgs"] = [_m("bad", R["pay_none"])]
+				out["fight"] = "enemy:highwayman"
+			else:
+				var n := mini(hero.money, maxi(RoadData.ROB_MIN, roundi(hero.money * RoadData.ROB_SHARE)))
+				hero.money -= n
+				out["msgs"] = [_m("bad", R["pay"] % n)]
+		"robbers:run":
+			if rng.randf() < GrowthData.success_chance(hero.body("agi") - EnemyData.ENEMIES["highwayman"]["agi"]):
+				out["msgs"] = [_m("info", R["run_ok"])]
+			else:
+				out["msgs"] = [_m("bad", R["run_fail"])]
+				out["fight"] = "enemy:highwayman"
+		"wounded:help":
+			# 他說得出路上看到的人（你聽說的就多了一個）
+			var seen := world.others().filter(func(o): return o.travel_left == 0 and o.role in ["villain", "follower", "duelist", "hunter"])
+			if seen.is_empty():
+				out["msgs"] = [_m("info", R["help_none"])]
+			else:
+				var o: Person = seen[rng.randi_range(0, seen.size() - 1)]
+				world.hear(o.id)
+				out["msgs"] = [_m("info", R["help"] % [MapData.place_name(o.location), ("%s%s" % [o.title, o.display_name])])]
+		"wounded:pass":
+			out["msgs"] = [_m("info", R["pass"])]
+		"caravan:join":
+			var pay := rng.randi_range(RoadData.CARAVAN_PAY[0], RoadData.CARAVAN_PAY[1])
+			hero.money += pay
+			out["msgs"] = [_m("good", R["join"] % pay)]
+		"caravan:alone":
+			out["msgs"] = [_m("info", R["alone"])]
+		"stalked:fight":
+			out["fight"] = "enemy:" + _stalker()
+		"stalked:hurry":
+			if rng.randf() < 0.6:
+				out["msgs"] = [_m("info", R["hurry_ok"])]
+			else:
+				out["msgs"] = [_m("bad", R["hurry_fail"])]
+				out["fight"] = "enemy:" + _stalker()
+		"corpse:take":
+			var n := rng.randi_range(RoadData.PURSE[0], RoadData.PURSE[1])
+			hero.money += n
+			out["msgs"] = [_m("info", R["take"] % n)]
+		"corpse:leave":
+			out["msgs"] = [_m("info", R["leave"])]
+		"traveler:greet":
+			var p := world.person(road["who"])
+			out["msgs"] = [_m("info", R["greet"].replace("{pron}", p.pron))]
+		"traveler:fight":
+			out["fight"] = "person:" + road["who"]
+		"flood:detour":
+			out["msgs"] = [_m("info", R["detour"])]
+			out["extra"] = 1
+	return out
+
+
+## 跟在後面的野獸：看你多強
+func _stalker() -> String:
+	return "wolf" if hero.realm <= 1 else "alpha_wolf"
 
 
 ## 送貨：走到那裡就交了，回劍庭交差
@@ -169,7 +315,7 @@ func start_monster(enemy_id: String) -> Battle:
 	loot.clear()
 	var foe := Combatant.from_enemy(enemy_id)
 	foe.enemy_def = foe.enemy_def.duplicate()
-	foe.enemy_def["scene"] = MapData.PLACES[hero.location]["scene"]
+	foe.enemy_def["scene"] = RoadData.SCENE if not road.is_empty() else MapData.PLACES[hero.location]["scene"]
 	return Battle.new([hero.to_combatant()], [foe])
 
 
@@ -226,6 +372,8 @@ func _maybe_break_through(foe_best: int) -> Array:
 ## 打輸了：重傷，被人撿回城裡
 func _knocked_out() -> Array:
 	hero.hp = maxi(1, roundi(hero.max_hp() * TownData.INJURED_HP))
+	road = {}
+	hero.travel_left = 0
 	var away := hero.location != MapData.HOME
 	hero.location = MapData.HOME
 	if away:
@@ -310,7 +458,10 @@ func start_person(id: String) -> Battle:
 	loot.clear()
 	fate_pending = null
 	# 打贏之後殺不殺由你決定（decide_fate），戰鬥本身只寫到他倒下
-	return Battle.new([hero.to_combatant()], [Combatant.from_person(p, hero.location, false)])
+	var foe := Combatant.from_person(p, hero.location, false)
+	if not road.is_empty():
+		foe.enemy_def["scene"] = RoadData.SCENE
+	return Battle.new([hero.to_combatant()], [foe])
 
 
 func finish_person(battle: Battle) -> Array:
