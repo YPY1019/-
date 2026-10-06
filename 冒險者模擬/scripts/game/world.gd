@@ -180,7 +180,6 @@ func _spawn(id: String) -> Person:
 	p.display_name = d["name"]
 	p.title = d.get("title", "")
 	p.pron = d.get("pron", "他")
-	p.blurb = d.get("blurb", "")
 	p.style = d["style"]
 	p.start_lines = d.get("start", [])
 	p.born_year = LifeData.year_of(month()) - d["age"]
@@ -199,7 +198,8 @@ func _spawn(id: String) -> Person:
 		p.give_item(it)
 	for m in d.get("learned", []):
 		p.learn(m)
-	p.approved_tier = d.get("approved", 1)
+	p.school = d.get("school", "")
+	p.rank = d.get("rank", 0)
 	p.location = d["place"]
 	p.role = d["role"]
 	p.haunts = d.get("haunts", [])
@@ -234,7 +234,6 @@ func newcomer() -> Person:
 	p.clock = clock
 	p.display_name = pick[0]
 	p.pron = pick[1]
-	p.blurb = PeopleData.NEWCOMER_BLURB
 	p.style = "master"
 	p.born_year = LifeData.year_of(month()) - LifeData.START_AGE
 	p.dies_at = LifeData.roll_dies_at(rng, p.born_year, LifeData.LIFESPAN_MIN, LifeData.LIFESPAN_MAX, month())
@@ -688,6 +687,7 @@ func pass_on(heir_id: String) -> void:
 	heir.money += maxi(0, old.money)
 	heir.role = ""
 	heir.jobs.clear()
+	heir.school_jobs.clear()
 	heir.target = ""
 	heir.grudges.clear()
 	heir.vow = {}

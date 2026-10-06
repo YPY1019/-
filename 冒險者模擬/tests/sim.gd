@@ -93,7 +93,8 @@ func _init() -> void:
 func _battle(str_v: int, agi_v: int, realm: int, moves: Array, weapon: String, enemy_id: String, rng_seed: int) -> Battle:
 	var hero := Person.new()
 	hero.stats = {"str": str_v, "agi": agi_v}
-	hero.realm = realm
+	# 境界照數值算（6 層，見 GrowthData）。setups 裡寫的境界只是名字
+	hero.realm = GrowthData.realm_of_value(maxi(str_v, agi_v))
 	hero.weapon = weapon
 	# 數值不到門檻的招學不到（跟道場一樣）
 	for m in moves:
@@ -109,7 +110,7 @@ func _battle(str_v: int, agi_v: int, realm: int, moves: Array, weapon: String, e
 		p.hp = p.max_hp()
 		foe = Combatant.from_person(p, p.location)
 	var b := Battle.new([me], [foe], rng_seed)
-	if enemy_id == SchoolData.MASTER_ENEMY:
+	if enemy_id == SchoolData.SPAR_ENEMY:
 		me.yield_hp = roundi(me.max_hp * SchoolData.SPAR_YIELD)
 		b.round_limit = SchoolData.SPAR_ROUNDS
 	return b

@@ -11,8 +11,6 @@ var display_name := "你"
 ## 名號（傭兵隊長、決鬥家）
 var title := ""
 var pron := "他"
-## 人物面板上看得到的樣子
-var blurb := ""
 ## 世界上的人跟你打的時候用的招和戰報（EnemyData 的 id）
 var style := ""
 ## 跟你打的時候登場的句子、被打倒時的句子（沒寫就用打法的）
@@ -44,12 +42,21 @@ var base_sum := 0
 
 ## 學會的招式 id。基本招式不用學。
 var learned: Array[String] = []
-## 師傅認可到第幾階（第 1 階交學費就教，所以一開始是 1）
-var approved_tier := 1
+## 流派（SchoolData.ID，空的是沒有）和階位（1 學徒、2 熟手、3 大師；0 不是成員）
+var school := ""
+var rank := 0
+## 替流派辦事累積的貢獻：還能用的、總共拿過的（升階位看總共）
+var merit := 0
+var merit_total := 0
+## 接下的流派委託（SchoolData.JOBS 的 id）
+var school_jobs: Array[String] = []
 ## 身上的秘笈（BookData）。讀完就學會裡面的招，書還留著
 var books: Array[String] = []
-## 師傅交代的事：劍譜拿回去給師傅看過了沒
+## 庭主交代的事：交代過了沒、劍譜拿回去給他看過了沒
+var errand_given := false
 var errand_reported := false
+## 跟誰打過（看過他出手，人物面板才列得出他會的招）
+var fought: Array[String] = []
 ## 接下的一般委託（怪物 id）。打贏才拿得到報酬
 var jobs: Array[String] = []
 ## 打贏過的對手（委託的怪物 id、人的 id）
@@ -300,6 +307,9 @@ func to_combatant(full := false) -> Combatant:
 		if decline(s) > 0:
 			c.aged[s] = decline(s)
 	c.omen = omen()
+	c.realm = realm
+	if SchoolData.stance_active(self):
+		c.stance = SchoolData.ID
 	c.attack_mult = WeaponData.get_def(weapon)["power"]
 	c.weapon = WeaponData.get_def(weapon)["name"]
 	c.weapon_id = weapon

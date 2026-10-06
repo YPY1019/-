@@ -17,6 +17,9 @@ extends RefCounted
 ## vs_big：對體型大的對手用的版本。
 ## self：用完之後自己的狀態（off_balance：下回合不能閃避、選項少一個）。
 ## no_repeat：用完下回合不能再用。
+## grade：等級（0 灰～5 紅，跟境界同一套顏色，見 GrowthData.GRADE_COLORS）。
+## school：哪一派的招（SchoolData.ID）；空的是通用招，不屬於任何流派。
+## text_mid / text_hi：境界到中段（第三、四境）、高段（第五、六境）的寫法。同一招，越強寫得越從容（見 Battle._text_for）。
 ## stat：這招靠哪個基礎數值（str 力量、agi 敏捷）。跟對手的同一項比，決定成不成功、打多痛；用了也會練到這個數值。
 ## fail：失敗時的結果。成功的機率看雙方數值的差距（GrowthData.success_chance）。招有效果（掃倒、破防、掙脫…）或能少挨打時才會失敗。
 ## odds：這招本身比較難（負）或比較容易（正）成功。
@@ -57,7 +60,7 @@ const HURT := {
 const MOVES := {
 	# ---------- 一般招（不用學） ----------
 	"attack": {
-		"name": "攻擊", "stat": "str", "desc": "普通的一劍，出手快。對方橫掃或直刺時搶先砍到，對方的攻擊會被打歪一點。對方防守時砍不進去。",
+		"grade": 0, "name": "攻擊", "stat": "str", "desc": "普通的一劍，出手快。對方橫掃或直刺時搶先砍到，對方的攻擊會被打歪一點。對方防守時砍不進去。",
 		"fail": {"deal": 1.0, "take": 1.0, "hit": true, "text": ["你想搶先出劍，慢了半拍，{pron}的攻擊先到了。"]},
 		"default": {"deal": 1.0, "take": 1.0, "hit": true, "text": [
 			"你不退，迎上去一劍砍向{name}。",
@@ -66,11 +69,11 @@ const MOVES := {
 		]},
 		"vs": {
 			# 出手快：對方出快攻時搶先砍到，對方的攻擊被打歪一點
-			"sweep": {"deal": 1.0, "take": 0.7, "hit": true, "text": [
+			"sweep": {"text_mid": ["{weapon}才拉開，你的劍已經到了{name}身上，那一掃軟了下來。"], "text_hi": ["你搶在{weapon}之前出劍，劍到的時候，{name}的手勢還沒開始。"], "deal": 1.0, "take": 0.7, "hit": true, "text": [
 				"{name}的{weapon}才拉開，你已經一劍砍了進去。{pron}這一掃的力道被打散了一半。",
 				"你不等{weapon}掃到，搶先出劍。劍先到，{pron}的手勢跟著歪了。",
 			]},
-			"thrust": {"deal": 1.0, "take": 0.7, "hit": true, "text": [
+			"thrust": {"text_mid": ["{name}衝過來，你的劍尖先到，{pron}自己把自己撞歪了。"], "text_hi": ["你一劍遞出去，正好停在{name}要經過的地方。"], "deal": 1.0, "take": 0.7, "hit": true, "text": [
 				"{name}直衝過來，你的劍尖先碰到{pron}，{pron}的勢子頓了一下。",
 				"{name}還沒衝到，你已經一劍砍了過去，{pron}的攻擊偏了幾分。",
 			]},
@@ -92,18 +95,18 @@ const MOVES := {
 		},
 	},
 	"defend": {
-		"name": "防禦", "stat": "str", "desc": "用劍擋住攻擊，會受一點傷，擋住後能順手回砍。擋不住擒抱、撒沙和吼聲。",
+		"grade": 0, "name": "防禦", "stat": "str", "desc": "用劍擋住攻擊，會受一點傷，擋住後能順手回砍。擋不住擒抱、撒沙和吼聲。",
 		"fail": {"take": 1.0, "hit": true, "text": ["你舉劍去擋，沒擋正，被打得連人帶劍退了回來。", "你架劍去擋，劍被壓回你自己身上。"]},
 		"default": {"text": [
 			"你舉劍守在身前，{name}卻沒有出手。",
 			"你擺好架勢等著，什麼也沒擋到。",
 		]},
 		"vs": {
-			"sweep": {"deal": 0.4, "take": 0.4, "text": [
+			"sweep": {"text_mid": ["你豎劍一擋，{weapon}的力道從劍身卸到腳下，你一步沒退，回手一劍。"], "text_hi": ["{weapon}撞在你的劍上，像撞上一根釘在地裡的樁。你順著反彈的勢子，劍已經回到{name}身上。"], "deal": 0.4, "take": 0.4, "text": [
 				"你豎劍硬擋。{weapon}撞在劍身上，你手臂一麻，腳下滑了半步。趁{pron}的力道剛過，你順手回了一劍。",
 				"鏘的一聲，{weapon}被你的劍擋住。你借著反彈的勢子，劍鋒往回一帶，在{name}身上拉了一道。",
 			]},
-			"thrust": {"deal": 0.4, "take": 0.3, "text": [
+			"thrust": {"text_mid": ["你劍身一格，{weapon}擦著劍刃滑開，你趁勢削了回去。"], "text_hi": ["你的劍只偏了一點，{weapon}就落空了。你沒有多餘的動作，回手一劍。"], "deal": 0.4, "take": 0.3, "text": [
 				"你用劍身一格，{weapon}偏了開去，只在你身上擦出一道血痕。你趁勢回了一劍。",
 				"你把{weapon}撥到一邊，衣服被劃破了。{name}收手之前，你往{pron}身上削了一劍。",
 			]},
@@ -117,7 +120,7 @@ const MOVES := {
 		},
 	},
 	"dodge": {
-		"name": "閃避", "stat": "agi", "desc": "躲開攻擊，不會受傷。但躲完腳步亂了：下回合不能再閃避，選項也少一個。躲不掉吼聲。",
+		"grade": 0, "name": "閃避", "stat": "agi", "desc": "躲開攻擊，不會受傷。但躲完腳步亂了：下回合不能再閃避，選項也少一個。躲不掉吼聲。",
 		"fail": {"take": 1.0, "hit": true, "text": ["你想閃開，腳下慢了一步，還是被打中了。", "你才剛要側身，{name}已經到了眼前。"]},
 		"self": "off_balance",
 		"default": {"take": 0.0, "text": [
@@ -140,12 +143,12 @@ const MOVES := {
 		},
 	},
 	"flee": {
-		"name": "撤退", "desc": "轉身逃走。這回合對方攻擊的話會挨打。",
+		"grade": 0, "name": "撤退", "desc": "轉身逃走。這回合對方攻擊的話會挨打。",
 		"default": {"take": 1.0, "hit": true, "text": ["你轉身就跑。", "你虛晃一劍，轉身就跑。"]},
 		"vs": {},
 	},
 	"struggle": {
-		"name": "掙扎", "stat": "str", "desc": "被抱住時拼命掙扎。力氣要比對方大才有把握掙開。",
+		"grade": 0, "name": "掙扎", "stat": "str", "desc": "被抱住時拼命掙扎。力氣要比對方大才有把握掙開。",
 		"fail": {"take": 1.0, "hit": true, "text": ["你掙了幾下，還是被死死勒住。"]},
 		# 硬掙比較難，力氣要比對方大才有把握
 		"odds": -0.2,
@@ -155,13 +158,13 @@ const MOVES := {
 
 	# ---------- 要學的招 ----------
 	"sweep_kick": {
-		"name": "低身斬", "stat": "agi", "desc": "對付橫掃：蹲低從底下鑽過，順勢斬對方的腳，把人斬倒。體型大的斬不倒。",
+		"name": "割麥", "grade": 1, "school": "", "stat": "agi", "desc": "對付橫掃：蹲低從底下鑽過，順勢斬對方的腳，把人斬倒。體型大的斬不倒。",
 		"fail": {"deal": 0.3, "take": 1.0, "hit": true, "text": ["你壓低身子斬向{name}的腳，{pron}腳一抬就讓開了，你自己反倒吃了一記。"]},
 		"default": {"deal": 0.5, "take": 1.0, "hit": true, "text": [
 			"你矮身斬向{name}的腳，可是{pron}這一下不是橫著來的，你整個人露在攻擊底下。",
 		]},
 		"vs": {
-			"sweep": {"deal": 0.5, "take": 0.0, "effect": "trip", "good": true, "text": [
+			"sweep": {"text_mid": ["{weapon}橫掃過來，你早就矮下了身子。劍貼著地面一抹，{name}的腳踝像麥稈一樣被割倒，整個人往前栽。"], "text_hi": ["{weapon}還沒掃到，你已經不在那個高度了。劍鋒貼地一帶，{name}自己往前撲倒，像是被絆了一下。"], "deal": 0.5, "take": 0.0, "effect": "trip", "good": true, "text": [
 				"你沉膝矮身，{weapon}從頭頂掠過，削下幾根頭髮。你借著下蹲的勢子一劍貼地斬出，正中{name}的腳踝。{pron}重心還壓在前腳，整個人往前栽倒。",
 				"{weapon}橫掃過來，你蹲得幾乎貼地。{pron}這一掃用盡了力，腳下是空的。你一劍斬在{pron}小腿上，{pron}往前撲倒。",
 			]},
@@ -177,11 +180,11 @@ const MOVES := {
 		},
 	},
 	"parry": {
-		"name": "迎擊", "stat": "agi", "desc": "對付直刺和撲咬：把攻擊撥開，同時刺回去。還是會被擦到一下。",
+		"name": "獅爪", "grade": 2, "school": "lionheart", "stat": "agi", "desc": "對付直刺和撲咬：把攻擊撥開，同時刺回去。還是會被擦到一下。",
 		"fail": {"take": 1.0, "hit": true, "text": ["你想撥開{weapon}，慢了一點，劍還沒碰到，攻擊已經到了。"]},
 		"default": {"text": ["你擺好撥擋的架勢，{name}卻沒有衝過來。"]},
 		"vs": {
-			"thrust": {"deal": 1.2, "take": 0.3, "good": true, "text": [
+			"thrust": {"text_mid": ["{name}衝過來，你劍身一搭一撥，{weapon}擦著你的肩膀過去。劍尖已經在{pron}身上了。"], "text_hi": ["你沒有退。劍只動了一寸，{weapon}就從你身邊滑了過去，{name}自己撞上了你的劍尖。"], "deal": 1.2, "take": 0.3, "good": true, "text": [
 				"{name}直衝過來。你的劍貼上{weapon}，往外一撥，{pron}的力道落了空。你手腕一翻，劍尖順著{pron}衝過來的勢子刺了進去。",
 				"{weapon}到了眼前，你側身讓過一半，劍身一帶把它引偏，劍尖直接刺回去。你的手臂被擦破了，{name}傷得更重。",
 			]},
@@ -193,15 +196,15 @@ const MOVES := {
 		},
 	},
 	"redirect": {
-		"name": "逆流斬", "stat": "str", "desc": "對付重砸和橫掃：順著力道把攻擊引開，再借力斬回去（比防禦強）。對重砸最有效，能讓對方收勢不住、往前踉蹌。",
+		"name": "十字鐵壁", "grade": 2, "school": "lionheart", "stat": "str", "desc": "對付重砸和橫掃：順著力道把攻擊引開，再借力斬回去（比防禦強）。對重砸最有效，能讓對方收勢不住、往前踉蹌。",
 		"fail": {"take": 1.0, "hit": true, "text": ["你想順勢把{weapon}引開，沒抓準，那股力道還是壓了下來。"]},
 		"default": {"text": ["你雙手虛握著劍等著，{name}卻沒有砸下來。"]},
 		"vs": {
-			"smash": {"deal": 0.8, "take": 0.2, "effect": "stagger", "good": true, "text": [
+			"smash": {"text_mid": ["{weapon}砸下來，你劍身斜架，重量順著劍身滑到地上。{name}收不住勢往前衝，你回手一劍。"], "text_hi": ["你只把劍斜斜一抬。{weapon}落在劍身上，順著滑了下去。{name}整個人跟著撲了出去，背後空了。"], "deal": 0.8, "take": 0.2, "effect": "stagger", "good": true, "text": [
 				"你不硬接，劍身斜斜迎上去。{weapon}順著你的劍滑開，砸進土裡。{name}整個人的重量都在這一下，收不住，往前衝過你身邊，背後全空了。你回手一劍斬在{pron}身上。",
 				"{weapon}壓下來的時候，你的劍只輕輕一帶，就把它引到一旁。{name}用力過猛，往前踉蹌了兩步。你的劍已經跟著劃過了{pron}的身體。",
 			]},
-			"sweep": {"deal": 0.8, "take": 0.3, "good": true, "text": [
+			"sweep": {"text_mid": ["你迎著{weapon}斜架一劍，把橫掃的力道往外一送，順勢劈回去。"], "text_hi": ["{weapon}掃到你身前，被你輕輕一引就偏了。你手腕一轉，劍已經落在{name}身上。"], "deal": 0.8, "take": 0.3, "good": true, "text": [
 				"你的劍貼上{weapon}，順著它的方向一帶，卸掉了大半力道，再借那股勁斬了回去。",
 				"{weapon}掃到你身前，你的劍一轉，把力道引向一旁，劍鋒反過來削在{name}身上。",
 			]},
@@ -212,7 +215,7 @@ const MOVES := {
 		},
 	},
 	"heavy": {
-		"name": "裂盾斬", "stat": "str", "desc": "雙手全力一擊，穿透盔甲盾牌。對方防守、蓄勢、露出破綻時才是大招（能破防、打斷蓄勢）；對方正在出手時只跟攻擊差不多，還挨得更痛。收招慢：下回合不能閃避，也不能再用裂盾斬。",
+		"name": "劈柴", "grade": 1, "school": "", "stat": "str", "desc": "雙手全力一擊，穿透盔甲盾牌。對方防守、蓄勢、露出破綻時才是大招（能破防、打斷蓄勢）；對方正在出手時只跟攻擊差不多，還挨得更痛。收招慢：下回合不能閃避，也不能再用劈柴。",
 		"no_repeat": true,
 		"fail": {"deal": 1.0, "text": ["你全力一劍劈下，{name}硬是扛住了。", "你雙手一劍劈下去，{name}晃都沒晃。"]},
 		"self": "off_balance",
@@ -222,13 +225,13 @@ const MOVES := {
 			"你一劍劈下，深深砍進{name}身上，{pron}的攻擊也同時落在你身上。",
 		]},
 		"vs": {
-			"guard": {"deal": 1.5, "effect": "break", "good": true, "text": [
+			"guard": {"text_mid": ["你看準{guard}的邊緣，雙手一劍劈下。{guard}被劈得歪到一邊，{name}的胸口露了出來。"], "text_hi": ["你一劍劈在{guard}最吃力的地方，不快，但很沉。{guard}整個被砸開，{name}的手臂也跟著垂了下去。"], "deal": 1.5, "effect": "break", "good": true, "text": [
 				"你雙手握劍，從上往下劈在{guard}上。{name}被砸得往後退了好幾步，{guard}歪到一邊。",
 			]},
-			"windup": {"deal": 2.0, "effect": "interrupt", "good": true, "text": [
+			"windup": {"text_mid": ["{name}的力還沒蓄滿，你一劍劈在{pron}抬起的手臂上，那一下硬生生被打斷。"], "text_hi": ["你等的就是{name}吸氣的那一刻。一劍劈下，{pron}蓄了半天的力，全散了。"], "deal": 2.0, "effect": "interrupt", "good": true, "text": [
 				"{name}還在蓄力，你搶先一劍劈下去，{pron}的動作硬生生斷了。",
 			]},
-			"opening": {"deal": 2.5, "good": true, "text": [
+			"opening": {"text_mid": ["{name}還沒站穩，你雙手握劍，一劍從肩頭劈了下去。"], "text_hi": ["你不急，等{name}的重心完全歪了，才一劍劈下。這一劍劈得很實。"], "deal": 2.5, "good": true, "text": [
 				"你雙手握劍，把全身的重量壓在這一劍上，劈在{name}身上。",
 				"你高高舉劍，一劍劈下。{name}來不及擋。",
 			]},
@@ -238,38 +241,38 @@ const MOVES := {
 		},
 	},
 	"vital": {
-		"name": "穿隙刺", "stat": "agi", "desc": "刺向要害或盔甲縫隙，盔甲擋不住。平常也跟攻擊一樣痛；對方露出破綻、蓄勢、或抱住你時，比裂盾斬還痛。",
+		"name": "獅王卸甲", "grade": 3, "school": "lionheart", "stat": "agi", "desc": "刺向要害或盔甲縫隙，盔甲擋不住。平常也跟攻擊一樣痛；對方露出破綻、蓄勢、或抱住你時，比劈柴還痛。",
 		"fail": {"deal": 0.5, "take": 1.0, "hit": true, "text": ["你刺向{name}的要害，{pron}一扭身讓開了，劍尖只劃破了點皮。"]},
 		"pierce": true,
 		"default": {"deal": 1.0, "take": 1.0, "hit": true, "text": [
 			"你刺向{name}的腋下，{pron}一扭身，劍尖還是刺進了肉裡。你自己也吃了一記。",
 		]},
 		"vs": {
-			"opening": {"deal": 2.8, "good": true, "text": [
+			"opening": {"text_mid": ["你左手握住劍身，劍尖從{name}腋下甲片的縫隙送了進去。"], "text_hi": ["你半握劍身，像拿短矛一樣一送。劍尖穿過甲片之間那條縫，一寸不差。"], "deal": 2.8, "good": true, "text": [
 				"{name}的脖子和領口之間露出一道縫。你跨上一步，劍尖對準那道縫刺了進去。",
 				"你貼上去，劍尖從{name}腋下鑽進去，刺得很深。",
 			]},
-			"windup": {"deal": 2.5, "good": true, "text": [
+			"windup": {"text_mid": ["{name}舉高了手臂蓄力，腋下全空了。你握住劍身，一劍刺了進去。"], "text_hi": ["{name}的手才舉起來，你的劍尖已經在{pron}腋下那條縫裡了。"], "deal": 2.5, "good": true, "text": [
 				"{name}還在蓄力，身子繃得死緊。你一步搶進去，劍尖刺了進去。",
 			]},
 			"smash": {"deal": 1.5, "take": 1.0, "hit": true, "text": [
 				"{name}砸下來的時候，你不退反進，迎著{pron}刺出一劍。你們同時擊中了對方。",
 			]},
 			"guard": {"deal": 0.0, "text": ["你刺向{name}的要害，劍尖叮的一聲撞在{guard}上，滑開了。"]},
-			"hold": {"deal": 2.0, "take": 0.5, "effect": "escape", "good": true, "text": [
+			"hold": {"text_mid": ["你被箍著，反手握住劍身，劍尖往{name}的肋下縫隙一捅，{pron}手一鬆。"], "text_hi": ["你沒有掙扎，只是把劍身轉了個方向。劍尖找到{name}甲片的縫，{pron}自己鬆了手。"], "deal": 2.0, "take": 0.5, "effect": "escape", "good": true, "text": [
 				"被抱住的時候你們貼得最近。你反手握劍，劍尖從{name}肋下刺進去。{pron}痛得一鬆，你掙了出來。",
 			]},
 		},
 	},
 	"disarm": {
-		"name": "奪刃", "stat": "agi", "desc": "對付拿武器的對手：在對方揮過來的瞬間把武器打飛。對野獸沒用，太重的武器也絞不動。",
+		"name": "斷牙", "grade": 3, "school": "lionheart", "stat": "agi", "desc": "對付拿武器的對手：在對方揮過來的瞬間把武器打飛。對野獸沒用，太重的武器也絞不動。",
 		"fail": {"take": 1.0, "hit": true, "text": ["你想絞掉{name}的{weapon}，{pron}手一縮，你的劍撲了個空。"]},
 		"default": {"text": ["你盯著{weapon}等著，{name}沒有揮過來。"]},
 		"vs": {
-			"sweep": {"take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": [
+			"sweep": {"text_mid": ["你劍鋒一絞，貼著{weapon}轉了半圈，{name}手腕一麻，{weapon}飛了出去。"], "text_hi": ["你的劍碰上{weapon}，只一纏一挑。{name}還在揮，手上已經空了。"], "take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": [
 				"{weapon}揮過來的時候，你的劍貼上去一絞，正好扭在{name}手腕最使不上力的角度。{weapon}脫手飛出去，噹啷一聲落在遠處。",
 			], "else": {"take": 1.0, "hit": true, "text": ["你想打掉{name}的武器，絞不動。"]}},
-			"thrust": {"take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": [
+			"thrust": {"text_mid": ["{weapon}刺過來，你劍身一壓一轉，把它從{name}手裡絞了出去。"], "text_hi": ["你迎著{weapon}一搭，手腕輕輕一翻。{weapon}落在地上，{name}愣了一下。"], "take": 0.5, "effect": "disarm", "good": true, "requires": "disarmable", "text": [
 				"你一劍壓住刺過來的{weapon}，順勢往上一挑，{weapon}從{name}手裡飛了出去。",
 			], "else": {"take": 1.0, "hit": true, "text": ["你想打掉{name}的武器，絞不動。"]}},
 			"smash": {"take": 1.0, "hit": true, "text": ["從頭頂砸下來的力道太大，你的劍一碰上就被壓了下去，絞不動。"]},
@@ -279,14 +282,14 @@ const MOVES := {
 		},
 	},
 	"break_free": {
-		"name": "脫鎖", "stat": "str", "desc": "對付擒抱：在被抱住前鑽出去，或被抱住時掙開，順手回一劍。",
+		"name": "泥鰍", "grade": 1, "school": "", "stat": "str", "desc": "對付擒抱：在被抱住前鑽出去，或被抱住時掙開，順手回一劍。",
 		"fail": {"take": 1.0, "hit": true, "text": ["你想掙脫，沒掙開。"]},
 		"default": {"take": 1.0, "hit": true, "text": ["你壓低重心準備掙脫，可是{name}根本沒有要抓你。"]},
 		"vs": {
-			"grab": {"deal": 0.5, "take": 0.0, "good": true, "text": [
+			"grab": {"text_mid": ["{name}撲過來抓你，你一縮肩膀，從{pron}手臂底下滑了出去，順手一劍。"], "text_hi": ["{name}的手才碰到你的衣服，你已經不在那裡了。你從{pron}身側繞出去，劍在{pron}背上劃了一道。"], "deal": 0.5, "take": 0.0, "good": true, "text": [
 				"{name}撲上來的時候，你矮身從{pron}手臂底下鑽了出去，轉身一劍砍在{pron}背上。",
 			]},
-			"hold": {"deal": 0.5, "take": 0.3, "effect": "escape", "good": true, "text": [
+			"hold": {"text_mid": ["你肩膀一沉一扭，從{name}手裡滑了出來，回手一劍。"], "text_hi": ["你只是換了一口氣，身子一轉就脫了出來。{name}的手還箍著空的。"], "deal": 0.5, "take": 0.3, "effect": "escape", "good": true, "text": [
 				"你手肘往後一撞，{name}吃痛，手鬆了一下。你扭身掙開，順手一劍。",
 				"你用頭往後一頂，撞在{name}臉上。{pron}手一鬆，你滾了出來，劍順勢劃過{pron}身上。",
 			]},
@@ -297,7 +300,7 @@ const MOVES := {
 	},
 
 	"combo": {
-		"name": "三連斬", "stat": "str", "desc": "一口氣連砍三劍，比普通攻擊痛。但三劍砍完收不回來，擋不開對方的攻擊。砍不穿厚甲和盾。",
+		"name": "怒獅三撲", "grade": 4, "school": "lionheart", "stat": "str", "desc": "一口氣連砍三劍，比普通攻擊痛。但三劍砍完收不回來，擋不開對方的攻擊。砍不穿厚甲和盾。",
 		"default": {"deal": 1.3, "take": 1.0, "hit": true, "text": [
 			"你一劍接一劍連砍三下，{name}也同時出手了。",
 			"你搶上去連砍三劍，自己的身子也全敞開了。",
@@ -312,7 +315,7 @@ const MOVES := {
 				"你連砍三劍，{name}不躲不閃，硬是頂著劍衝了進來。",
 				"你三劍連著砍出去，{name}的{weapon}也同時到了。",
 			]},
-			"opening": {"deal": 2.2, "good": true, "text": [
+			"opening": {"text_mid": ["你連撲三劍，一劍比一劍深，{name}只來得及擋住第一劍。"], "text_hi": ["三劍連成一劍。{name}只聽見一聲，身上卻多了三道口子。"], "deal": 2.2, "good": true, "text": [
 				"你不收劍，第一劍砍下去，手腕一轉接第二劍、第三劍。{name}身上多了三道口子。",
 				"你連砍三劍，劍劍都落在{name}來不及護住的地方。",
 			]},
@@ -329,7 +332,7 @@ const MOVES := {
 	# no_weak：數值輸對手也不會變弱（破綻就是破綻）
 	# 從秘笈學（BookData），不在道場學
 	"sunder": {
-		"name": "北境裁決", "stat": "str", "desc": "北境劍術的絕學。對手露出大破綻時才用得出來（被掃倒、破防、收勢不住、喘氣、卡住）。",
+		"name": "王權裁定", "grade": 5, "school": "lionheart", "stat": "str", "desc": "獅心劍庭的絕學。對手露出大破綻時才用得出來（被掃倒、破防、收勢不住、喘氣、卡住）。",
 		"ult": true, "when": "opening", "pierce": true, "no_weak": true,
 		"pre": [
 			"你等的就是這一下。",
@@ -344,7 +347,7 @@ const MOVES := {
 		"vs": {},
 	},
 	"falcon": {
-		"name": "隼之一刺", "stat": "agi", "desc": "南方決鬥家的絕學。對手縮在防守後面、或正在蓄力時才用得出來：從縫裡一劍刺進去，盾和兵器都擋不住（盔甲還是擋得住一些）。刺中蓄力的人，那一下就使不出來了。",
+		"name": "隼之一刺", "grade": 4, "school": "", "stat": "agi", "desc": "南方決鬥家的絕學。對手縮在防守後面、或正在蓄力時才用得出來：從縫裡一劍刺進去，盾和兵器都擋不住（盔甲還是擋得住一些）。刺中蓄力的人，那一下就使不出來了。",
 		"ult": true, "when": "closed",
 		"pre": [
 			"你看準了那道縫。",
@@ -364,7 +367,7 @@ const MOVES := {
 		},
 	},
 	"bastion": {
-		"name": "不落要塞", "stat": "str", "desc": "守城人的絕學。對手蓄好的重招砸下來的那一刻才用得出來：用劍硬接住，借那股力打回去。",
+		"name": "不落要塞", "grade": 5, "school": "", "stat": "str", "desc": "守城人的絕學。對手蓄好的重招砸下來的那一刻才用得出來：用劍硬接住，借那股力打回去。",
 		"ult": true, "when": "heavy",
 		"pre": [
 			"你不退。",
@@ -395,3 +398,16 @@ static func entry(move_id: String, intent_type: String, traits: Array) -> Dictio
 
 static func is_basic(move_id: String) -> bool:
 	return not LEARNABLE.has(move_id)
+
+
+static func grade(move_id: String) -> int:
+	return MOVES[move_id].get("grade", 0)
+
+
+static func color(move_id: String) -> String:
+	return GrowthData.GRADE_COLORS[grade(move_id)]
+
+
+## 哪一派的招（空的是通用招）
+static func school(move_id: String) -> String:
+	return MOVES[move_id].get("school", "")

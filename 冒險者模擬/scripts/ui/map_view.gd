@@ -60,7 +60,7 @@ func refresh() -> void:
 		row.add_child(go)
 		side.add_child(row)
 	if MapData.is_city(selected):
-		side.add_child(UiKit.label("公會、北境劍術道場、武器店、旅店。", 16, 0.6, true))
+		side.add_child(UiKit.label("冒險者公會、練武場、獅心劍庭、武器店、旅店。", 16, 0.6, true))
 
 	var monsters := town.monsters_at(selected)
 	if not monsters.is_empty():

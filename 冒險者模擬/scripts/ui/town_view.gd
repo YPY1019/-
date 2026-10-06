@@ -1,7 +1,8 @@
 class_name TownView
 extends VBoxContainer
 
-## 主畫面：你的狀態、地圖、人物、休養；在城裡才有委託板（公會）、北境劍術道場、武器店的分頁。
+## 主畫面：你的狀態、地圖、人物、休養；在城裡才有委託板（冒險者公會）、練武場、獅心劍庭、武器店的分頁。
+## 點人的名字發出 person_requested，由 main 打開人物面板。
 ## 只負責顯示和按鈕，規則都在 Town。城外只能走路、找人打；接委託、休養、學招、讀秘笈、買武器要在城裡。
 ## 要開打、要走路時發出 monster_requested / fight_requested / travel_requested / spar_requested，由 main 處理。
 ## 花時間的事（學招、讀秘笈、休養）發出 wait_requested，由 main 擋住按鈕、呼叫 play_wait 演那段時間。
@@ -12,6 +13,8 @@ signal fight_requested(person_id: String)
 signal travel_requested(place: String)
 signal heir_chosen(person_id: String)
 signal spar_requested
+signal trial_requested
+signal person_requested(person_id: String)
 ## 花了時間：w 是 Town.take_wait() 那一段，msgs 是這件事的結果
 signal wait_requested(w: Dictionary, msgs: Array)
 ## 城裡發生了事（寫試玩紀錄用）
@@ -32,7 +35,8 @@ var hp_label: Label
 var rest_row: HBoxContainer
 var me_box: VBoxContainer
 var board_box: VBoxContainer
-var dojo_box: VBoxContainer
+var training_view: SchoolView
+var school_view: SchoolView
 var shop_box: VBoxContainer
 var log_label: RichTextLabel
 var tabs: TabContainer
@@ -97,16 +101,20 @@ func _init(p_town: Town) -> void:
 	map_view.fight_requested.connect(func(id): fight_requested.emit(id))
 	map_view.monster_requested.connect(func(id): monster_requested.emit(id))
 	map_view.person_selected.connect(show_person)
+	training_view = SchoolView.new(town, "training", _act)
+	training_view.name = "練武場"
+	tabs.add_child(training_view)
+	school_view = SchoolView.new(town, "school", _act)
+	school_view.name = SchoolData.NAME
+	school_view.spar_requested.connect(func(): spar_requested.emit())
+	school_view.trial_requested.connect(func(): trial_requested.emit())
+	school_view.person_requested.connect(show_person)
+	tabs.add_child(school_view)
 	tabs.add_child(map_view)
 	people_view = PeopleView.new(town)
 	people_view.name = "人物"
-	people_view.travel_requested.connect(func(p): travel_requested.emit(p))
-	people_view.fight_requested.connect(func(id): fight_requested.emit(id))
+	people_view.person_requested.connect(show_person)
 	tabs.add_child(people_view)
-	dojo_box = UiKit.vbox(8)
-	var dojo := _scroll(dojo_box)
-	dojo.name = "北境劍術道場"
-	tabs.add_child(dojo)
 	shop_box = UiKit.vbox(10)
 	var shop := _scroll(shop_box)
 	shop.name = "武器"
@@ -209,8 +217,8 @@ func refresh() -> void:
 	rest_row.visible = town.in_city() and not h.dying()
 	# 城裡才有的地方：公會的委託板、道場、武器店
 	var city := town.in_city()
-	for tab in [board_box, dojo_box, shop_box]:
-		var idx: int = tab.get_parent().get_index()
+	for tab in [board_box.get_parent(), training_view, school_view, shop_box.get_parent()]:
+		var idx: int = tab.get_index()
 		tabs.set_tab_hidden(idx, not city)
 		if not city and tabs.current_tab == idx:
 			tabs.current_tab = map_view.get_index()
@@ -223,7 +231,8 @@ func refresh() -> void:
 	_build_rest()
 	_build_me()
 	_build_board()
-	_build_dojo()
+	training_view.refresh()
+	school_view.refresh()
 	_build_shop()
 	map_view.refresh()
 	people_view.refresh()
@@ -231,10 +240,9 @@ func refresh() -> void:
 		_build_deathbed()
 
 
-## 在人物分頁打開這個人
+## 打開這個人的人物面板
 func show_person(id: String) -> void:
-	tabs.current_tab = people_view.get_index()
-	people_view.select(id)
+	person_requested.emit(id)
 
 
 ## 走到一個地方之後：打開地圖，看這裡有誰
@@ -277,7 +285,12 @@ func _build_rest() -> void:
 func _build_me() -> void:
 	UiKit.clear(me_box)
 	var h := town.hero
-	me_box.add_child(UiKit.label(h.display_name, 20, 0.8))
+	var name_button := LinkButton.new()
+	name_button.text = h.display_name
+	name_button.tooltip_text = "人物面板"
+	name_button.add_theme_font_size_override("font_size", 22)
+	name_button.pressed.connect(func(): show_person(town.world.hero_id))
+	me_box.add_child(name_button)
 	var realm := _tip(UiKit.label(h.realm_text(), 22), "境界。衝破瓶頸就升一境，血量也跟著變多。")
 	realm.add_theme_color_override("font_color", Color(h.realm_color()))
 	me_box.add_child(realm)
@@ -308,20 +321,15 @@ func _build_me() -> void:
 	var w := WeaponData.get_def(h.weapon)
 	me_box.add_child(_tip(UiKit.label(w["name"], 18), UiKit.weapon_tooltip(w)))
 
-	me_box.add_child(UiKit.heading("會的招"))
-	_move_flow(MoveData.BASIC)
-	var school := []
-	for t in SchoolData.TIERS:
-		for id in t["moves"]:
-			if h.knows(id):
-				school.append(id)
-	_move_flow(school)
-	# 道場以外學到的（別派的秘笈）
-	var other := []
-	for id in h.learned:
-		if SchoolData.tier_of(id) == 0:
-			other.append(id)
-	_move_flow(other)
+	# 流派、架勢（招和更多的東西看人物面板）
+	if h.school == SchoolData.ID and h.rank > 0:
+		me_box.add_child(UiKit.label("%s %s・貢獻 %d" % [SchoolData.NAME, SchoolData.RANKS[h.rank], h.merit], 17, 0.85))
+	elif h.merit > 0:
+		me_box.add_child(UiKit.label("劍庭的貢獻 %d" % h.merit, 17, 0.85))
+	if SchoolData.stance_active(h):
+		var st := _tip(UiKit.label("架勢：%s" % SchoolData.STANCE["name"], 17), SchoolData.STANCE["desc"])
+		st.add_theme_color_override("font_color", Color(MoveData.color("parry")))
+		me_box.add_child(st)
 
 	if not h.books.is_empty():
 		me_box.add_child(UiKit.heading("秘笈"))
@@ -340,18 +348,6 @@ func _build_me() -> void:
 				b.pressed.connect(func(): _act(town.read_book(id)))
 				row.add_child(b)
 			me_box.add_child(row)
-
-
-## 一排招式名字，滑鼠移上去看說明
-func _move_flow(ids: Array) -> void:
-	if ids.is_empty():
-		return
-	var flow := HFlowContainer.new()
-	flow.add_theme_constant_override("h_separation", 14)
-	for id in ids:
-		var m: Dictionary = MoveData.MOVES[id]
-		flow.add_child(_tip(UiKit.label(m["name"], 17, 0.9), m["desc"]))
-	me_box.add_child(flow)
 
 
 # ---------- 委託板 ----------
@@ -453,7 +449,8 @@ func _build_deathbed() -> void:
 		title_row.add_child(realm)
 		title_row.add_child(UiKit.label("%d 歲" % p.age(), 18, 0.7))
 		info.add_child(title_row)
-		info.add_child(UiKit.label(p.blurb, 16, 0.75, true))
+		var school := "%s %s" % [SchoolData.NAME, SchoolData.RANKS[p.rank]] if p.school == SchoolData.ID and p.rank > 0 else "沒有流派"
+		info.add_child(UiKit.label("%s・在%s" % [school, MapData.place_name(p.location)], 16, 0.7))
 		row.add_child(info)
 		var b := UiKit.button("交給%s" % p.pron, 130, 52)
 		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -461,72 +458,6 @@ func _build_deathbed() -> void:
 		row.add_child(b)
 		deathbed_box.add_child(row)
 		deathbed_box.add_child(HSeparator.new())
-
-
-# ---------- 道場 ----------
-
-func _build_dojo() -> void:
-	UiKit.clear(dojo_box)
-	var h := town.hero
-	for t in SchoolData.TIERS:
-		match t["exam"]:
-			"spar":
-				dojo_box.add_child(UiKit.heading(t["name"]))
-				var st := town.spar_state()
-				if not st["passed"]:
-					dojo_box.add_child(UiKit.label("師傅：" + t["exam_quote"], 17, 0.8, true))
-					var b := UiKit.button("過招（%s）" % LifeData.span_text(SchoolData.SPAR_MONTHS), 170)
-					b.disabled = not st["ok"]
-					b.tooltip_text = st["why"]
-					b.pressed.connect(func(): spar_requested.emit())
-					var row := UiKit.hbox(0)
-					row.add_child(b)
-					dojo_box.add_child(row)
-			"errand":
-				# 絕學：師傅交代事情之後才出現。不在道場學（讀秘笈），讀完之後才列出招名
-				if h.approved_tier < 2:
-					continue
-				dojo_box.add_child(UiKit.heading(t["name"]))
-				if not h.knows(SchoolData.ULT):
-					if h.errand_reported:
-						dojo_box.add_child(UiKit.book_label(SchoolData.ERRAND["book"], 19))
-					else:
-						dojo_box.add_child(UiKit.label(SchoolData.ERRAND["reminder"], 17, 0.8, true))
-					dojo_box.add_child(HSeparator.new())
-					continue
-			_:
-				dojo_box.add_child(UiKit.heading(t["name"]))
-		for id in t["moves"]:
-			_move_row(id)
-		dojo_box.add_child(HSeparator.new())
-
-
-func _move_row(id: String) -> void:
-	var h := town.hero
-	var m: Dictionary = MoveData.MOVES[id]
-	var st := town.move_state(id)
-	var row := UiKit.hbox(12)
-	var name_label := _tip(UiKit.label(m["name"], 19, 1.0 if st["learned"] or st["ok"] else 0.5), m["desc"])
-	if st["learned"]:
-		name_label.add_theme_color_override("font_color", Color("#9be39b"))
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(name_label)
-	if not st["learned"]:
-		# 數值門檻：不夠的標紅
-		var req: Dictionary = SchoolData.REQ.get(id, {})
-		for s in req:
-			var tag := UiKit.label("%s %d" % [GrowthData.NAMES[s], req[s]], 15, 0.6)
-			if h.body(s) < req[s]:
-				tag.add_theme_color_override("font_color", Color(BAD))
-			row.add_child(tag)
-		var span := LifeData.span_text(st["months"])
-		var price := "%d 銀・%s" % [st["cost"], span] if st["cost"] > 0 else span
-		var b := UiKit.button("學（%s）" % price, 170)
-		b.disabled = not st["ok"]
-		b.tooltip_text = "、".join(st["why"])
-		b.pressed.connect(func(): _act(town.learn_move(id)))
-		row.add_child(b)
-	dojo_box.add_child(row)
 
 
 # ---------- 武器（你的武器、武器店） ----------

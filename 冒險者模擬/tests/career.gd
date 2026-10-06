@@ -78,7 +78,7 @@ func _career(run: int) -> Dictionary:
 			town.travel(MapData.HOME)
 			continue
 		if town.in_city() and _city_chores(town, pilot, rng, spar_tries):
-			spar_tries += 1 if h.approved_tier < 2 and town.spar_state()["ok"] else 0
+			spar_tries += 1 if town.spar_state()["ok"] or town.trial_state()["ok"] else 0
 			continue
 		# 挑懸賞：打得過的（看粗略的強弱），在目前實力下輸了兩次的先不去
 		# 會的招多，比粗略的強弱估得強一點
@@ -155,25 +155,34 @@ func _career(run: int) -> Dictionary:
 
 ## 不在城裡時，城裡有沒有事可做（只看「要在城裡」以外的條件）
 func _city_wanted(town: Town) -> bool:
-	for t in SchoolData.TIERS:
-		for id in t["moves"]:
-			var st := town.move_state(id)
-			if not st["learned"] and st["why"] == ["要在城裡"]:
-				return true
+	for id in TownData.TRAINING:
+		var st := town.training_state(id)
+		if not st["learned"] and st["why"] == ["要在城裡"]:
+			return true
+	for id in SchoolData.MOVES:
+		var st := town.school_move_state(id)
+		if not st["learned"] and st["why"] == ["要在城裡"]:
+			return true
 	for id in town.hero.books:
 		if town.book_state(id)["why"] == "要在城裡":
 			return true
 	return false
 
 
-## 城裡的事：學招、讀秘笈、考驗、買劍、換劍。做了一件就回傳 true
+## 城裡的事：練武場學招、劍庭入門、接劍庭的委託、換招、比試、讀秘笈、買劍、換劍。做了一件就回傳 true
 func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar_tries: int) -> bool:
 	var h := town.hero
-	for t in SchoolData.TIERS:
-		for id in t["moves"]:
-			if town.move_state(id)["ok"]:
-				town.learn_move(id)
-				return true
+	for id in TownData.TRAINING:
+		if town.training_state(id)["ok"]:
+			town.learn_training(id)
+			return true
+	for id in town.school_jobs():
+		if not town.took_school_job(id):
+			town.accept_school_job(id)
+	for id in SchoolData.MOVES:
+		if town.school_move_state(id)["ok"]:
+			town.learn_school_move(id)
+			return true
 	for id in h.books:
 		if town.book_state(id)["ok"]:
 			town.read_book(id)
@@ -188,11 +197,17 @@ func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar
 		if WeaponData.get_def(wid)["power"] > WeaponData.get_def(h.weapon)["power"] and town.weapon_state(wid)["ok"]:
 			town.buy_weapon(wid)
 			return true
-	if town.spar_state()["ok"] and h.learned.size() >= 2 and spar_tries < 3:
+	if town.spar_state()["ok"] and h.learned.size() >= 1 and spar_tries < 3:
 		var sb := town.start_spar()
 		sb.rng.seed = rng.randi()
 		pilot.play(sb)
 		town.finish_spar(sb)
+		return true
+	if town.trial_state()["ok"] and spar_tries < 6:
+		var tb := town.start_trial()
+		tb.rng.seed = rng.randi()
+		pilot.play(tb)
+		town.finish_trial(tb)
 		return true
 	return false
 

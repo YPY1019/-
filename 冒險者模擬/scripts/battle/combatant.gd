@@ -40,6 +40,11 @@ var aged := {}
 var aged_said := 0
 ## 快死的徵兆有多明顯（0～1）：戰報偶爾寫喘、咳
 var omen := 0.0
+## 境界（玩家方）：戰報照境界換寫法
+var realm := 0
+## 架勢（SchoolData.STANCE 的 id），空的是沒有。braced：剛擋下一招，下一劍比較重
+var stance := ""
+var braced := false
 
 ## ---- 玩家方 ----
 ## 這回合手上的招（抽到的 + 基本招）

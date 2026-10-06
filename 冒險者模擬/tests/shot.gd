@@ -30,6 +30,33 @@ func _init() -> void:
 	tv.show_person("roderick")
 	await _frames(3)
 	_save("04_person")
+	main.person_panel.close()
+
+	# 練武場、獅心劍庭：學一招、接庭主三招入門
+	tv.tabs.current_tab = tv.training_view.get_index()
+	await _frames(3)
+	_save("04a_training")
+	tv._act(town.learn_training("heavy"))
+	await _idle()
+	h.stats = {"str": 12, "agi": 12}
+	main._start_spar()
+	main.battle_view._skip()
+	await _frames(3)
+	_save("04b_spar")
+	main._close_battle()
+	await _idle()
+	tv.tabs.current_tab = tv.school_view.get_index()
+	await _frames(3)
+	_save("04c_school")
+	tv.show_person(w.hero_id)
+	await _frames(3)
+	_save("04d_me_panel")
+	main.person_panel.tabs.current_tab = 1
+	main.person_panel.move_kind = "sword"
+	main.person_panel.refresh()
+	await _frames(3)
+	_save("04e_me_moves")
+	main.person_panel.close()
 
 	# 接下布蘭的懸賞：葛雷森傳話
 	tv.add_messages(town.accept_bounty("bran"))
@@ -100,6 +127,29 @@ func _init() -> void:
 	tv.show_person("grayson")
 	await _frames(3)
 	_save("16_grayson_panel")
+	main.person_panel.close()
+
+	# 劍庭的委託、公開比試
+	tv.add_messages(town.accept_school_job("roderick"))
+	h.school = SchoolData.ID
+	h.rank = max(h.rank, 1)
+	h.merit_total = 40
+	h.merit = 40
+	main._start_trial()
+	main.battle_view._skip()
+	await _frames(3)
+	_save("16a_trial")
+	main._close_battle()
+	await _idle()
+	tv.tabs.current_tab = tv.school_view.get_index()
+	await _frames(3)
+	_save("16b_school_after")
+	main.person_panel.show_person("grayson")
+	main.person_panel.tabs.current_tab = 1
+	main.person_panel.refresh()
+	await _frames(3)
+	_save("16c_grayson_moves")
+	main.person_panel.close()
 
 	# 世界過了幾年
 	h.dies_at = 99999
@@ -116,6 +166,7 @@ func _init() -> void:
 	tv.show_person("roderick")
 	await _frames(3)
 	_save("19_roderick_later")
+	main.person_panel.close()
 
 	# 快死了：休養到病倒
 	h.dies_at = w.month() + LifeData.DYING_MONTHS + 2
@@ -136,6 +187,7 @@ func _init() -> void:
 	tv.show_person(w.lives[0])
 	await _frames(3)
 	_save("23_old_hero_panel")
+	main.person_panel.close()
 	quit()
 
 

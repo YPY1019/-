@@ -3,8 +3,8 @@ extends RefCounted
 
 ## 基礎數值（身體）和境界的數字。只有資料和換算，沒有規則。
 ##
-## 力量 str：攻擊、防禦、裂盾斬、逆流斬、脫鎖、三連斬、怒喝、掙扎
-## 敏捷 agi：閃避、迎擊、低身斬、奪刃、穿隙刺、擲沙
+## 力量 str：攻擊、防禦、劈柴、十字鐵壁、泥鰍、怒獅三撲、掙扎
+## 敏捷 agi：閃避、獅爪、割麥、斷牙、獅王卸甲
 ##
 ## 戰鬥：同一項跟同一項比。你用力量的招，比雙方的力量；對手用力量的招打你，也比雙方的力量。
 ##   差距 = 出手的人 − 被打的人。
@@ -14,25 +14,30 @@ extends RefCounted
 ## 怎麼長：冒險打怪。用了哪個數值的招，就練到哪個數值。
 ##   練多少看對手「那一項」比你高多少：比你低 GROW_OFFSET 點以上的對手練不到你。
 ##   數值到了瓶頸就不長，要衝破瓶頸才能再長：
-##     卡在瓶頸時，打贏比瓶頸強的對手。只有這條路（師傅不能帶你過瓶頸）。
+##     卡在瓶頸時，打贏比瓶頸強的對手。只有這條路（流派的人不能帶你過瓶頸）。
 ##
-## 境界：衝破一次瓶頸就升一境。血量看境界。同一境再分前段、中段、後段（看數值）。
+## 境界：6 層，衝破一次瓶頸就升一境。血量看境界。同一境再分前段、中段、後段（看數值）。
 
 const STATS := ["str", "agi"]
 const NAMES := {"str": "力量", "agi": "敏捷"}
 const START := 10
 
+# ---- 等級的顏色 ----
+## 境界、武學、秘笈、稀有武器共用同一套 6 個顏色（參考龍胤立志傳）：灰、綠、藍、紫、橙、紅。看到紫色就是同一個檔次
+const GRADE_COLORS := ["#c9ccd1", "#6fcf7a", "#6fa8ff", "#b98cff", "#ffa64d", "#ff6b6b"]
+const GRADE_NAMES := ["灰", "綠", "藍", "紫", "橙", "紅"]
+
 # ---- 境界 ----
 ## 第 i 境的瓶頸（數值最多練到這裡）
-const CAPS := [15, 20, 25]
+const CAPS := [12, 15, 18, 21, 25, 30]
 ## 第 i 境從哪裡算起（算前中後段用）
-const REALM_FLOOR := [10, 15, 20]
-const REALM_NAMES := ["第一境", "第二境", "第三境"]
-## 參考品級顏色：越高越亮眼
-const REALM_COLORS := ["#c9ccd1", "#6fcf7a", "#6fa8ff"]
+const REALM_FLOOR := [10, 12, 15, 18, 21, 25]
+## 境界的名字還沒定（GAME_DESIGN.md「還沒決定」）
+const REALM_NAMES := ["第一境", "第二境", "第三境", "第四境", "第五境", "第六境"]
+const REALM_COLORS := GRADE_COLORS
 const STAGES := ["前段", "中段", "後段"]
 ## 第 i 境的血量
-const REALM_HP := [100, 150, 220]
+const REALM_HP := [100, 125, 155, 190, 230, 280]
 ## 世界上有打法的人：數值每長 1 點，血量多幾點（掉 1 點就少幾點）
 const HP_PER_POINT := 12
 
@@ -60,7 +65,7 @@ const OUTCLASS := 4
 
 # ---- 成長 ----
 ## 第 i 境長 1 點要多少經驗（境界越高越難長）
-const EXP_PER_POINT := [100.0, 200.0, 350.0]
+const EXP_PER_POINT := [100.0, 140.0, 190.0, 250.0, 320.0, 400.0]
 ## 每用一次招給的經驗（再乘上成長倍率）
 const EXP_PER_USE := 15.0
 ## 對手那一項比你低 GROW_OFFSET 點時練不到；跟你一樣時 = 1 倍
@@ -105,7 +110,7 @@ static func win_chance(power_a: float, power_b: float) -> float:
 
 ## 在這一境的前段 0、中段 1、後段 2
 static func stage(realm: int, value: int) -> int:
-	var span: int = CAPS[realm] - REALM_FLOOR[realm]
+	var span: int = maxi(1, CAPS[realm] - REALM_FLOOR[realm])
 	return clampi(int(float(value - REALM_FLOOR[realm]) * 3.0 / span), 0, 2)
 
 

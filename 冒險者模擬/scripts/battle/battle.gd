@@ -297,14 +297,23 @@ func _show_age(ally: Combatant, ev: Array) -> void:
 ## 你這招的結果 e 寫出來、算傷害和效果
 func _land_player(ally: Combatant, move_id: String, e: Dictionary, target: Combatant, ev: Array) -> Dictionary:
 	var m: Dictionary = MoveData.MOVES[move_id]
-	ev.append(_ev("action", target.fill(_pick(e["text"]))))
+	ev.append(_ev("action", target.fill(_pick(_text_for(ally, e)))))
 	if e.get("failed", false):
 		ev.append(_ev("stat", "（失敗。%s：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
 
 	if move_id != MoveData.FLEE:
 		ally.used.append(move_id)
-	if e.get("deal", 0.0) > 0.0:
-		_damage_enemy(ally, target, move_id, e["deal"], ev)
+	var deal: float = e.get("deal", 0.0)
+	# 架勢：剛擋下一招，這一劍借著那股勢子，比較重
+	if ally.braced and deal > 0.0 and MoveData.OFFENSE.has(move_id):
+		deal *= SchoolData.STANCE["bonus"]
+		ally.braced = false
+		ev.append(_ev("action", target.fill(_pick(SchoolData.STANCE["lines"]))))
+	if deal > 0.0:
+		_damage_enemy(ally, target, move_id, deal, ev)
+	if ally.stance != "" and MoveData.DEFENSE.has(move_id) and not e.get("failed", false) and e.get("take", 1.0) < 1.0 \
+			and target.intent.get("phase", "") in ["do", "strike", "hold"]:
+		ally.braced = true
 
 	if target.is_alive():
 		match e.get("effect", ""):
@@ -321,6 +330,15 @@ func _land_player(ally: Combatant, move_id: String, e: Dictionary, target: Comba
 	if m.has("self"):
 		ally.next_status.append(m["self"])
 	return {"move": move_id, "entry": e}
+
+
+## 你這招的寫法：境界越高，剋制對手的招寫得越從容（有寫的才換）
+func _text_for(ally: Combatant, e: Dictionary) -> Array:
+	if ally.realm >= 4 and e.has("text_hi"):
+		return e["text_hi"]
+	if ally.realm >= 2 and e.has("text_mid"):
+		return e["text_mid"]
+	return e["text"]
 
 
 ## 這招碰上對手這回合的動作，結果是什麼：擲一次成不成功（失敗就換成失敗的版本，加上 failed）。

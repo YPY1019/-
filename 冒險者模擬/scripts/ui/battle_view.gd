@@ -161,7 +161,7 @@ func begin(p_battle: Battle, note := "") -> void:
 	var hide: bool = foe_c.enemy_def.get("hide_hp", false)
 	foe_bar.visible = not hide
 	foe_hp_label.visible = not hide
-	# 師傅的考驗：撐過幾回合就好，不能撤退（認輸由血量決定）
+	# 考驗和比試：不能撤退（認輸由血量決定）
 	var spar := hero_c.yield_hp > 0
 	flee_button.visible = not spar
 	_append(battle.start())

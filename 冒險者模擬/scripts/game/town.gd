@@ -2,7 +2,7 @@ class_name Town
 extends RefCounted
 
 ## 你能做的事（規則）：走到哪裡、打委託的怪物、找人打、接懸賞、休養、時間（月）和生活費、
-## 師傅（考驗、交代的事）、秘笈、武器店、戰利品、戰鬥打完的結算（數值成長、瓶頸）、臨終和換人接著玩。
+## 練武場、獅心劍庭（入門、委託和貢獻、換招、公開比試）、秘笈、武器店、戰利品、戰鬥打完的結算（數值成長、瓶頸）、臨終和換人接著玩。
 ## 世界上的人自己的事在 World；你也是 World 裡的一個人（hero）。
 ## 不碰畫面：每個動作回傳訊息清單 [{"kind", "text"}]，畫面照著顯示。
 ##   kind：info 一般、good 好事、bad 壞事、big 大事、epic 一輩子記得的大事（升境、拿到秘笈、讀完秘笈、病倒、死去）、
@@ -113,6 +113,7 @@ func finish_monster(battle: Battle) -> Array:
 				msgs.append(_m("good", "報酬 %d 銀。" % c["reward"]))
 			else:
 				msgs.append(_m("info", "你沒有接這張委託，報酬拿不到。"))
+			msgs.append_array(_jobs_done("monster", id))
 			msgs.append_array(_after_monster(id))
 		"flee":
 			hero.hp = r["hp"]
@@ -163,7 +164,7 @@ func people_here() -> Array:
 	return world.at(hero.location)
 
 
-## 能不能找這個人打：在同一個地方。師傅不打
+## 能不能找這個人打：在同一個地方。庭主不打
 func can_fight(id: String) -> bool:
 	var p := world.person(id)
 	return p != null and not p.dead and p.role != "master" and p.location == hero.location and p.travel_left == 0 \
@@ -192,6 +193,8 @@ func start_person(id: String) -> Battle:
 	_fight_enemy = ""
 	_fight_person = p
 	_fight_lethal = world.lethal(hero, p)
+	if not hero.fought.has(p.id):
+		hero.fought.append(p.id)
 	loot.clear()
 	return Battle.new([hero.to_combatant()], [Combatant.from_person(p, hero.location, _fight_lethal)])
 
@@ -215,6 +218,8 @@ func finish_person(battle: Battle) -> Array:
 			if not hero.beaten.has(p.id):
 				hero.beaten.append(p.id)
 			world.hero_won(p, _fight_lethal)
+			if _fight_lethal:
+				msgs.append_array(_jobs_done("kill", p.id))
 			if paid:
 				hero.money += b["reward"]
 				msgs.append(_m("good", "懸賞 %d 銀。" % b["reward"]))
@@ -276,7 +281,7 @@ func clear_loot() -> void:
 	_fight_person = null
 
 
-## 打完回來：劍譜在身上，師傅又交代過，就拿去給他看
+## 打完回來：劍譜在身上，庭主又交代過，就拿去給他看
 func after_fight() -> Array:
 	return _report_errand() if in_city() else []
 
@@ -313,18 +318,20 @@ func read_book(id: String) -> Array:
 	return msgs
 
 
-## 師傅交代的事：劍譜拿回來給他看。first：他還沒交代，就看見你拿著了
+## 庭主交代的事：劍譜拿回來給他看，算一份大功勞。first：他還沒交代，就看見你拿著了
 func _report_errand(first := false) -> Array:
 	var book: String = SchoolData.ERRAND["book"]
-	if hero.errand_reported or hero.approved_tier < 2 or not hero.books.has(book):
+	if hero.errand_reported or not hero.errand_given or not member() or not hero.books.has(book):
 		return []
 	hero.errand_reported = true
 	var read := hero.knows(BookData.get_def(book)["move"])
 	var text: String = SchoolData.ERRAND["seen" if first else "returned"]
-	return [_m("epic", text + "\n" + SchoolData.ERRAND["keep_read" if read else "keep"])]
+	var msgs := [_m("epic", text + "\n" + SchoolData.ERRAND["keep_read" if read else "keep"])]
+	msgs.append_array(_merit("book"))
+	return msgs
 
 
-## 師傅交代的話：劍譜還在羅德里克身上，還是已經不知道到誰手上了
+## 庭主交代的話：劍譜還在羅德里克身上，還是已經不知道到誰手上了
 func errand_ask() -> String:
 	var r := world.person(SchoolData.ERRAND["holder"])
 	if r != null and not r.dead and r.has_item(SchoolData.ERRAND["book"]):
@@ -339,6 +346,9 @@ const BREAKTHROUGH_TEXT := [
 	"",
 	"回城的路上，你走了一整天也不覺得累。呼吸又深又穩，劍拿在手上也輕了。",
 	"這一仗打完，你在原地站了很久。耳朵裡很安靜，只聽得到自己的心跳，又沉又慢。",
+	"你發現自己看得見對手肩膀先動，還是腳先動。以前你只看得見劍。",
+	"那天之後，你出劍不再想。想的時候，劍已經到了。",
+	"你站在那裡，對手還沒動，你已經知道這一仗怎麼結束。",
 ]
 
 
@@ -472,30 +482,15 @@ func succeed() -> Array:
 	return msgs
 
 
-# ---------- 師傅 ----------
+# ---------- 練武場 ----------
 
-## 有沒有入門（學過第 1 階的招）
-func enrolled() -> bool:
-	for id in SchoolData.tier_def(1)["moves"]:
-		if hero.knows(id):
-			return true
-	return false
-
-
-## 這招現在能不能在道場學：{"learned", "ok", "why": [原因], "cost", "months"}。絕學不在道場學（讀秘笈）
-## 數值門檻看現在的身體
-func move_state(id: String) -> Dictionary:
-	var t := SchoolData.tier_def(SchoolData.tier_of(id))
-	var st := {"learned": hero.knows(id), "ok": false, "why": [], "cost": t.get("cost", 0), "months": t.get("months", 0)}
-	if st["learned"] or t["exam"] == "errand":
+## 練武場的招現在能不能學：{"learned", "ok", "why": [原因], "cost", "months"}。數值門檻看現在的身體
+func training_state(id: String) -> Dictionary:
+	var t: Dictionary = TownData.TRAINING[id]
+	var st := {"learned": hero.knows(id), "ok": false, "why": _req_why(id), "cost": t["cost"], "months": t["months"]}
+	if st["learned"]:
 		return st
-	if t["tier"] > hero.approved_tier:
-		st["why"].append("要通過「%s」" % t["exam_name"])
-	var req: Dictionary = SchoolData.REQ.get(id, {})
-	for s in req:
-		if hero.body(s) < req[s]:
-			st["why"].append("%s要 %d" % [GrowthData.NAMES[s], req[s]])
-	if st["cost"] > hero.money:
+	if t["cost"] > hero.money:
 		st["why"].append("錢不夠")
 	if not in_city():
 		st["why"].append("要在城裡")
@@ -504,13 +499,18 @@ func move_state(id: String) -> Dictionary:
 
 
 ## 學費先付。學完之前病倒就學不成
-func learn_move(id: String) -> Array:
-	var st := move_state(id)
+func learn_training(id: String) -> Array:
+	var st := training_state(id)
 	if not st["ok"]:
 		return []
 	hero.money -= st["cost"]
+	return _learn(id, st["months"])
+
+
+## 花時間學一招
+func _learn(id: String, months: int) -> Array:
 	var move_name: String = MoveData.MOVES[id]["name"]
-	var msgs := _pass_months(st["months"], "learn", "學「%s」" % move_name)
+	var msgs := _pass_months(months, "learn", "學「%s」" % move_name)
 	if hero.dying():
 		return msgs
 	hero.learn(id)
@@ -519,16 +519,33 @@ func learn_move(id: String) -> Array:
 	return msgs
 
 
-## 第 2 階的考驗：{"passed", "ok", "why"}
+## 數值門檻不夠的原因
+func _req_why(id: String) -> Array:
+	var why := []
+	var req: Dictionary = SchoolData.REQ.get(id, {})
+	for s in req:
+		if hero.body(s) < req[s]:
+			why.append("%s要 %d" % [GrowthData.NAMES[s], req[s]])
+	return why
+
+
+# ---------- 獅心劍庭 ----------
+
+func member() -> bool:
+	return SchoolData.is_member(hero)
+
+
+## 入門考驗：{"passed", "ok", "why"}
 func spar_state() -> Dictionary:
-	var st := {"passed": hero.approved_tier >= 2, "ok": false, "why": ""}
-	if not st["passed"]:
-		if not enrolled():
-			st["why"] = "先學一招基礎招"
-		elif not in_city():
-			st["why"] = "要在城裡"
-		else:
-			st["ok"] = true
+	var st := {"passed": member(), "ok": false, "why": ""}
+	if st["passed"]:
+		return st
+	if maxi(hero.body("str"), hero.body("agi")) < SchoolData.JOIN_BODY:
+		st["why"] = "身體還不夠結實"
+	elif not in_city():
+		st["why"] = "要在城裡"
+	else:
+		st["ok"] = true
 	return st
 
 
@@ -536,22 +553,152 @@ func start_spar() -> Battle:
 	_fight_person = null
 	var me := hero.to_combatant(true)
 	me.yield_hp = roundi(me.max_hp * SchoolData.SPAR_YIELD)
-	var b := Battle.new([me], [Combatant.from_enemy(SchoolData.MASTER_ENEMY)])
+	var b := Battle.new([me], [Combatant.from_enemy(SchoolData.SPAR_ENEMY)])
 	b.round_limit = SchoolData.SPAR_ROUNDS
 	return b
 
 
-## 通過考驗：師傅交代他的事（劍譜已經在你身上的話，他直接看見）
+## 通過考驗：成為學徒，庭主交代劍譜的事（劍譜已經在你身上的話，他直接看見）
 func finish_spar(battle: Battle) -> Array:
 	var msgs := []
 	if battle.result()["outcome"] == "survive":
-		hero.approved_tier = 2
-		hero.note("接住了師傅三招")
+		hero.school = SchoolData.ID
+		hero.rank = 1
+		hero.note("加入獅心劍庭")
+		msgs.append(_m("big", "你成了獅心劍庭的學徒。"))
+		hero.errand_given = true
 		if hero.books.has(SchoolData.ERRAND["book"]):
 			msgs.append_array(_report_errand(true))
 		else:
 			msgs.append(_m("big", errand_ask()))
 	msgs.append_array(_pass_months(SchoolData.SPAR_MONTHS))
+	return msgs
+
+
+## 劍庭的招現在能不能換：{"learned", "ok", "why": [原因], "merit", "months", "rank"}
+## 不是成員也能換第 1 階（藍）的招
+func school_move_state(id: String) -> Dictionary:
+	var t: Dictionary = SchoolData.MOVES[id]
+	var st := {"learned": hero.knows(id), "ok": false, "why": _req_why(id), "merit": t["merit"], "months": t["months"], "rank": t["rank"]}
+	if st["learned"]:
+		return st
+	if t["rank"] > 1 and not member():
+		st["why"].push_front("要是劍庭的人")
+	elif t["rank"] > hero.rank and member():
+		st["why"].push_front("要%s" % SchoolData.RANKS[t["rank"]])
+	if t["merit"] > hero.merit:
+		st["why"].append("貢獻不夠")
+	if not in_city():
+		st["why"].append("要在城裡")
+	st["ok"] = st["why"].is_empty()
+	return st
+
+
+func learn_school_move(id: String) -> Array:
+	var st := school_move_state(id)
+	if not st["ok"]:
+		return []
+	hero.merit -= st["merit"]
+	return _learn(id, st["months"])
+
+
+## 劍庭現在有的委託（怪物有出現才有；要討伐的人還活著才有；劍譜要庭主交代過、還沒拿回來才有）
+func school_jobs() -> Array:
+	var list := []
+	for id in SchoolData.JOBS:
+		var j: Dictionary = SchoolData.JOBS[id]
+		match j["kind"]:
+			"monster":
+				if world.monster_open(j["enemy"]):
+					list.append(id)
+			"kill":
+				var t := world.person(j["target"])
+				if t != null and not t.dead:
+					list.append(id)
+			"book":
+				if hero.errand_given and not hero.errand_reported:
+					list.append(id)
+	return list
+
+
+func accept_school_job(id: String) -> Array:
+	if hero.school_jobs.has(id) or not school_jobs().has(id):
+		return []
+	hero.school_jobs.append(id)
+	return [_m("info", "你接下了劍庭的委託。")]
+
+
+func took_school_job(id: String) -> bool:
+	return hero.school_jobs.has(id) or SchoolData.JOBS[id]["kind"] == "book" and hero.errand_given
+
+
+## 辦完劍庭的事：記一筆貢獻
+func _merit(id: String) -> Array:
+	var j: Dictionary = SchoolData.JOBS[id]
+	hero.school_jobs.erase(id)
+	hero.merit += j["merit"]
+	hero.merit_total += j["merit"]
+	return [_m("good", "劍庭記下了你這份功勞（貢獻 %d）。" % hero.merit)]
+
+
+## 打贏怪物、討伐了人：有接劍庭的委託就算數
+func _jobs_done(kind: String, key: String) -> Array:
+	var msgs := []
+	for id in hero.school_jobs.duplicate():
+		var j: Dictionary = SchoolData.JOBS[id]
+		if j["kind"] == kind and j.get("enemy", j.get("target", "")) == key:
+			msgs.append_array(_merit(id))
+	return msgs
+
+
+## 公開比試：{"rank": 要升到第幾階, "ok", "why", "opponent": 世界上的人 id（空的就用 fallback）}
+func trial_state() -> Dictionary:
+	var st := {"rank": hero.rank + 1, "ok": false, "why": "", "opponent": ""}
+	if not member() or hero.rank >= SchoolData.RANKS.size() - 1:
+		return st
+	var t: Dictionary = SchoolData.TRIALS[st["rank"]]
+	var p := world.person(t["opponent"]) if t["opponent"] != "" else null
+	if p != null and not p.dead and p.location == MapData.HOME and p.travel_left == 0:
+		st["opponent"] = p.id
+	if hero.merit_total < t["merit_total"]:
+		st["why"] = "替劍庭做的事還不夠多"
+	elif not in_city():
+		st["why"] = "要在城裡"
+	else:
+		st["ok"] = true
+	return st
+
+
+## 比試：打到一方剩 MATCH_YIELD 的血就停。不會死、不會被搶，打完不帶傷
+func start_trial() -> Battle:
+	var st := trial_state()
+	_fight_person = null
+	var me := hero.to_combatant(true)
+	me.yield_hp = roundi(me.max_hp * SchoolData.MATCH_YIELD)
+	var foe: Combatant
+	if st["opponent"] != "":
+		var p := world.person(st["opponent"])
+		foe = Combatant.from_person(p, MapData.HOME, false)
+		foe.hp = foe.max_hp
+		foe.enemy_def["win_text"] = "{name}退了一步，把劍放低：「我輸了。」"
+		foe.enemy_def["scene"] = [SchoolData.TRIALS[st["rank"]]["text"]]
+	else:
+		foe = Combatant.from_enemy(SchoolData.TRIALS[st["rank"]]["fallback"])
+	foe.yield_hp = roundi(foe.max_hp * SchoolData.MATCH_YIELD)
+	return Battle.new([me], [foe])
+
+
+func finish_trial(battle: Battle) -> Array:
+	var st := trial_state()
+	var msgs := []
+	if battle.result()["outcome"] == "win":
+		hero.rank = st["rank"]
+		hero.note("在公開比試升為%s" % SchoolData.RANKS[hero.rank])
+		msgs.append(_m("epic", "你是獅心劍庭的%s了。" % SchoolData.RANKS[hero.rank]))
+	else:
+		msgs.append(_m("info", "這次沒能贏下來。"))
+	msgs.append_array(_grow(battle.enemies[0].stats, battle.result()))
+	msgs.append_array(_pass_months(SchoolData.TRIALS[st["rank"]]["months"]))
 	return msgs
 
 

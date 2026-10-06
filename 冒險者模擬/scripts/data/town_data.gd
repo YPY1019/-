@@ -29,5 +29,14 @@ const COMMISSIONS := {
 		"text": "食人魔在舊城牆一帶出沒，已經有人被抓走了。城主親自發的懸賞。"},
 }
 
+## 練武場：退休的老兵收錢教通用招（綠）。招 id -> 學費、學多久。數值門檻在 SchoolData.REQ
+const TRAINING := {
+	"sweep_kick": {"cost": 40, "months": 3},
+	"heavy": {"cost": 40, "months": 3},
+	"break_free": {"cost": 50, "months": 4},
+}
+const TRAINER := "老兵哈洛德"
+const TRAINER_TEXT := "練武場在城牆根下，地上的沙被踩得很實。老兵哈洛德少了一隻耳朵，教的都是戰場上活下來的招。"
+
 ## 開局的名字（玩家角色）
 const HERO_NAMES := [["凱爾", "他"], ["羅蘭", "他"], ["艾德", "他"], ["莫琳", "她"], ["蕾娜", "她"], ["班恩", "他"]]

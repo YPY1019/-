@@ -12,8 +12,9 @@ var battle_view: BattleView
 ## 等的時候擋住所有按鈕（透明，蓋在最上面）
 var blocker: Control
 var life_view: LifeView
+var person_panel: PersonPanel
 var battle: Battle
-## 現在打的是 monster 委託的怪物 / person 世界上的人 / spar 師傅的考驗
+## 現在打的是 monster 委託的怪物 / person 世界上的人 / spar 庭主的入門考驗 / trial 劍庭的公開比試
 var fight_kind := ""
 var _settled := []
 ## 死去那一句停多久，才換到「這一生」
@@ -38,6 +39,8 @@ func _ready() -> void:
 	town_view.fight_requested.connect(_fight_person)
 	town_view.travel_requested.connect(_travel)
 	town_view.spar_requested.connect(_start_spar)
+	town_view.trial_requested.connect(_start_trial)
+	town_view.person_requested.connect(func(id): person_panel.show_person(id))
 	town_view.heir_chosen.connect(_heir_chosen)
 	town_view.wait_requested.connect(_on_wait_requested)
 	town_view.messages_added.connect(_on_town_messages)
@@ -52,6 +55,10 @@ func _ready() -> void:
 	life_view.continue_requested.connect(_continue_as_heir)
 	life_view.restart_requested.connect(func(): get_tree().reload_current_scene())
 	margin.add_child(life_view)
+	person_panel = PersonPanel.new(town)
+	person_panel.travel_requested.connect(_travel)
+	person_panel.fight_requested.connect(_fight_person)
+	add_child(person_panel)
 	blocker = Control.new()
 	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	blocker.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -60,7 +67,7 @@ func _ready() -> void:
 
 	var h := town.hero
 	town_view.add_messages([
-		{"kind": "big", "text": "你叫%s，%d 歲，帶著一把舊鐵劍和 %d 銀來到北境的霜溪城。城裡有冒險者公會的委託板、北境劍術的道場和一間武器店。" % [h.display_name, h.age(), h.money]},
+		{"kind": "big", "text": "你叫%s，%d 歲，帶著一把舊鐵劍和 %d 銀來到北境的霜溪城。城裡有冒險者公會、練武場、獅心劍庭和一間武器店。" % [h.display_name, h.age(), h.money]},
 		{"kind": "info", "text": "每個月生活費 %d 銀。" % TownData.LIVING_COST},
 	])
 	_show(town_view)
@@ -156,7 +163,14 @@ func _start_person(id: String, why: String) -> void:
 func _start_spar() -> void:
 	fight_kind = "spar"
 	battle = town.start_spar()
-	play_log.battle_start("師傅的考驗：接住我三招", battle)
+	play_log.battle_start("庭主的考驗：接住我三招", battle)
+	_show_battle()
+
+
+func _start_trial() -> void:
+	fight_kind = "trial"
+	battle = town.start_trial()
+	play_log.battle_start("公開比試", battle)
 	_show_battle()
 
 
@@ -172,6 +186,8 @@ func _on_battle_ended() -> void:
 			_settled = town.finish_monster(battle)
 		"person":
 			_settled = town.finish_person(battle)
+		"trial":
+			_settled = town.finish_trial(battle)
 		_:
 			_settled = town.finish_spar(battle)
 	battle_view.show_settlement(_settled)
