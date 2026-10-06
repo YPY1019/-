@@ -246,8 +246,9 @@ func _append(events: Array) -> void:
 	for e in events:
 		var text: String = e["text"]
 		if e.has("move"):
-			# 學來的招：前面標出招名（招的等級顏色）
-			text = "[b][color=%s]%s[/color][/b]" % [MoveData.color(e["move"]), MoveData.call_name(e["move"])] + text
+			# 句子裡的招名用招的等級顏色
+			var n := MoveData.call_name(e["move"])
+			text = text.replace(n, "[color=%s]%s[/color]" % [MoveData.color(e["move"]), n])
 		last = e["kind"]
 		match e["kind"]:
 			"round", "intent", "stat":

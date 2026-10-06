@@ -18,6 +18,8 @@ const GROW_UNTIL := 30
 ## 有懸賞的人在外面做壞事（每個月的機率），懸賞跟著漲
 const CRIME_CHANCE := 0.05
 const CRIME_RAISE := 25
+## 同一個人的壞事，傳聞至少隔幾個月才再傳一次
+const CRIME_NEWS_GAP := 18
 ## 有懸賞的人搶路過的人（每個月的機率，只搶比自己弱的）
 const ROB_CHANCE := 0.08
 ## 說得出是誰下的手的機率（其他時候只知道人死了）
@@ -43,6 +45,8 @@ var bounties := {}
 var monsters := {}
 ## 武器店收來的東西（世界上的人用不到的稀有武器、秘笈）。你買得到
 var shop_stock: Array = []
+## 每個人的壞事上次傳到你耳裡是第幾個月
+var _crime_told := {}
 ## 這次推的時候傳到你耳裡的事
 var news: Array = []
 ## 已經傳過話給你的人（target id）
@@ -315,6 +319,7 @@ func tick() -> void:
 	for p in list:
 		if not p.dead and p.travel_left == 0:
 			_act(p)
+			_sell_off(p)
 	if LifeData.month_of_year(month()) == SchoolData.SELECTION_MONTHS[-1]:
 		_spring()
 	look_around()
@@ -446,6 +451,10 @@ func _crime(p: Person) -> void:
 	if lines.is_empty():
 		return
 	bounties[p.id]["reward"] += CRIME_RAISE
+	# 同一個人的壞事，傳聞隔一陣子才再傳一次（不然同一句一直出現）
+	if month() - _crime_told.get(p.id, -999) < CRIME_NEWS_GAP:
+		return
+	_crime_told[p.id] = month()
 	_tell(_pick(lines).replace("{place}", MapData.place_name(p.location)))
 
 
@@ -605,23 +614,27 @@ func _take(w: Person, l: Person, kill: bool) -> Array:
 	w.weapon = w.best_weapon()
 	for it in w.items():
 		if BookData.is_book(it):
+			# 秘笈不賣（錢買不到秘笈）：湊得成、拿著的武器用得出來就學，不然帶在身上
 			var move: String = BookData.get_def(it)["move"]
-			if MoveData.usable(move, w.weapon):
+			if MoveData.usable(move, w.weapon) and BookData.complete(w.books, it):
 				w.learn(move)
-			elif not w.knows(move):
-				_sell(w, it)
-		elif it != w.weapon and WeaponData.is_rare(it):
-			_sell(w, it)
+		elif it != w.weapon and WeaponData.is_rare(it) and not w.to_sell.has(it):
+			w.to_sell.append(it)
 	return taken
 
 
-## 用不上的好東西賣給武器店
-func _sell(p: Person, it: String) -> void:
-	p.remove_item(it)
-	if not shop_stock.has(it):
-		shop_stock.append(it)
-	var name: String = "《%s》" % BookData.get_def(it)["name"] if BookData.is_book(it) else WeaponData.get_def(it)["name"]
-	_tell(NewsData.SOLD.replace("{p:who}", "{p:%s}" % p.id).replace("{item}", name))
+## 用不上的稀有武器：回到霜溪城才賣給武器店
+func _sell_off(p: Person) -> void:
+	if p.location != MapData.HOME or p.travel_left > 0:
+		return
+	for it in p.to_sell:
+		if not p.has_item(it) or it == p.weapon:
+			continue
+		p.remove_item(it)
+		if not shop_stock.has(it):
+			shop_stock.append(it)
+		_tell(NewsData.SOLD.replace("{p:who}", "{p:%s}" % p.id).replace("{item}", WeaponData.get_def(it)["name"]))
+	p.to_sell.clear()
 
 
 ## 世界上的人打贏你：拿走你身上最值錢的一樣（稀有的武器 > 還沒讀的秘笈 > 比他好的武器）。最後一把武器不拿
@@ -707,6 +720,9 @@ func _die(p: Person) -> void:
 			_tell(NewsData.BURIED.replace("{p:who}", "{p:%s}" % p.id))
 			for it in valuable:
 				p.remove_item(it)
+				# 殘頁不會憑空消失：落到同一個地方的別人手上（沒有人就隨便一個人）
+				if BookData.is_book(it) and BookData.get_def(it).has("page_of"):
+					_pass_page(p, it)
 	p.dead = true
 	p.died_at = month()
 	if bounties.has(p.id):
@@ -747,6 +763,17 @@ func hero_fled(p: Person) -> void:
 	p.rest_left = rng.randi_range(REST_AFTER[0], REST_AFTER[1])
 
 
+## 死人身上的殘頁落到別人手上
+func _pass_page(dead: Person, it: String) -> void:
+	var near := at(dead.location).filter(func(o): return o != dead)
+	var pool: Array = near if not near.is_empty() else others().filter(func(o): return o != dead)
+	if pool.is_empty():
+		return
+	var o: Person = pool[rng.randi_range(0, pool.size() - 1)]
+	o.give_item(it)
+	_tell(NewsData.PAGE_PASSED.replace("{p:who}", "{p:%s}" % dead.id).replace("{p:to}", "{p:%s}" % o.id))
+
+
 ## 換人接著玩：上一個人死了，東西交給接手的人，仇人也記到他頭上
 func pass_on(heir_id: String) -> void:
 	var old := hero()
@@ -761,6 +788,7 @@ func pass_on(heir_id: String) -> void:
 	heir.jobs.clear()
 	heir.school_jobs.clear()
 	heir.claims.clear()
+	heir.shield = heir.shield or old.shield
 	heir.heard = old.heard.duplicate()
 	heir.seen = old.seen.duplicate()
 	heir.target = ""

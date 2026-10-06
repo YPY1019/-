@@ -55,6 +55,12 @@ var books: Array[String] = []
 ## 庭主交代的事：交代過了沒、劍譜拿回去給他看過了沒
 var errand_given := false
 var errand_reported := false
+## 拿給庭主看過的殘頁
+var errand_pages: Array = []
+## 有劍庭的圓盾（學了劍庭的招才有。劍庭的招要一手劍一手盾）
+var shield := false
+## 世界上的人：要拿去城裡武器店賣的東西（回到城裡才賣）
+var to_sell: Array = []
 ## 跟誰打過（看過他出手，人物面板才列得出他會的招）
 var fought: Array[String] = []
 ## 辦完還沒回去交差的事：[{"from": guild 公會 / school 劍庭, "what", "money", "merit"}]
@@ -306,7 +312,7 @@ func power() -> float:
 	var w_power: float = WeaponData.get_def(weapon)["power"]
 	var p := 0.6 * hi + 0.4 * lo + (w_power - 1.0) * GrowthData.POWER_PER_WEAPON
 	for b in BookData.BOOKS:
-		if knows(BookData.BOOKS[b]["move"]):
+		if not BookData.BOOKS[b].has("page_of") and knows(BookData.BOOKS[b]["move"]):
 			p += GrowthData.POWER_PER_ULT
 	return p
 

@@ -420,6 +420,8 @@ func _build_items(p: Person, me: bool) -> void:
 			l.tooltip_text = UiKit.weapon_tooltip(def)
 			l.mouse_filter = Control.MOUSE_FILTER_STOP
 		items_box.add_child(l)
+	if p.shield:
+		items_box.add_child(UiKit.label("劍庭的圓盾", 18))
 	for b in p.books:
 		if me:
 			items_box.add_child(UiKit.book_label(b, 18))

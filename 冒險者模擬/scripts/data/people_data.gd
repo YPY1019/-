@@ -20,7 +20,7 @@ const PEOPLE := {
 	"roderick": {
 		"name": "羅德里克", "title": "傭兵隊長", "pron": "他", "age": 38, "life": [56, 64],
 		"style": "merc_captain", "hp": 450, "stats": {"str": 20, "agi": 20}, "potential": {"str": 20, "agi": 20}, "growth": 0.0,
-		"weapon": "red_fang", "learned": ["knee", "fallstone", "deflect", "triple", "needle"], "items": ["verdict_book"], "place": "wheat", "haunts": ["wheat", "relay", "bridge"],
+		"weapon": "red_fang", "learned": ["knee", "fallstone", "deflect", "triple", "needle"], "items": ["verdict_1"], "place": "wheat", "haunts": ["wheat", "relay", "bridge"],
 		"role": "villain",
 		"bounty": {"reward": 300, "text": "傭兵團「紅鬃」洗劫了東邊的兩個村子。商會懸賞隊長羅德里克的人頭。"},
 		"start": ["一個獨眼的高個子從人群裡走出來，拔出一把暗紅色的劍：「就是你要拿我的人頭？」"],
@@ -31,7 +31,7 @@ const PEOPLE := {
 		"style": "merc_captain", "hp": 200, "stats": {"str": 16, "agi": 16}, "potential": {"str": 19, "agi": 18}, "growth": 0.8,
 		"weapon": "knight_sword", "learned": ["knee", "fallstone", "triple"], "items": [], "place": "wheat",
 		"role": "follower", "follows": "roderick", "relations": {"roderick": "boss"},
-		"start": ["一個臉上有疤的傭兵拔出長劍，往你走過來：「隊長的劍，你也配拿？」"],
+		"start": ["一個臉上有疤的傭兵拔出長劍，往你走過來：「紅鬃的事，你也敢管？」"],
 		"avenge": "「隊長的劍，該回到紅鬃手上。」",
 		"crimes": ["紅鬃的人又在{place}鬧事，帶頭的是一個臉上有疤的傢伙。"],
 	},
@@ -110,13 +110,13 @@ const PEOPLE := {
 	"oskar": {
 		"name": "奧斯卡", "title": "劍術教師", "pron": "他", "age": 41, "life": [54, 64],
 		"style": "old_captain", "hp": 300, "stats": {"str": 20, "agi": 20}, "potential": {"str": 20, "agi": 20}, "growth": 0.0,
-		"weapon": "knight_sword", "learned": ["deflect", "needle", "triple", "knee"], "items": [], "place": "frost",
+		"weapon": "knight_sword", "learned": ["deflect", "needle", "triple", "knee"], "items": ["verdict_3"], "place": "frost",
 		"role": "hunter", "boldness": 0.0, "vow": {"target": "yvette", "month": 8},
 		"start": ["奧斯卡脫下手套，慢慢拔出長劍：「我教人用劍三十年了。」"],
 	},
 	"leonard": {
 		"name": "雷納德", "title": "白手", "pron": "他", "age": 31, "life": [56, 66], "arrive": 100,
-		"style": "old_captain", "hp": 420, "stats": {"str": 23, "agi": 22}, "potential": {"str": 24, "agi": 23}, "growth": 0.3,
+		"style": "old_captain", "hp": 360, "stats": {"str": 20, "agi": 20}, "potential": {"str": 21, "agi": 21}, "growth": 0.3,
 		"weapon": "knight_sword", "learned": ["deflect", "needle", "triple", "knee", "fallstone"], "items": [], "place": "frost",
 		"role": "hunter", "boldness": 0.5,
 		"start": ["雷納德把白手套一根一根摘下來，收進懷裡，才拔出劍。"],
@@ -158,7 +158,7 @@ const PEOPLE := {
 	"grayson": {
 		"name": "葛雷森", "title": "老衛隊長", "pron": "他", "age": 56, "life": [62, 68],
 		"style": "old_captain", "hp": 620, "stats": {"str": 29, "agi": 30}, "potential": {"str": 29, "agi": 30}, "growth": 0.0,
-		"weapon": "nightwatch", "learned": ["deflect", "needle", "triple", "knee", "shed"], "items": [], "place": "frost",
+		"weapon": "nightwatch", "learned": ["deflect", "needle", "triple", "knee", "shed"], "items": ["verdict_2"], "place": "frost",
 		"role": "settled",
 		"start": ["葛雷森慢慢拔出長劍，劍的護手很寬，磨得發亮：「我年輕的時候，也是這樣一個人去找別人麻煩。」"],
 		"warn": "葛雷森在旅店的角落叫住你。他沒有抬頭，看著杯子裡的酒：「布蘭是我兒子。他做的事，我會去管。」\n他停了一下。「別動他。」",
@@ -181,7 +181,7 @@ const PEOPLE := {
 		"style": "raider", "stats": {"str": 13, "agi": 13}, "potential": {"str": 21, "agi": 19}, "growth": 1.4,
 		"weapon": "hand_axe", "learned": ["fb_cleave"], "items": [], "place": "frost",
 		"role": "youth", "grudges": ["ulf"],
-		"start": ["歐拉握緊手斧，一句話都沒說。"],
+		"start": ["歐拉握緊{weapon}，一句話都沒說。"],
 		"arrive_text": "城裡來了一個從北岸逃出來的女孩，背著一把手斧，到處問烏爾夫在哪裡。",
 	},
 	"hogg": {

@@ -80,9 +80,10 @@ static func messages_bbcode(msgs: Array) -> String:
 ## 秘笈的名字：書名號、品級的顏色，滑鼠移上去看說明和要讀多久
 static func book_label(id: String, size := 18) -> Label:
 	var b := BookData.get_def(id)
-	var l := label("《%s》" % b["name"], size)
+	# 殘頁不寫書名號（還不知道是哪一本）
+	var l := label(b["name"] if b.has("page_of") else "《%s》" % b["name"], size)
 	l.add_theme_color_override("font_color", Color(BookData.color(id)))
-	l.tooltip_text = "%s\n讀完要 %s" % [b["desc"], LifeData.span_text(b["months"])]
+	l.tooltip_text = b["desc"] if b.has("page_of") else "%s\n讀完要 %s" % [b["desc"], LifeData.span_text(b["months"])]
 	l.mouse_filter = Control.MOUSE_FILTER_STOP
 	return l
 

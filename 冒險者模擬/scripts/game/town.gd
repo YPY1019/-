@@ -27,6 +27,8 @@ var _fight_person: Person
 var _fight_lethal := true
 ## 打的是同門
 var _fight_kin := false
+## 打的怪物有沒有接委託
+var _fight_has_job := false
 ## 剛打贏、還沒決定殺不殺的人
 var fate_pending: Person = null
 ## 選拔的對手（世界上的人；沒有就是 null）
@@ -68,6 +70,11 @@ func travel(place: String) -> Array:
 	world.look_around()
 	msgs.append(_m("info", "你到了%s。" % MapData.place_name(place)))
 	msgs.append_array(_deliver(place))
+	if MapData.is_city(place):
+		if not claims("guild").is_empty():
+			msgs.append(_m("info", "公會的櫃台後面，有人朝你招手。"))
+		if not claims("school").is_empty():
+			msgs.append(_m("info", "劍庭門口的學徒看見你，進去通報了。"))
 	return msgs
 
 
@@ -124,6 +131,7 @@ func took_job(enemy_id: String) -> bool:
 ## 開打：場景照所在的地方寫
 func start_monster(enemy_id: String) -> Battle:
 	_fight_enemy = enemy_id
+	_fight_has_job = hero.jobs.has(enemy_id) or duels_at(hero.location).has(enemy_id)
 	_fight_person = null
 	loot.clear()
 	var foe := Combatant.from_enemy(enemy_id)
@@ -146,6 +154,8 @@ func finish_monster(battle: Battle) -> Array:
 					var e: Dictionary = EnemyData.ENEMIES[id]
 					_claim("guild", e["name"], TownData.COMMISSIONS[id]["reward"], 0)
 					msgs.append(_m("info", "你帶上能證明的東西，回公會交差。"))
+				elif not _fight_has_job:
+					msgs.append(_m("info", "這一趟沒有人付錢。"))
 			msgs.append_array(_jobs_done("duel", id))
 			msgs.append_array(_after_monster(id))
 		"flee":
@@ -367,9 +377,13 @@ func take_loot(id: String) -> Array:
 	hero.give_item(id)
 	if BookData.is_book(id):
 		var b := BookData.get_def(id)
-		hero.note("拿到劍譜《%s》" % b["name"])
+		hero.note("拿到%s" % _item_name(id))
 		var got: String = b["got"].replace("{p:from}", _fight_person.display_name if _fight_person != null else "")
-		return [_m("epic", got)]
+		var msgs := [_m("epic", got)]
+		# 殘頁湊齊了
+		if b.has("page_of") and BookData.complete(hero.books, id):
+			msgs.append(_m("epic", BookData.get_def(b["page_of"])["complete"]))
+		return msgs
 	var w := WeaponData.get_def(id)
 	if w.get("rare", false):
 		hero.note("拿到%s" % w["name"])
@@ -388,13 +402,15 @@ func after_fight() -> Array:
 
 # ---------- 秘笈 ----------
 
-## 這本現在能不能讀：{"read", "ok", "months", "why"}
+## 這本現在能不能讀：{"read", "ok", "months", "why"}。殘頁要湊齊才能讀（讀的是整本）
 func book_state(id: String) -> Dictionary:
-	var b := BookData.get_def(id)
+	var b := BookData.get_def(BookData.set_of(id))
 	var st := {"read": hero.knows(b["move"]), "ok": false, "months": b["months"], "why": ""}
 	if st["read"]:
 		return st
-	if hero.realm < b.get("realm", 0):
+	if not BookData.complete(hero.books, id):
+		st["why"] = "只有幾張，看不出整套"
+	elif hero.realm < b.get("realm", 0):
 		st["why"] = "還看不懂"
 	elif not in_city():
 		st["why"] = "要在城裡"
@@ -407,7 +423,7 @@ func read_book(id: String) -> Array:
 	var st := book_state(id)
 	if not st["ok"]:
 		return []
-	var b := BookData.get_def(id)
+	var b := BookData.get_def(BookData.set_of(id))
 	var msgs := _pass_months(st["months"], "read", "讀《%s》" % b["name"])
 	if hero.dying():
 		return msgs
@@ -418,25 +434,32 @@ func read_book(id: String) -> Array:
 	return msgs
 
 
-## 庭主交代的事：劍譜拿回來給他看，算一份大功勞。first：他還沒交代，就看見你拿著了
+## 庭主交代的事：找到的殘頁拿回來給他看，一疊算一份功勞，他讓你留著。first：他還沒交代，就看見你拿著了。
+## 庭主不在了，劍庭的人收下。全部看過了，這件事就辦完了
 func _report_errand(first := false) -> Array:
 	var book: String = SchoolData.ERRAND["book"]
-	if hero.errand_reported or not hero.errand_given or not member() or not hero.books.has(book):
+	if hero.errand_reported or not hero.errand_given or not member():
 		return []
-	hero.errand_reported = true
-	var read := hero.knows(BookData.get_def(book)["move"])
-	var text: String = SchoolData.ERRAND["seen" if first else "returned"]
-	var msgs := [_m("epic", text + "\n" + SchoolData.ERRAND["keep_read" if read else "keep"])]
-	msgs.append_array(_merit_now("book"))
+	var pages: Array = BookData.get_def(book)["pages"]
+	var msgs := []
+	var head := world.person(SchoolData.HEAD)
+	for page in pages:
+		if not hero.books.has(page) or hero.errand_pages.has(page):
+			continue
+		hero.errand_pages.append(page)
+		var text: String = SchoolData.ERRAND["gone" if head == null or head.dead else ("seen" if first else "returned")]
+		var done := BookData.complete(hero.books, page)
+		msgs.append(_m("epic", text + "\n" + SchoolData.ERRAND["keep_done" if done else "keep"]))
+		msgs.append_array(_merit_now("book"))
+		first = false
+	if hero.errand_pages.size() >= pages.size():
+		hero.errand_reported = true
 	return msgs
 
 
-## 庭主交代的話：劍譜還在羅德里克身上，還是已經不知道到誰手上了
+## 庭主交代的話
 func errand_ask() -> String:
-	var r := world.person(SchoolData.ERRAND["holder"])
-	if r != null and not r.dead and r.has_item(SchoolData.ERRAND["book"]):
-		return SchoolData.ERRAND["ask"]
-	return SchoolData.ERRAND["ask_lost"]
+	return SchoolData.ERRAND["ask"]
 
 
 # ---------- 基礎數值成長 ----------
@@ -616,6 +639,10 @@ func _learn(id: String, months: int) -> Array:
 	hero.learn(id)
 	hero.note("學會「%s」" % move_name)
 	msgs.append(_m("good", "你學會了「%s」。" % move_name))
+	# 劍庭的招一手劍一手盾：第一次學，劍庭給你一面盾
+	if MoveData.school(id) == SchoolData.ID and not hero.shield:
+		hero.shield = true
+		msgs.append(_m("info", "劍庭的人拿來一面圓盾，盾面上畫著一頭站起來的獅子。"))
 	return msgs
 
 
@@ -671,6 +698,11 @@ func start_spar() -> Battle:
 	hero.selection_year = year
 	var me := hero.to_combatant(true)
 	me.yield_hp = roundi(me.max_hp * SchoolData.MATCH_YIELD)
+	# 選拔用木劍：你的武器不算
+	me.weapon_id = WeaponData.START
+	me.weapon = "木劍"
+	me.attack_mult = 1.0
+	me.weapon_fx = ""
 	var p := _applicant()
 	var foe: Combatant
 	if p != null:
@@ -681,6 +713,10 @@ func start_spar() -> Battle:
 	else:
 		foe = Combatant.from_enemy(SchoolData.SPAR_ENEMY)
 		foe.enemy_def = foe.enemy_def.duplicate()
+		# 沒名字的報名者也給個名字
+		var pick: Array = PeopleData.NEWCOMER_NAMES[world.rng.randi_range(0, PeopleData.NEWCOMER_NAMES.size() - 1)]
+		foe.display_name = pick[0]
+		foe.pron = pick[1]
 		_selection_foe = null
 	foe.weapon = "木劍"
 	foe.enemy_def["scene"] = [SchoolData.SELECTION_TEXT]
@@ -700,10 +736,10 @@ func finish_spar(battle: Battle) -> Array:
 		hero.note("通過獅心劍庭的選拔")
 		msgs.append(_m("big", "庭主在名冊上寫下你的名字。你成了獅心劍庭的學徒。"))
 		hero.errand_given = true
-		if hero.books.has(SchoolData.ERRAND["book"]):
-			msgs.append_array(_report_errand(true))
-		else:
+		var found := _report_errand(true)
+		if found.is_empty():
 			msgs.append(_m("big", errand_ask()))
+		msgs.append_array(found)
 	else:
 		msgs.append(_m("info", "這次沒選上。"))
 		if _selection_foe != null:
@@ -817,7 +853,7 @@ func _merit_now(id: String) -> Array:
 	hero.school_jobs.erase(id)
 	hero.merit += j["merit"]
 	hero.merit_total += j["merit"]
-	return [_m("good", "劍庭記下了你這份功勞（貢獻 %d）。" % hero.merit)]
+	return [_m("good", "劍庭記下了你這份功勞（貢獻 +%d）。" % j["merit"])]
 
 
 ## 打贏了人、討伐了人：有接劍庭的事就算辦完了
@@ -858,7 +894,7 @@ func turn_in(from: String) -> Array:
 	if merit > 0:
 		hero.merit += merit
 		hero.merit_total += merit
-		msgs.append(_m("good", "劍庭記下了你這份功勞（貢獻 %d）。" % hero.merit))
+		msgs.append(_m("good", "劍庭記下了你這份功勞（貢獻 +%d）。" % merit))
 	return msgs
 
 
@@ -895,6 +931,10 @@ func start_trial() -> Battle:
 		foe.enemy_def["scene"] = [SchoolData.TRIALS[st["rank"]]["text"]]
 	else:
 		foe = Combatant.from_enemy(SchoolData.TRIALS[st["rank"]]["fallback"])
+		# 升大師本來是庭主下場；庭主不在了，換劍庭最老的大師
+		var head := world.person(SchoolData.HEAD)
+		if st["rank"] == 3 and (head == null or head.dead):
+			foe.display_name = "劍庭的老大師"
 	foe.yield_hp = roundi(foe.max_hp * SchoolData.MATCH_YIELD)
 	return Battle.new([me], [foe])
 
@@ -966,7 +1006,8 @@ func equip(id: String) -> Array:
 
 func _item_name(id: String) -> String:
 	if BookData.is_book(id):
-		return "《%s》" % BookData.get_def(id)["name"]
+		var b := BookData.get_def(id)
+		return b["name"] if b.has("page_of") else "《%s》" % b["name"]
 	return WeaponData.get_def(id)["name"]
 
 

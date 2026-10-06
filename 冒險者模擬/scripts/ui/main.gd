@@ -209,10 +209,11 @@ func _on_battle_ended() -> void:
 		_:
 			_settled = town.finish_spar(battle)
 	battle_view.show_settlement(_settled)
-	if not town.loot.is_empty():
-		battle_view.show_loot(town.hero, town.loot)
+	# 打贏了人：先決定殺不殺，再看他身上的東西
 	if fight_kind == "person" and town.fate_pending != null:
 		battle_view.show_fate(town.fate_pending.pron)
+	elif not town.loot.is_empty():
+		battle_view.show_loot(town.hero, town.loot)
 
 
 ## 殺了他，還是放他走
@@ -220,6 +221,8 @@ func _fate_chosen(kill: bool) -> void:
 	var msgs := town.decide_fate(kill)
 	_settled.append_array(msgs)
 	battle_view.show_settlement(msgs)
+	if not town.loot.is_empty():
+		battle_view.show_loot(town.hero, town.loot)
 
 
 ## 拿到的東西接在結算後面，回主畫面時一起寫進紀錄

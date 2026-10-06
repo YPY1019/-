@@ -153,9 +153,7 @@ func _record(ev: Array) -> void:
 			"round":
 				record.append("── %s ──" % e["text"])
 			"tell", "intent":
-				record.append("▶ " + _named(e))
-			"action":
-				record.append(_named(e))
+				record.append("▶ " + e["text"])
 			"damage_in", "damage_out":
 				record.append("　%s −%d（%s）" % [e["text"], e["amount"], e["note"]])
 			_:
@@ -274,7 +272,7 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 	# 先吃虧：對手露出破綻，還拿得起兵器擋，你的劍常常砍到兵器上（絕學不會）
 	if not m.get("ult", false) and e.get("deal", 0.0) > 0.0 and big_opening(target) and can_parry(target) \
 			and rng.randf() < guard_chance(ally, move_id, target):
-		e = {"deal": e["deal"] * GUARDED_DEAL, "text": target.enemy_def["parry"]}
+		e = {"deal": e["deal"] * GUARDED_DEAL, "text": target.enemy_def["parry"], "guarded": true}
 	if m.get("ult", false):
 		# 絕學：先寫起手，喊出招名，再寫結果
 		ev.append(_ev("action", target.fill(_pick(m["pre"]))))
@@ -305,11 +303,7 @@ func _show_age(ally: Combatant, ev: Array) -> void:
 ## 你這招的結果 e 寫出來、算傷害和效果
 func _land_player(ally: Combatant, move_id: String, e: Dictionary, target: Combatant, ev: Array) -> Dictionary:
 	var m: Dictionary = MoveData.MOVES[move_id]
-	var line := _ev("action", target.fill(_pick(_text_for(ally, e))))
-	# 學來的招：戰報前面標出招名（絕學另外大字喊出來）
-	if not MoveData.is_basic(move_id) and not m.get("ult", false):
-		line["move"] = move_id
-	ev.append(line)
+	ev.append(_named_ev("action", target.fill(_pick(_text_for(ally, e))), move_id))
 	if e.get("failed", false):
 		ev.append(_ev("stat", "（失敗。%s：%s）" % [GrowthData.NAMES[m["stat"]], _compare(ally, target, m["stat"])]))
 
@@ -329,7 +323,7 @@ func _land_player(ally: Combatant, move_id: String, e: Dictionary, target: Comba
 			if rng.randf() < 0.4:
 				ev.append(_ev("action", target.fill(_pick(st["lines"]))))
 	if deal > 0.0:
-		_damage_enemy(ally, target, move_id, deal, ev)
+		_damage_enemy(ally, target, move_id, deal, ev, e)
 	if ally.stance == "lionheart" and MoveData.DEFENSE.has(move_id) and not e.get("failed", false) and e.get("take", 1.0) < 1.0 \
 			and target.intent.get("phase", "") in ["do", "strike", "hold"]:
 		ally.braced = true
@@ -508,8 +502,16 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 	# 差很多時換寫法：你高很多，打中了也不痛；對手高很多，一下就知道差多少
 	var g := gap(enemy, target, stat)
 	var shrug := power > 0.0 and g <= -GrowthData.OUTCLASS
+	# 附加效果也看差距：你那一項比對手高越多，越常沒用。沒用的話，打中的句子換成擋掉的句子（不然前一句才寫被抱起來，下一句又寫甩開了）
+	var resisted := on_hit != "" and rng.randf() >= GrowthData.success_chance(g)
+	if resisted:
+		if show_hit:
+			ev.append(_ev("action", enemy.fill(_pick(EnemyData.RESIST[on_hit]))))
+			show_hit = false
+		on_hit = ""
 	if show_hit:
-		ev.append(_ev("action", enemy.fill(_pick(MoveData.HURT["shrug"] if shrug else hits))))
+		var move: String = enemy.action_def(enemy.intent["action"]).get("move", "") if enemy.intent.get("action", "") != "" else ""
+		ev.append(_named_ev("action", enemy.fill(_pick(MoveData.HURT["shrug"] if shrug else hits)), move))
 	if power > 0.0:
 		var dmg := maxi(1, roundi(damage_in(enemy, target, power, stat) * take * _spread()))
 		# 你拿著守夜人：常用護手把這一下架開
@@ -527,10 +529,6 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 		if hurt != "":
 			ev.append(_ev("pain", hurt))
 		_weapon_fx_in(enemy, target, dmg, ev)
-	# 附加效果也看差距：你那一項比對手高越多，越常沒用
-	if on_hit != "" and rng.randf() >= GrowthData.success_chance(gap(enemy, target, stat)):
-		ev.append(_ev("action", enemy.fill(_pick(EnemyData.RESIST[on_hit]))))
-		on_hit = ""
 	match on_hit:
 		"":
 			pass
@@ -581,22 +579,24 @@ func _weapon_fx_out(ally: Combatant, enemy: Combatant, dmg: int, ev: Array) -> v
 				_fell(enemy, ev)
 		"knell":
 			# 下回合露出破綻（斷岳出得來）
-			enemy.forced_next = "stagger"
+			enemy.forced_next = "jolt"
 
 
-func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: float, ev: Array) -> void:
+## e：你這招的結果。失敗的招、砍在兵器上的（guarded）不寫對手痛的樣子（戰報已經寫了沒砍實），也不會把人砍倒
+func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: float, ev: Array, e := {}) -> void:
+	var weak: bool = e.get("failed", false) or e.get("guarded", false)
 	var m: Dictionary = MoveData.MOVES[move_id]
 	var raw := damage_out(ally, move_id, enemy, deal) * _spread()
 	# 碎門者砍得穿甲
 	if not m.get("pierce", false) and ally.weapon_fx != "rend":
 		raw *= EnemyData.ARMOR_MULT[enemy.armor]
 	var dmg := maxi(1, roundi(raw))
-	# 對手拿著守夜人：常用護手把你的劍架開（絕學架不開）
-	if enemy.weapon_fx == "ward" and not m.get("ult", false) and (not enemy.fx_shown or rng.randf() < WeaponData.FX_CHANCE):
+	# 對手拿著守夜人：常用護手把你的劍架開（絕學、剋制成功的招架不開，戰報已經寫了砍實）
+	if enemy.weapon_fx == "ward" and not m.get("ult", false) and not e.get("good", false) and not weak and (not enemy.fx_shown or rng.randf() < WeaponData.FX_CHANCE):
 		enemy.fx_shown = true
 		dmg = maxi(1, roundi(dmg * WeaponData.WARD_TAKE))
 		ev.append(_ev("fx", enemy.fill(_pick(WeaponData.FX_TEXT["ward"]["in"]))))
-	enemy.hp = maxi(0, enemy.hp - dmg)
+	enemy.hp = maxi(1 if weak else 0, enemy.hp - dmg)
 	var s: String = m["stat"]
 	ev.append({"kind": "damage_out", "text": enemy.display_name, "amount": dmg,
 		"note": "%s %d 對 %d" % [GrowthData.NAMES[s], ally.stats[s], enemy.stats[s]]})
@@ -606,7 +606,9 @@ func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: flo
 	# 差很多時換寫法：你高很多，對手被打飛；對手高很多，砍中了也沒用
 	var pain: Dictionary = enemy.enemy_def["pain"]
 	var g := gap(ally, enemy, s)
-	if enemy.hp <= enemy.max_hp * 0.25:
+	if weak:
+		pass
+	elif enemy.hp <= enemy.max_hp * 0.25:
 		# 快撐不住的樣子第一次一定寫，之後偶爾寫，不然每回合都一樣
 		if not enemy.said_dying or rng.randf() < 0.3:
 			ev.append(_ev("pain", enemy.fill(_pick(pain["dying"]))))
@@ -682,12 +684,9 @@ func _choose_intents(ev: Array) -> void:
 		# 一般的出手不單獨寫一行（只進試玩紀錄）；蓄勢、破綻、被抱住、對手用出學來的招，才寫進戰報
 		var move: String = enemy.action_def(intent["action"]).get("move", "") if intent.get("action", "") != "" and intent["phase"] in ["do", "windup"] else ""
 		var quiet: bool = intent["phase"] == "do" and intent["type"] != "opening" and move == ""
-		var line := _ev("intent" if quiet else "tell", intent["text"])
-		if move != "":
-			line["move"] = move
-			if enemy.person != null and allies[0].person != null:
-				allies[0].person.saw_move(enemy.person.id, move)
-		ev.append(line)
+		if move != "" and enemy.person != null and allies[0].person != null:
+			allies[0].person.saw_move(enemy.person.id, move)
+		ev.append(_ev("intent" if quiet else "tell", intent["text"]))
 
 
 func _remember(enemy: Combatant, id: String) -> void:
@@ -769,6 +768,10 @@ func _habit_matches(enemy: Combatant, h: Dictionary) -> bool:
 
 ## 隨機挑一句。同一場先挑還沒用過（用得最少）的，全部用過才會重複
 func _pick(list: Array) -> String:
+	# 有說話（「」）的句子一場只說一次（還有別句可選的話）
+	var fresh_talk := list.filter(func(s): return not (s.contains("「") and line_uses.get(s, 0) > 0))
+	if not fresh_talk.is_empty():
+		list = fresh_talk
 	var least := INF
 	for s in list:
 		least = minf(least, line_uses.get(s, 0))
@@ -809,11 +812,13 @@ func _ev(kind: String, text: String) -> Dictionary:
 
 
 
-## 試玩紀錄：有招名的句子前面標出招名
-func _named(e: Dictionary) -> String:
-	if e.has("move"):
-		return MoveData.call_name(e["move"]) + e["text"]
-	return e["text"]
+## 招奏效的句子：{move} 換成招名，標出是哪一招（畫面用招的等級顏色）
+func _named_ev(kind: String, text: String, move_id: String) -> Dictionary:
+	var e := _ev(kind, text)
+	if move_id != "" and e["text"].contains("{move}"):
+		e["text"] = e["text"].replace("{move}", MoveData.call_name(move_id))
+		e["move"] = move_id
+	return e
 
 
 ## 你受傷後的反應：快撐不住、重傷、或偶爾一句輕傷

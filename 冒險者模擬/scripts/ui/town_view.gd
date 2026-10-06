@@ -334,12 +334,19 @@ func _build_me() -> void:
 
 	if not h.books.is_empty():
 		me_box.add_child(UiKit.heading("秘笈"))
+		var shown := []
 		for id in h.books:
 			var st := town.book_state(id)
 			var row := UiKit.hbox(10)
 			var n := UiKit.book_label(id, 18)
 			n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(n)
+			# 殘頁：同一本只在第一張旁邊放一個讀的按鈕（湊齊了才按得下去）
+			var set_id := BookData.set_of(id)
+			if shown.has(set_id):
+				me_box.add_child(row)
+				continue
+			shown.append(set_id)
 			if st["read"]:
 				row.add_child(UiKit.label("讀過", 16, 0.5))
 			else:
