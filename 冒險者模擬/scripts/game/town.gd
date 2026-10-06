@@ -656,15 +656,20 @@ func _report_errand(first := false) -> Array:
 	var pages: Array = BookData.get_def(book)["pages"]
 	var msgs := []
 	var head := world.person(SchoolData.HEAD)
+	var brought := 0
 	for page in pages:
-		if not hero.books.has(page) or hero.errand_pages.has(page):
-			continue
-		hero.errand_pages.append(page)
+		if hero.books.has(page) and not hero.errand_pages.has(page):
+			hero.errand_pages.append(page)
+			brought += 1
+	if brought > 0:
+		# 一次拿回好幾疊，只寫一次
 		var text: String = SchoolData.ERRAND["gone" if head == null or head.dead else ("seen" if first else "returned")]
-		var done := BookData.complete(hero.books, page)
+		var done := BookData.complete(hero.books, pages[0])
 		msgs.append(_m("epic", text + "\n" + SchoolData.ERRAND["keep_done" if done else "keep"]))
-		msgs.append_array(_merit_now("book"))
-		first = false
+		var merit: int = SchoolData.JOBS["book"]["merit"] * brought
+		hero.merit += merit
+		hero.merit_total += merit
+		msgs.append(_m("good", "劍庭記下了你這份功勞（貢獻 +%d）。" % merit))
 	if hero.errand_pages.size() >= pages.size():
 		hero.errand_reported = true
 	return msgs
@@ -886,6 +891,8 @@ func spar_state() -> Dictionary:
 		st["why"] = "選拔在 %s" % SchoolData.selection_text()
 	elif hero.selection_year == LifeData.year_of(world.month()):
 		st["why"] = "今年考過了"
+	elif hero.hp < hero.max_hp() * SchoolData.FIT_HP:
+		st["why"] = "身上的傷還沒好"
 	else:
 		st["ok"] = true
 	return st
@@ -905,7 +912,7 @@ func start_spar() -> Battle:
 	_fight_person = null
 	var year := LifeData.year_of(world.month())
 	hero.selection_year = year
-	var me := hero.to_combatant(true)
+	var me := hero.to_combatant()
 	me.yield_hp = roundi(me.max_hp * SchoolData.MATCH_YIELD)
 	# 選拔用木劍：你的武器不算
 	me.weapon_id = WeaponData.START
@@ -939,6 +946,7 @@ func start_spar() -> Battle:
 ## 輸了：明年春天再來；贏你的那個人選上了
 func finish_spar(battle: Battle) -> Array:
 	var msgs := []
+	hero.hp = maxi(1, battle.result()["hp"])
 	if battle.result()["outcome"] == "win":
 		hero.school = SchoolData.ID
 		hero.rank = 1
@@ -1118,6 +1126,8 @@ func trial_state() -> Dictionary:
 		st["opponent"] = p.id
 	if hero.merit_total < t["merit_total"]:
 		st["why"] = "替劍庭做的事還不夠多"
+	elif hero.hp < hero.max_hp() * SchoolData.FIT_HP:
+		st["why"] = "身上的傷還沒好"
 	elif not in_city():
 		st["why"] = "要在城裡"
 	else:
@@ -1129,7 +1139,7 @@ func trial_state() -> Dictionary:
 func start_trial() -> Battle:
 	var st := trial_state()
 	_fight_person = null
-	var me := hero.to_combatant(true)
+	var me := hero.to_combatant()
 	me.yield_hp = roundi(me.max_hp * SchoolData.MATCH_YIELD)
 	var foe: Combatant
 	if st["opponent"] != "":
@@ -1151,6 +1161,7 @@ func start_trial() -> Battle:
 func finish_trial(battle: Battle) -> Array:
 	var st := trial_state()
 	var msgs := []
+	hero.hp = maxi(1, battle.result()["hp"])
 	if battle.result()["outcome"] == "win":
 		hero.rank = st["rank"]
 		hero.note("在公開比試升為%s" % SchoolData.RANKS[hero.rank])

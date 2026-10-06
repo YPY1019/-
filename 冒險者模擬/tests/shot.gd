@@ -189,6 +189,7 @@ func _init() -> void:
 	h.rank = max(h.rank, 1)
 	h.merit_total = 40
 	h.merit = 40
+	h.hp = h.max_hp()
 	main._start_trial()
 	main.battle_view._skip()
 	await _frames(3)

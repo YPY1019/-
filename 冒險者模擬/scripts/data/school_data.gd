@@ -64,6 +64,8 @@ const TRIALS := {
 		"text": "庭主親自下場。中庭裡站滿了人，連街上的人都擠在門口看。"},
 }
 const MATCH_YIELD := 0.4
+## 選拔、比試要血量有這個比例以上才能上場（帶著傷上去，比試就照現在的血打）
+const FIT_HP := 0.6
 
 ## 架勢：會 need 招以上劍庭的招就生效。擋下一招之後，下一劍重 bonus 倍
 const STANCE := {

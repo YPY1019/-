@@ -103,6 +103,7 @@ func _show(view: Control, refresh := true) -> void:
 ## w：Town.take_wait() 那一段。在主畫面裡跳年月，跳的時候按鈕按不了。after：跳完之後
 func _wait(w: Dictionary, after: Callable) -> void:
 	_show(town_view, false)
+	town_view.refresh_status()
 	blocker.visible = true
 	town_view.play_wait(w, func():
 		blocker.visible = false
@@ -319,8 +320,9 @@ func _close_battle() -> void:
 		town_view.add_messages(msgs)
 		_after_time()
 		return
+	# 打輸了：先寫被救回來，再跳養傷的年月
+	town_view.add_messages(msgs)
 	_wait(w, func():
-		town_view.add_messages(msgs)
 		_after_time())
 
 

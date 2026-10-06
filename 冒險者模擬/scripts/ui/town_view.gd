@@ -207,9 +207,19 @@ func _pick_line(list: Array) -> String:
 	return list[_rng.randi_range(0, list.size() - 1)]
 
 
-func refresh() -> void:
+## 上面那排：年月、錢、血量（等的時候先更新血量，不然打輸了還顯示滿血）
+func refresh_status() -> void:
 	var h := town.hero
 	date_label.text = h.date_text()
+	money_label.text = "%d 銀" % h.money
+	hp_label.text = "血量 %d / %d" % [h.hp, h.max_hp()]
+	hp_bar.max_value = h.max_hp()
+	hp_bar.value = h.hp
+
+
+func refresh() -> void:
+	var h := town.hero
+	refresh_status()
 	place_label.text = "往%s的路上" % MapData.place_name(h.location) if h.travel_left > 0 else MapData.place_name(h.location)
 	var home := MapData.distance(h.location, MapData.HOME)
 	home_button.visible = home > 0 and not h.dying()
@@ -348,12 +358,15 @@ func _build_me() -> void:
 		for id in h.books:
 			var st := town.book_state(id)
 			var row := UiKit.hbox(10)
-			var n := UiKit.book_label(id, 18)
+			# 殘頁湊齊了就是一本書（寫書名）；還沒湊齊只寫殘頁，不能讀
+			var set_id := BookData.set_of(id)
+			var whole := BookData.complete(h.books, id)
+			if shown.has(set_id) and whole:
+				continue
+			var n := UiKit.book_label(set_id if whole else id, 18)
 			n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(n)
-			# 殘頁：同一本只在第一張旁邊放一個讀的按鈕（湊齊了才按得下去）
-			var set_id := BookData.set_of(id)
-			if shown.has(set_id):
+			if not whole:
 				me_box.add_child(row)
 				continue
 			shown.append(set_id)
