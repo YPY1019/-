@@ -540,6 +540,28 @@ func _expel() -> Array:
 	return [_m("bad", "消息傳回劍庭。第二天，你的名字從劍庭的名冊上劃掉了。")]
 
 
+# ---------- 招式欄 ----------
+
+## 能不能換招：只有在城裡能換。{"ok", "why"}
+func equip_state(id: String) -> Dictionary:
+	var h := hero
+	if not in_city():
+		return {"ok": false, "why": "要在城裡"}
+	if not h.equipped.has(id) and h.equipped.size() >= h.slots():
+		return {"ok": false, "why": "帶不下了，先放下一招"}
+	return {"ok": true, "why": ""}
+
+
+## 帶上或放下一招
+func toggle_equip(id: String) -> void:
+	if not hero.learned.has(id) or not equip_state(id)["ok"]:
+		return
+	if hero.equipped.has(id):
+		hero.equipped.erase(id)
+	else:
+		hero.equipped.append(id)
+
+
 ## 在公會打聽一個人的下落：付錢，之後幾個月都知道他在哪（地圖上標出來）。要在城裡
 func inquire_state(id: String) -> Dictionary:
 	var p := world.person(id)

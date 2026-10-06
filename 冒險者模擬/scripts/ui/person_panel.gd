@@ -295,6 +295,8 @@ func _build_moves(p: Person, me: bool) -> void:
 		var why := "你沒見過%s出手。" % p.pron if not town.hero.fought.has(p.id) else "你沒見過%s用什麼有名堂的招。" % p.pron
 		moves_box.add_child(UiKit.label(why, 18, 0.6))
 		return
+	if me and p.uses_slots:
+		_build_loadout(p)
 	var bar := UiKit.hbox(6)
 	moves_box.add_child(bar)
 	for k in KIND_TABS:
@@ -330,6 +332,35 @@ func _build_moves(p: Person, me: bool) -> void:
 		any = true
 	if not any:
 		moves_box.add_child(UiKit.label("沒有。", 18, 0.6))
+
+
+## 招式欄：帶在身上的招（打架只用得出這些和人人都會的），在城裡才能換
+func _build_loadout(p: Person) -> void:
+	moves_box.add_child(UiKit.label("帶在身上的招（%d／%d）" % [p.equipped.size(), p.slots()], 17, 0.8))
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 4)
+	moves_box.add_child(grid)
+	var list := p.learned.duplicate()
+	list.sort_custom(func(a, b): return MoveData.grade(a) > MoveData.grade(b))
+	for id in list:
+		var on := p.equipped.has(id)
+		var n := UiKit.label(MoveData.MOVES[id]["name"], 18, 1.0 if on else 0.5)
+		n.add_theme_color_override("font_color", Color(MoveData.color(id)) if on else Color("#8a919c"))
+		n.tooltip_text = _move_tip(id)
+		n.mouse_filter = Control.MOUSE_FILTER_STOP
+		n.custom_minimum_size.x = 110
+		grid.add_child(n)
+		var st := town.equip_state(id)
+		var b := UiKit.button("放下" if on else "帶上", 70, 32)
+		b.disabled = not st["ok"]
+		b.tooltip_text = st["why"]
+		b.pressed.connect(func():
+			town.toggle_equip(id)
+			refresh())
+		grid.add_child(b)
+	moves_box.add_child(HSeparator.new())
 
 
 func _in_kinds(id: String, kinds: Array) -> bool:

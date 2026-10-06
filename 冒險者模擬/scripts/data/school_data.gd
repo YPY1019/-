@@ -158,8 +158,8 @@ static func is_member(p: Person) -> bool:
 ## 會幾招這派的招
 static func moves_known(p: Person, school := ID) -> int:
 	var n := 0
-	for id in MoveData.MOVES:
-		if MoveData.school(id) == school and p.knows(id):
+	for id in p.active_moves():
+		if MoveData.school(id) == school:
 			n += 1
 	return n
 

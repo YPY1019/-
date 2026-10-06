@@ -220,6 +220,7 @@ func make_hero(name: String, pron: String) -> Person:
 	h.born_year = -LifeData.START_AGE
 	h.dies_at = LifeData.roll_dies_at(rng, h.born_year, LifeData.LIFESPAN_MIN, LifeData.LIFESPAN_MAX, month())
 	h.hp = h.max_hp()
+	h.uses_slots = true
 	people[h.id] = h
 	hero_id = h.id
 	return h
@@ -1022,6 +1023,11 @@ func pass_on(heir_id: String) -> void:
 	heir.jobs.clear()
 	heir.school_jobs.clear()
 	heir.claims.clear()
+	# 接手的人也只能帶幾招：先帶他會的、照等級高的帶
+	heir.uses_slots = true
+	var moves := heir.learned.duplicate()
+	moves.sort_custom(func(a, b): return MoveData.grade(a) > MoveData.grade(b))
+	heir.equipped.assign(moves.slice(0, heir.slots()))
 	heir.shield = heir.shield or old.shield
 	heir.heard = old.heard.duplicate()
 	heir.seen = old.seen.duplicate()

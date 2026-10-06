@@ -191,12 +191,12 @@ func _deal_hands() -> void:
 		ally.hand.clear()
 		if ally.held:
 			for id in MoveData.HELD:
-				if MoveData.is_basic(id) or ally.person.knows(id):
+				if MoveData.is_basic(id) or ally.person.active_moves().has(id):
 					ally.hand.append(id)
 			notes.append("你被抱住了。")
 		else:
 			# 一般招和學來的招放在同一個池子裡抽，沒有永遠都在的招
-			var pool: Array = MoveData.BASIC + ally.person.learned
+			var pool: Array = MoveData.BASIC + ally.person.active_moves()
 			# 收招慢的招（裂盾斬），用完下回合不能再用
 			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
 				pool.erase(ally.used[-1])

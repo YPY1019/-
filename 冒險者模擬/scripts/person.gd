@@ -67,6 +67,11 @@ var fought: Array[String] = []
 var claims: Array = []
 ## 劍庭的事：辦完之後第幾個月才會再有（世界的月）
 var job_back := {}
+## 招式欄：玩家角色一次只能帶幾招出門（人人都會的不佔格子）。世界上的人不用（會的都帶著）
+var uses_slots := false
+var equipped: Array[String] = []
+const SLOT_BASE := 3
+const SLOT_MAX := 8
 ## 名聲：打贏有名的人就變有名（強者榜照這個排，不寫出數字）
 var fame := 0.0
 ## 在公會打聽的人：人 id -> 消息斷掉的那個月（世界的月）
@@ -242,6 +247,19 @@ func knows(move_id: String) -> bool:
 func learn(move_id: String) -> void:
 	if not learned.has(move_id):
 		learned.append(move_id)
+		# 學會的招，格子還有空就先帶上
+		if uses_slots and equipped.size() < slots():
+			equipped.append(move_id)
+
+
+## 招式欄有幾格：第一境 SLOT_BASE 格，每升一境多一格
+func slots() -> int:
+	return mini(SLOT_BASE + realm, SLOT_MAX)
+
+
+## 打架時用得出來的招（學來的）：玩家角色是帶在身上的，世界上的人是會的全部
+func active_moves() -> Array:
+	return equipped if uses_slots else learned
 
 
 ## 長 1 點要多少經驗（看境界）

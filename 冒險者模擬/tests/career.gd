@@ -178,6 +178,10 @@ func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar
 	if not h.claims.is_empty():
 		town.turn_in("guild")
 		town.turn_in("school")
+	# 招式欄：帶等級最高的幾招
+	var best := h.learned.duplicate()
+	best.sort_custom(func(x, y): return MoveData.grade(x) > MoveData.grade(y))
+	h.equipped.assign(best.slice(0, h.slots()))
 	for id in TownData.TRAINING:
 		if town.training_state(id)["ok"]:
 			town.learn_training(id)
