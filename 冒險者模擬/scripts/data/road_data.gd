@@ -20,7 +20,7 @@ extends RefCounted
 ##     有機率，不是一刀切；成功照 ok、不成功照 fail
 ##   結果（寫在選項上，或 ok / fail 裡）：
 ##     text 寫進紀錄的一句；next 接哪一步（沒寫就結束，接著走路）
-##     fight 跟誰打："who"/"other"/"thug" 沒名字的小賊/"stalker" 野獸/EnemyData id；win 打贏了接哪一步
+##     fight 跟誰打："who"/"other"/"thug" 沒名字的小賊/EnemyData id；win 打贏了接哪一步
 ##     duel true 跟 who 比劍（點到為止）
 ##     money 錢 +/-（"purse" 錢袋裡的錢）；rob 被拿走身上幾成的錢；pay 付錢了結他的仇；bribe 付錢讓來收懸賞的人走
 ##     hear "who"/"other"/"lead"/"notable"：知道那個人在哪
@@ -49,13 +49,12 @@ const CHANCE := {
 	"repay": 0.08,
 	"traveler": 0.015,
 	"caravan": 0.01,
-	"stalked": 0.01,
 	"thug": 0.02,
 }
 const AMBUSH_IDLE := 0.06
 ## 同一件事隔多久才會再碰到（月）；同一個人隔多久才會再找你（月）。寫好的事一輩子一次（ONCE）
 const AGAIN := {"robbers": 10, "robbers_shy": 10, "challenge": 18, "kin_help": 36, "merchant": 24, "repay": 18, "traveler": 12,
-	"caravan": 60, "stalked": 60, "thug": 18, "raided": 12, "corpse": 0, "ambush": 0}
+	"caravan": 60, "thug": 18, "raided": 12, "corpse": 0, "ambush": 0}
 const PERSON_AGAIN := 24
 const ONCE := ["corpse"]
 ## 你比他強這麼多（Person.power），攔路的就不敢出來
@@ -241,19 +240,6 @@ const EVENTS := {
 		]},
 		"hero": {"text": "你一個人收拾了摸過來的人。領隊天亮才知道，看你的眼神不一樣了。", "options": [
 			{"label": "繼續走", "money": 60, "fame": 2.0, "text": "分手的時候，領隊數了 60 銀給你，說會跟人提起你。"},
-		]},
-	}},
-	"stalked": {"title": "跟在後面的東西", "steps": {
-		"start": {"text": "天快黑的時候，你聽見後面的草叢裡有東西跟著，一直沒有走遠。", "options": [
-			{"label": "回頭看看", "fight": "stalker"},
-			{"label": "加快腳步", "check": {"stat": "agi", "vs": 12},
-				"ok": {"text": "你加快腳步，走到有人家的地方，那東西沒再跟上來。"},
-				"fail": {"text": "你才走了幾步，牠就從草叢裡竄了出來。", "fight": "stalker"}},
-			{"label": "找地方生火", "next": "fire"},
-		]},
-		"fire": {"text": "你找了塊背風的石頭生起火。火光照出草叢裡兩點綠光，一直沒有靠近。", "options": [
-			{"label": "守到天亮", "text": "天亮的時候，草叢裡什麼都沒有。"},
-			{"label": "拿著火把過去", "fight": "stalker"},
 		]},
 	}},
 	# 沒名字的小賊：活下來就變成世界上的人

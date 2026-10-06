@@ -167,8 +167,6 @@ func _candidates(path: Array) -> Array:
 	if _free("caravan", null):
 		var raider := robbers.filter(func(o): return wild.has(o.location))
 		out.append({"id": "caravan", "chance": RoadData.CHANCE["caravan"], "who": raider[0].id if not raider.is_empty() else "", "at": mid})
-	if h.realm <= 3 and _free("stalked", null):
-		out.append({"id": "stalked", "chance": RoadData.CHANCE["stalked"], "at": mid})
 	if h.realm <= 1 and _free("thug", null):
 		out.append({"id": "thug", "chance": RoadData.CHANCE["thug"], "at": mid})
 	return out
@@ -340,8 +338,6 @@ func answer(choice: String) -> Dictionary:
 				fight = "person:" + st[out["fight"]]
 			"thug":
 				fight = "enemy:highwayman"
-			"stalker":
-				fight = "enemy:" + ("wolf" if h.realm <= 1 else "alpha_wolf")
 			"raider":
 				fight = "person:" + st["who"] if who != null and not who.dead else "enemy:highwayman"
 			_:

@@ -76,7 +76,6 @@ func _init() -> void:
 	_case("有懸賞的人剛搶過的村子", "raided", "roderick", "", "wheat", ["0", "0"])
 	_case("被搶的商人：去追", "merchant", "magnus", "", "wheat", ["0", "0", "1"])
 	_case("商隊：夜裡摸過來的是真的攔路的人", "caravan", "black_knight", "", "relay", ["0", "1", "spare", "0"])
-	_case("跟在後面的東西", "stalked", "", "", "lodge", ["2", "1"])
 	_case("路上的酒館：問你在找的人", "traveler", "leonard_or_any", "", "bridge", ["1", "0"])
 	quit()
 
