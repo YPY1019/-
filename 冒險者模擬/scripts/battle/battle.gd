@@ -311,7 +311,7 @@ func _land_player(ally: Combatant, move_id: String, e: Dictionary, target: Comba
 		ally.used.append(move_id)
 	var deal: float = e.get("deal", 0.0)
 	# 架勢：磐石劍位，剛擋下一招，這一劍借著那股勢子，比較重
-	if ally.stance == "lionheart" and ally.braced and deal > 0.0 and MoveData.OFFENSE.has(move_id):
+	if ally.stance == "lionheart" and ally.braced and deal > 0.0 and MoveData.OFFENSE.has(move_id) and not m.get("ult", false):
 		deal *= SchoolData.STANCE["bonus"]
 		ally.braced = false
 		ev.append(_ev("action", target.fill(_pick(SchoolData.STANCE["lines"]))))

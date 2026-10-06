@@ -105,10 +105,15 @@ static func from_enemy(id: String) -> Combatant:
 		c.weapon_fx = WeaponData.fx(d["loot"])
 	c.enemy_def = d
 	c.enemy_id = id
-	if d.has("moves"):
+	if d.has("moves") or d.has("move_pool"):
 		c.enemy_def = d.duplicate()
 		var kinds: Array = d.get("kinds", [])
-		add_moves(c.enemy_def, d["moves"], kinds[0] if not kinds.is_empty() else "")
+		var moves: Array = d.get("moves", []).duplicate()
+		# 從 move_pool 隨機挑幾招：同一種對手，每次碰上的人會的不一樣
+		var pool: Array = d.get("move_pool", []).duplicate()
+		pool.shuffle()
+		moves.append_array(pool.slice(0, d.get("pool_n", 0)))
+		add_moves(c.enemy_def, moves, kinds[0] if not kinds.is_empty() else "")
 	return c
 
 

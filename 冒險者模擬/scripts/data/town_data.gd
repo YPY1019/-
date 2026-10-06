@@ -16,26 +16,39 @@ const INJURED_HP := 0.1
 const INJURED_MONTHS := 6
 
 
-## 一般委託（只有討伐）：委託板上的怪物在哪裡出沒（固定一個地方）、報酬多少。sign：走到那裡時看到的痕跡。
+## 一般委託（只有討伐）：委託板上的怪物在哪裡出沒（固定一個地方）、報酬多少。
 ## 危險度從敵人的數值算（EnemyData.danger）。報酬打完回公會交差才拿得到。
 ## 打完一次就撤下來，越打越久才再出現（World.MONSTER_BACK）。有名字的人的懸賞在 World（PeopleData）。
 ## text 的 {place}：這次出沒的地方
 const COMMISSIONS := {
 	"wolf": {"place": "pasture", "reward": 60,
-		"text": "{place}附近的野狼咬死了好幾頭羊。牧場主人請人去把牠解決掉。",
-		"sign": "村外的草地上有幾具被咬開的羊，血還沒乾。"},
+		"text": "{place}附近的野狼咬死了好幾頭羊。牧場主人請人去把牠解決掉。"},
 	"bandit_leader": {"place": "wheat", "reward": 100,
-		"text": "往{place}的路上有盜匪攔路搶劫。鎮長懸賞他們的頭目。",
-		"sign": "林道邊散著被翻過的行李。"},
+		"text": "往{place}的路上有盜匪攔路搶劫。鎮長懸賞他們的頭目。"},
 	"deserter": {"place": "bridge", "reward": 150,
-		"text": "一個逃兵騎士佔了{place}，向過路的人收過路費。領主的管家請人去把他趕走。",
-		"sign": "橋頭擺著一個木箱，箱蓋上插著一面破旗。"},
+		"text": "一個逃兵騎士佔了{place}，向過路的人收過路費。領主的管家請人去把他趕走。"},
 	"bear": {"place": "lodge", "reward": 250,
-		"text": "{place}附近出了一頭大熊，拆了兩間屋子。獵人公會請人去討伐。",
-		"sign": "樹幹上有新的爪痕，比你的頭還高。"},
+		"text": "{place}附近出了一頭大熊，拆了兩間屋子。獵人公會請人去討伐。"},
 	"ogre": {"place": "old_wall", "reward": 500,
-		"text": "食人魔在{place}一帶出沒，已經有人被抓走了。城主親自發的懸賞。",
-		"sign": "地上有很大的腳印，一路往城牆的缺口裡去。"},
+		"text": "食人魔在{place}一帶出沒，已經有人被抓走了。城主親自發的懸賞。"},
+	"boar": {"place": "south_road", "reward": 70,
+		"text": "{place}一帶有野豬拱壞了好幾片田，還撞傷了一個趕車的。"},
+	"poacher": {"place": "lodge", "reward": 140,
+		"text": "{place}附近有人下套子盜獵。獵人公會派人去看過一次，那個人沒回來。"},
+	"smuggler": {"place": "coast", "reward": 160,
+		"text": "{place}的碼頭有一夥走私的，打傷了收稅的人。稅務官出錢請人去收拾。"},
+	"pikeman": {"place": "relay", "reward": 240,
+		"text": "一個逃營的長槍兵占了{place}，攔下過路的馬車收錢。驛站的主人請人去把他趕走。"},
+	"alpha_wolf": {"place": "pasture", "reward": 260,
+		"text": "{place}外面的狼群換了一頭頭狼，這個冬天已經咬死了兩個牧人。"},
+	"elk": {"place": "south_road", "reward": 380,
+		"text": "{place}的山路上有一頭巨角鹿，頂翻了好幾輛馬車。"},
+	"butcher": {"place": "old_wall", "reward": 420,
+		"text": "{place}的缺口裡住著一個屠夫。附近一直有人失蹤。"},
+	"croc": {"place": "coast", "reward": 600,
+		"text": "{place}的泥灘上有一條老鱷，拖走了一個撿蛤蜊的孩子。"},
+	"troll": {"place": "fortress", "reward": 900,
+		"text": "{place}有巨魔出沒，要塞的補給隊過不去。領主出了重賞。"},
 }
 
 ## 武器店收來的好東西的價錢：等級 × 這個數

@@ -10,7 +10,7 @@ extends SceneTree
 
 const PRIZES := ["red_fang", "knell", "gatebreaker", "nightwatch", "verdict_1", "verdict_2", "verdict_3", "rain_book", "siege_book"]
 ## 怪物由弱到強
-const LADDER := ["wolf", "bandit_leader", "deserter", "bear", "ogre"]
+const LADDER := EnemyData.ORDER
 
 var verbose := false
 

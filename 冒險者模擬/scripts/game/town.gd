@@ -69,9 +69,6 @@ func travel(place: String) -> Array:
 		return msgs
 	world.look_around()
 	msgs.append(_m("info", "你到了%s。" % MapData.place_name(place)))
-	# 委託的怪物在這裡：看得到牠留下的痕跡
-	for id in monsters_at(place):
-		msgs.append(_m("info", TownData.COMMISSIONS[id]["sign"]))
 	msgs.append_array(_deliver(place))
 	if MapData.is_city(place):
 		if not claims("guild").is_empty():

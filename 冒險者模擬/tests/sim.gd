@@ -2,9 +2,9 @@ extends SceneTree
 
 ## 平衡模擬（開發用，不是遊戲的一部分）。
 ## 不同的數值、境界、招式和武器組合，打委託的怪物和世界上有名字的人（開局時的身體）很多場（滿血開打，自動戰鬥），看勝率。
-## 執行：Godot.exe --headless --path . --script res://tests/sim.gd
+## 執行：Godot.exe --headless --path . --script res://tests/sim.gd [-- 組合名字的一段] [monsters]
 
-const N := 150
+const N := 80
 
 const T1 := ["knee", "fallstone", "shed", "lh_cross"]
 const T2 := ["lh_pommel", "lh_half", "lh_advance", "lh_bind", "deflect", "triple", "needle"]
@@ -58,7 +58,11 @@ func _init() -> void:
 		if _world.person(id) == null:
 			_world._spawn(id)
 	# 加參數只跑名字裡有這段字的組合：-- "/10"
-	var only := OS.get_cmdline_user_args()
+	var only := Array(OS.get_cmdline_user_args())
+	# 加參數 monsters：改打全部委託的怪物（照危險度排）
+	if only.has("monsters"):
+		ids = EnemyData.ORDER.duplicate()
+		only.erase("monsters")
 	if not only.is_empty():
 		setups = setups.filter(func(s): return s[0].contains(only[0]))
 	for s in setups:
@@ -109,8 +113,4 @@ func _battle(str_v: int, agi_v: int, realm: int, moves: Array, weapon: String, e
 		var p := _world.person(enemy_id)
 		p.hp = p.max_hp()
 		foe = Combatant.from_person(p, p.location)
-	var b := Battle.new([me], [foe], rng_seed)
-	if enemy_id == SchoolData.SPAR_ENEMY:
-		me.yield_hp = roundi(me.max_hp * SchoolData.SPAR_YIELD)
-		b.round_limit = SchoolData.SPAR_ROUNDS
-	return b
+	return Battle.new([me], [foe], rng_seed)
