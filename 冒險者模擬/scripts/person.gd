@@ -44,8 +44,6 @@ var base_sum := 0
 
 ## 學會的招式 id。基本招式不用學。
 var learned: Array[String] = []
-## 偷學：招式 id -> 被打中幾次
-var steal_hits := {}
 ## 師傅認可到第幾階（第 1 階交學費就教，所以一開始是 1）
 var approved_tier := 1
 ## 身上的秘笈（BookData）。讀完就學會裡面的招，書還留著

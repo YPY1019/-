@@ -13,9 +13,6 @@ const REST_HEAL := 0.2
 const INJURED_HP := 0.1
 const INJURED_MONTHS := 6
 
-## 偷學：被敵人的招牌招打中幾次就學會
-const STEAL_NEED := 3
-
 
 ## 一般委託（只有討伐）：委託板上的怪物在哪裡、報酬多少。危險度從敵人的數值算（EnemyData.danger）。
 ## 打完一次就撤下來，越打越久才再出現（World.MONSTER_BACK）。有名字的人的懸賞在 World（PeopleData）。

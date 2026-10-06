@@ -2,7 +2,7 @@ class_name Town
 extends RefCounted
 
 ## 你能做的事（規則）：走到哪裡、打委託的怪物、找人打、接懸賞、休養、時間（月）和生活費、
-## 師傅（考驗、交代的事）、秘笈、武器店、戰利品、戰鬥打完的結算（數值成長、瓶頸、偷學）、臨終和換人接著玩。
+## 師傅（考驗、交代的事）、秘笈、武器店、戰利品、戰鬥打完的結算（數值成長、瓶頸）、臨終和換人接著玩。
 ## 世界上的人自己的事在 World；你也是 World 裡的一個人（hero）。
 ## 不碰畫面：每個動作回傳訊息清單 [{"kind", "text"}]，畫面照著顯示。
 ##   kind：info 一般、good 好事、bad 壞事、big 大事、epic 一輩子記得的大事（升境、拿到秘笈、讀完秘笈、病倒、死去）、
@@ -120,7 +120,6 @@ func finish_monster(battle: Battle) -> Array:
 			hero.note("被%s打成重傷" % EnemyData.ENEMIES[id]["name"])
 			msgs.append_array(_knocked_out())
 	msgs.append_array(_grow(EnemyData.ENEMIES[id], r))
-	msgs.append_array(_steal(r["sig_hits"]))
 	if r["outcome"] == "lose":
 		msgs.append_array(_pass_months(TownData.INJURED_MONTHS, "injured", "養傷"))
 	return msgs
@@ -234,7 +233,6 @@ func finish_person(battle: Battle) -> Array:
 			for it in taken:
 				msgs.append(_m("bad", "你身上的%s不見了。" % _item_name(it)))
 	msgs.append_array(_grow(p.body_stats(), r))
-	msgs.append_array(_steal(r["sig_hits"]))
 	if r["outcome"] == "lose":
 		msgs.append_array(_pass_months(TownData.INJURED_MONTHS, "injured", "養傷"))
 	return msgs
@@ -373,22 +371,6 @@ func _grow(enemy: Dictionary, r: Dictionary) -> Array:
 			msgs.append(_m("good", "%s +%d" % [GrowthData.NAMES[s], gained]))
 			if hero.at_cap(s):
 				msgs.append(_m("info", "%s到了瓶頸。" % GrowthData.NAMES[s]))
-	return msgs
-
-
-# ---------- 偷學 ----------
-
-func _steal(sig_hits: Dictionary) -> Array:
-	var msgs := []
-	for id in sig_hits:
-		if hero.knows(id):
-			continue
-		var n: int = hero.steal_hits.get(id, 0) + sig_hits[id]
-		hero.steal_hits[id] = n
-		if n >= TownData.STEAL_NEED:
-			hero.learn(id)
-			hero.note("偷學到「%s」" % MoveData.MOVES[id]["name"])
-			msgs.append(_m("big", "你學會了「%s」。" % MoveData.MOVES[id]["name"]))
 	return msgs
 
 

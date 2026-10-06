@@ -11,7 +11,6 @@ const T2 := ["redirect", "disarm", "break_free", "vital", "combo"]
 const ULT := ["sunder"]
 const ULT2 := ["sunder", "falcon"]
 const ULT3 := ["sunder", "falcon", "bastion"]
-const WILD := ["sand", "shout"]
 
 var _world: World
 
@@ -34,23 +33,23 @@ func _init() -> void:
 		["18/18 二境 斷岳 赤牙", 18, 18, 1, T1 + T2 + ULT, "red_fang"],
 		["20/18 二境 斷岳 赤牙", 20, 18, 1, T1 + T2 + ULT, "red_fang"],
 		["18/16 二境 斷岳 騎士", 18, 16, 1, T1 + T2 + ULT, "knight_sword"],
-		["18/16 二境 斷岳 赤牙", 18, 16, 1, T1 + T2 + ULT + WILD, "red_fang"],
-		["20/17 二境 斷岳 赤牙", 20, 17, 1, T1 + T2 + ULT + WILD, "red_fang"],
-		["20/17 二境 斷岳 喪鐘", 20, 17, 1, T1 + T2 + ULT + WILD, "knell"],
-		["20/17 三境 斷岳 喪鐘", 20, 17, 2, T1 + T2 + ULT + WILD, "knell"],
+		["18/16 二境 斷岳 赤牙", 18, 16, 1, T1 + T2 + ULT, "red_fang"],
+		["20/17 二境 斷岳 赤牙", 20, 17, 1, T1 + T2 + ULT, "red_fang"],
+		["20/17 二境 斷岳 喪鐘", 20, 17, 1, T1 + T2 + ULT, "knell"],
+		["20/17 三境 斷岳 喪鐘", 20, 17, 2, T1 + T2 + ULT, "knell"],
 		# 只練力量（2026-10-05 第三次試玩的路線）
 		["17/10 二境 基礎 騎士", 17, 10, 1, T1, "knight_sword"],
 		["18/10 二境 進階 騎士", 18, 10, 1, T1 + T2, "knight_sword"],
 		["19/10 二境 斷岳 赤牙", 19, 10, 1, T1 + T2 + ULT, "red_fang"],
 		["20/10 二境 斷岳 喪鐘", 20, 10, 1, T1 + T2 + ULT, "knell"],
 		# 第三境：拿到後面的武器和秘笈
-		["21/19 三境 斷岳 喪鐘", 21, 19, 2, T1 + T2 + ULT + WILD, "knell"],
-		["21/19 三境 二絕 喪鐘", 21, 19, 2, T1 + T2 + ULT2 + WILD, "knell"],
-		["21/19 三境 二絕 碎門", 21, 19, 2, T1 + T2 + ULT2 + WILD, "gatebreaker"],
-		["23/21 三境 斷岳 喪鐘", 23, 21, 2, T1 + T2 + ULT + WILD, "knell"],
-		["23/21 三境 二絕 喪鐘", 23, 21, 2, T1 + T2 + ULT2 + WILD, "knell"],
-		["23/21 三境 二絕 守夜", 23, 21, 2, T1 + T2 + ULT2 + WILD, "nightwatch"],
-		["25/23 三境 二絕 守夜", 25, 23, 2, T1 + T2 + ULT2 + WILD, "nightwatch"],
+		["21/19 三境 斷岳 喪鐘", 21, 19, 2, T1 + T2 + ULT, "knell"],
+		["21/19 三境 二絕 喪鐘", 21, 19, 2, T1 + T2 + ULT2, "knell"],
+		["21/19 三境 二絕 碎門", 21, 19, 2, T1 + T2 + ULT2, "gatebreaker"],
+		["23/21 三境 斷岳 喪鐘", 23, 21, 2, T1 + T2 + ULT, "knell"],
+		["23/21 三境 二絕 喪鐘", 23, 21, 2, T1 + T2 + ULT2, "knell"],
+		["23/21 三境 二絕 守夜", 23, 21, 2, T1 + T2 + ULT2, "nightwatch"],
+		["25/23 三境 二絕 守夜", 25, 23, 2, T1 + T2 + ULT2, "nightwatch"],
 	]
 	# 怪物用 EnemyData 的 id，人用 PeopleData 的 id（開局時的身體；後來才來的人用剛來時的身體）
 	var ids := ["bear", "bran", "roderick", "ulf", "yvette", "black_knight", "ogre", "grayson", "leonard", "varen"]

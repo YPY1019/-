@@ -28,7 +28,6 @@ extends RefCounted
 ## str / agi：力量、敏捷。戰鬥時跟你同一項比（見 GrowthData），也決定打牠能把你練到多高。
 ##   招靠哪一項看類型（TYPE_STAT），招自己寫了 stat 就用招的。
 ## realm：只有人有境界（師傅）。怪物用危險度，從數值算（danger()）。
-## signature：招牌招，被打中幾次就偷學得會。action 對手的招、learn 你學到的招、seen 被打中時的提示。
 ## win_text / lose_text / flee_text / survive_text：戰鬥結束的句子（不寫就用預設的）。
 ## hide_hp：戰鬥畫面不顯示血量（師傅）。
 ## loot：打贏就拿到的武器（WeaponData）。稀有的劍拿在手上時，他打你也會發動那把劍的特效。
@@ -150,8 +149,6 @@ const ENEMIES := {
 		"habits": [
 			{"last": "sweep", "chance": 0.6, "then": "smash", "tell": "{name}順著掃刀的勢子，把大刀舉過頭頂。"},
 		],
-		"signature": {"action": "sand_kick", "learn": "sand",
-			"seen": ["你一邊揉眼睛，一邊記住了他腳尖一勾的動作。", "眼睛痛得要命，那一腳是怎麼踢的，你看清楚了。"]},
 		"rage": {
 			"hp_below": 0.35,
 			"text": "{name}滿臉是血，紅著眼大吼：「老子砍死你！」刀法亂了。",
@@ -235,8 +232,6 @@ const ENEMIES := {
 			# 發狂後砸完不喘，直接撲上來抱
 			{"last": "rear_smash", "rage": true, "then": "hug", "tell": "熊一落地沒有停，張開前臂朝你撲過來。"},
 		],
-		"signature": {"action": "roar", "learn": "shout",
-			"seen": ["你的腿還在發軟，可是那一吼是怎麼從胸口逼出來的，你好像摸到了一點門道。", "吼聲還在耳朵裡響。你想：如果是你對著野獸這樣吼呢？"]},
 		"rage": {
 			"hp_below": 0.4,
 			"text": "熊被打痛了，仰頭長嚎，樹上的鳥全飛了起來。",

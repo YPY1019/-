@@ -316,11 +316,12 @@ func _build_me() -> void:
 			if h.knows(id):
 				school.append(id)
 	_move_flow(school)
-	var wild := []
+	# 道場以外學到的（別派的秘笈）
+	var other := []
 	for id in h.learned:
 		if SchoolData.tier_of(id) == 0:
-			wild.append(id)
-	_move_flow(wild)
+			other.append(id)
+	_move_flow(other)
 
 	if not h.books.is_empty():
 		me_box.add_child(UiKit.heading("秘笈"))

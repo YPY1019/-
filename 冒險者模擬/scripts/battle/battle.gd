@@ -164,7 +164,7 @@ func is_over() -> bool:
 func result() -> Dictionary:
 	var hero := allies[0]
 	return {"outcome": outcome, "rounds": round_no, "hp": hero.hp, "max_hp": hero.max_hp,
-		"used": hero.used, "sig_hits": hero.sig_hits}
+		"used": hero.used}
 
 
 ## 結束的句子，敵人資料裡有寫就用敵人的
@@ -501,7 +501,6 @@ func _land(enemy: Combatant, target: Combatant, d: Dictionary, power: float, sta
 			enemy.hold_rounds = 0
 		_:
 			target.next_status.append(on_hit)
-	_watch_signature(enemy, target, ev)
 
 
 ## 對手拿著稀有的劍：砍中你時也會發動特效（你先挨過，才知道它多可怕）
@@ -544,17 +543,6 @@ func _weapon_fx_out(ally: Combatant, enemy: Combatant, dmg: int, ev: Array) -> v
 		"knell":
 			# 下回合露出破綻（斷岳出得來）
 			enemy.forced_next = "stagger"
-
-
-## 偷學：被對手的招牌招打中，記一次
-func _watch_signature(enemy: Combatant, target: Combatant, ev: Array) -> void:
-	var sig: Dictionary = enemy.enemy_def.get("signature", {})
-	if sig.is_empty() or enemy.intent.get("action", "") != sig["action"]:
-		return
-	if target.person == null or target.person.knows(sig["learn"]):
-		return
-	target.sig_hits[sig["learn"]] = target.sig_hits.get(sig["learn"], 0) + 1
-	ev.append(_ev("info", _pick(sig["seen"])))
 
 
 func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: float, ev: Array) -> void:

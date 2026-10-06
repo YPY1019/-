@@ -52,8 +52,6 @@ var next_status: Array[String] = []
 var held := false
 ## 這場用過的招（算基礎數值成長用）
 var used: Array[String] = []
-## 這場被敵人招牌招打中幾次：你偷學的招 id -> 次數
-var sig_hits := {}
 
 ## ---- 敵人 ----
 ## 這回合要做的事：{"action", "type", "phase": windup/strike/do/forced/hold, "text", "target"}

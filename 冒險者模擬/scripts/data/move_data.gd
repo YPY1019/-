@@ -25,14 +25,14 @@ extends RefCounted
 
 ## 人人都會的一般招。跟學來的招放在同一個池子裡，不是永遠都在
 const BASIC := ["attack", "defend", "dodge"]
-## 每回合的選項至少有一個攻擊類、一個防守類（擲沙、怒喝不算這兩類）
+## 每回合的選項至少有一個攻擊類、一個防守類
 const OFFENSE := ["attack", "heavy", "vital", "combo", "sunder", "falcon"]
 const DEFENSE := ["defend", "dodge", "sweep_kick", "parry", "redirect", "disarm", "break_free", "bastion"]
 ## 撤退不是招式，永遠可以選（被抱住時不行）
 const FLEE := "flee"
 ## 被抱住時能用的招（沒學的不會出現）
 const HELD := ["struggle", "attack", "break_free", "vital"]
-const LEARNABLE := ["sweep_kick", "parry", "redirect", "heavy", "vital", "disarm", "break_free", "sand", "shout", "combo", "sunder", "falcon", "bastion"]
+const LEARNABLE := ["sweep_kick", "parry", "redirect", "heavy", "vital", "disarm", "break_free", "combo", "sunder", "falcon", "bastion"]
 
 ## 你受傷後的反應（依傷勢挑一句）
 ## shrug：你那一項比對手高很多，打中了也不痛（取代對手「打中你」的描述）
@@ -295,40 +295,7 @@ const MOVES := {
 			"windup": {"text": ["你壓低重心等著，{name}還在蓄力。"]},
 		},
 	},
-	"sand": {
-		"name": "擲沙", "stat": "agi", "desc": "抓一把沙撒向對方的眼睛。對方下一次攻擊很可能打偏。這回合自己不會躲。",
-		"fail": {"text": ["你抓起一把沙撒過去，{name}一偏頭就躲開了。"]},
-		"default": {"effect": "blind", "take": 1.0, "hit": true, "text": [
-			"你彎腰抓起一把沙土往{name}臉上撒，自己也沒空躲。",
-		]},
-		"vs": {
-			"guard": {"effect": "blind", "text": ["你抓起一把沙，從{guard}旁邊撒進{name}的眼睛。{pron}罵了一聲，拼命眨眼。"]},
-			"opening": {"effect": "blind", "text": ["你趁機抓起一把沙，撒進{name}的眼睛。"]},
-			"windup": {"effect": "blind", "good": true, "text": ["{name}還在蓄力，你抓起一把沙撒進{pron}的眼睛。"]},
-		},
-	},
-	"shout": {
-		"name": "怒喝", "stat": "str", "desc": "對野獸大喝一聲，把牠嚇得退縮。也能壓過對方的吼聲。對人沒什麼用。",
-		"fail": {"text": ["你大喝一聲，{name}沒被嚇到。"]},
-		"default": {"take": 1.0, "hit": true, "effect": "scare", "requires": "beast", "text": [
-			"你張開雙臂大喝一聲，{name}往後一縮。",
-		], "else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}冷笑了一下。"]}},
-		"vs": {
-			"roar": {"take": 0.0, "effect": "scare", "good": true, "requires": "beast", "text": [
-				"你迎著吼聲大喝一聲，硬是蓋了過去。{name}愣住了，耳朵往後一貼。",
-			], "else": {"take": 0.0, "text": ["你一聲大喝，蓋過了{name}的吼聲。"]}},
-			"sweep": {"take": 0.6, "effect": "scare", "good": true, "requires": "beast", "text": [
-				"你迎著{name}大喝一聲，{pron}一縮，攻擊只用了一半的力。",
-			], "else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}不理你。"]}},
-			"thrust": {"take": 0.6, "effect": "scare", "good": true, "requires": "beast", "text": [
-				"你迎著{name}大喝一聲，{pron}撲到一半縮了回去，只碰到你一下。",
-			], "else": {"take": 1.0, "hit": true, "text": ["你大喝一聲，{name}不理你。"]}},
-			"guard": {"text": ["你大喝一聲，{name}躲在{guard}後面不為所動。"]},
-			# 只有對方出手時嚇得到，不能一直喝住{pron}
-			"opening": {"text": ["你大喝一聲，{name}瞪著你，沒有退。"]},
-			"windup": {"text": ["你大喝一聲，{name}正專心蓄力，沒理你。"]},
-		},
-	},
+
 	"combo": {
 		"name": "三連斬", "stat": "str", "desc": "一口氣連砍三劍，比普通攻擊痛。但三劍砍完收不回來，擋不開對方的攻擊。砍不穿厚甲和盾。",
 		"default": {"deal": 1.3, "take": 1.0, "hit": true, "text": [
