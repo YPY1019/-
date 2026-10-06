@@ -462,13 +462,13 @@ func _build_board() -> void:
 		board_box.add_child(HSeparator.new())
 
 
-## 強者榜：公會牆上的名單，照名聲排（不寫數字）。點名字看人物面板，旁邊可以直接打聽
+## 強者榜：公會牆上的名單，照實力排，旁邊寫境界（不寫數字）。點名字看人物面板，旁邊可以直接打聽
 func _build_ranking() -> void:
 	var head := UiKit.heading("強者榜")
 	board_box.add_child(head)
-	board_box.add_child(UiKit.label("公會牆上釘著一張羊皮紙，寫著這幾年北境最有名的人。", 16, 0.7, true))
+	board_box.add_child(UiKit.label("公會牆上釘著一張羊皮紙，寫著北境最能打的人。", 16, 0.7, true))
 	var grid := GridContainer.new()
-	grid.columns = 3
+	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 16)
 	grid.add_theme_constant_override("v_separation", 4)
 	board_box.add_child(grid)
@@ -484,6 +484,10 @@ func _build_ranking() -> void:
 		name_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_button.pressed.connect(show_person.bind(p.id))
 		grid.add_child(name_button)
+		var realm := UiKit.label(p.realm_text(), 16, 0.7)
+		realm.add_theme_color_override("font_color", Color(p.realm_color()))
+		realm.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		grid.add_child(realm)
 		grid.add_child(_inquire_button(p.id) if not me else Control.new())
 	board_box.add_child(HSeparator.new())
 

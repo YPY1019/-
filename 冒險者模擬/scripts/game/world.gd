@@ -723,8 +723,8 @@ func _new_person(name: String, pron: String, style: String, role: String, born_y
 
 ## 強者榜：最有名的幾個人（活著的，含你）
 func ranking() -> Array:
-	var list: Array = people.values().filter(func(p): return not p.dead and p.fame > 0.0)
-	list.sort_custom(func(a, b): return a.fame > b.fame)
+	var list: Array = people.values().filter(func(p): return not p.dead)
+	list.sort_custom(func(a, b): return a.power() > b.power())
 	return list.slice(0, RANKING_SIZE)
 
 

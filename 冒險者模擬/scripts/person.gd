@@ -327,12 +327,12 @@ func best_weapon() -> String:
 	return best if best != "" else (owned_weapons[0] if not owned_weapons.is_empty() else WeaponData.FIST)
 
 
-## 有多強（世界上的人互相打、決定要不要去找誰時用的粗略估計）：身體、武器、會的絕學
+## 有多強（世界上的人互相打、強者榜用的估計）：身體、血、武器、會的絕學。tests/rank_check.gd 對過實際勝率
 func power() -> float:
 	var hi := maxi(body("str"), body("agi"))
 	var lo := mini(body("str"), body("agi"))
 	var w_power: float = WeaponData.get_def(weapon)["power"]
-	var p := 0.6 * hi + 0.4 * lo + (w_power - 1.0) * GrowthData.POWER_PER_WEAPON
+	var p := 0.6 * hi + 0.4 * lo + (w_power - 1.0) * GrowthData.POWER_PER_WEAPON + GrowthData.POWER_PER_HP * log(max_hp() / GrowthData.HP_BASE)
 	for b in BookData.BOOKS:
 		if not BookData.BOOKS[b].has("page_of") and knows(BookData.BOOKS[b]["move"]):
 			p += GrowthData.POWER_PER_ULT

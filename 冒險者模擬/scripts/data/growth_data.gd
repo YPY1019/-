@@ -45,6 +45,9 @@ const HP_PER_POINT := 12
 ## 粗略的強弱：0.6 × 比較高的那項 ＋ 0.4 × 比較低的那項 ＋ 武器 ＋ 絕學
 const POWER_PER_WEAPON := 3.0
 const POWER_PER_ULT := 1.0
+## 血越厚越難打倒：每多 e 倍的血（以 HP_BASE 為準）多算這麼多
+const POWER_PER_HP := 4.0
+const HP_BASE := 150.0
 ## 強弱差這麼多，勝率大約 73%（差兩倍約 88%）
 const POWER_SPREAD := 1.0
 
