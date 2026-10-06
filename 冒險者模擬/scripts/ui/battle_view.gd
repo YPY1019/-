@@ -14,6 +14,8 @@ signal closed
 ## 戰利品：拿走對方身上的東西、換上自己的武器
 signal loot_taken(id: String)
 signal equip_requested(id: String)
+## 打贏了人：殺了他（true）還是放他走
+signal fate_chosen(kill: bool)
 
 ## 播放速度：圖示、每回合幾秒
 const SPEEDS := [["▶", 1.4], ["▶▶", 0.8], ["▶▶▶", 0.3]]
@@ -54,6 +56,8 @@ var play_box: HBoxContainer
 var speed_buttons: Array[Button] = []
 var flee_button: Button
 var end_box: HBoxContainer
+var back_button: Button
+var fate_box: HBoxContainer
 ## 打贏後的戰利品：左邊你的武器、右邊對方身上的
 var loot_box: HBoxContainer
 var mine_list: VBoxContainer
@@ -124,9 +128,12 @@ func _init() -> void:
 	add_child(loot_box)
 
 	end_box = UiKit.hbox(10)
-	var back := UiKit.button("繼續", 170, 52)
-	back.pressed.connect(func(): closed.emit())
-	end_box.add_child(back)
+	fate_box = UiKit.hbox(10)
+	fate_box.visible = false
+	end_box.add_child(fate_box)
+	back_button = UiKit.button("繼續", 170, 52)
+	back_button.pressed.connect(func(): closed.emit())
+	end_box.add_child(back_button)
 	add_child(end_box)
 
 	timer = Timer.new()
@@ -139,6 +146,8 @@ func begin(p_battle: Battle, note := "") -> void:
 	hero_c = battle.allies[0]
 	foe_c = battle.enemies[0]
 	flee_requested = false
+	fate_box.visible = false
+	back_button.visible = true
 	log_label.clear()
 	_para.clear()
 	loot_box.visible = false
@@ -170,6 +179,25 @@ func begin(p_battle: Battle, note := "") -> void:
 	_refresh()
 	_set_speed(speed_index)
 	timer.start()
+
+
+## 打贏了人：先決定殺不殺，才能離開
+func show_fate(pron: String) -> void:
+	UiKit.clear(fate_box)
+	var kill := UiKit.button("殺了%s" % pron, 150, 52)
+	kill.pressed.connect(_choose_fate.bind(true))
+	fate_box.add_child(kill)
+	var spare := UiKit.button("放%s走" % pron, 150, 52)
+	spare.pressed.connect(_choose_fate.bind(false))
+	fate_box.add_child(spare)
+	fate_box.visible = true
+	back_button.visible = false
+
+
+func _choose_fate(kill: bool) -> void:
+	fate_box.visible = false
+	back_button.visible = true
+	fate_chosen.emit(kill)
 
 
 ## 打完的結算（拿到多少錢、數值成長…）接在戰鬥紀錄後面

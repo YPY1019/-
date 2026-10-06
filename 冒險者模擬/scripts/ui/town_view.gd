@@ -358,6 +358,18 @@ func _build_me() -> void:
 func _build_board() -> void:
 	UiKit.clear(board_box)
 	var h := town.hero
+	# 辦完的事：回來交差才拿得到報酬
+	var done := town.claims("guild")
+	if not done.is_empty():
+		var row := UiKit.hbox(16)
+		var l := UiKit.label("辦完了：" + "、".join(done.map(func(c): return c["what"])), 18, 1.0, true)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(l)
+		var b := UiKit.button("交差", 110, 48)
+		b.pressed.connect(func(): add_messages(town.turn_in("guild")))
+		row.add_child(b)
+		board_box.add_child(row)
+		board_box.add_child(HSeparator.new())
 	board_box.add_child(UiKit.heading("一般委託"))
 	var list := town.board()
 	if list.is_empty():
@@ -378,8 +390,8 @@ func _build_board() -> void:
 		if h.beaten.has(id):
 			title_row.add_child(UiKit.label("打贏過", 16, 0.5))
 		info.add_child(title_row)
-		info.add_child(UiKit.label(c["text"], 16, 0.75, true))
-		info.add_child(UiKit.label("%s・%d 銀" % [MapData.place_name(c["place"]), c["reward"]], 15, 0.6))
+		info.add_child(UiKit.label(town.commission_text(id), 16, 0.75, true))
+		info.add_child(UiKit.label("%s・%d 銀" % [MapData.place_name(town.world.monster_place(id)), c["reward"]], 15, 0.6))
 		row.add_child(info)
 		row.add_child(_take_button(town.took_job(id), func(): add_messages(town.accept_job(id))))
 		board_box.add_child(row)
@@ -404,7 +416,8 @@ func _build_board() -> void:
 		name_row.add_child(name_button)
 		info.add_child(name_row)
 		info.add_child(UiKit.label(bounty["text"], 16, 0.75, true))
-		var line := "%d 銀" % bounty["reward"]
+		# 公會知道的：最近有人在哪裡看到他
+		var line := "最近有人在%s看到%s・%d 銀" % [MapData.place_name(p.travel_to if p.travel_left > 0 else p.location), p.pron, bounty["reward"]]
 		var takers: Array = bounty["takers"].filter(func(t): return t != town.world.hero_id and not town.world.person(t).dead)
 		if not takers.is_empty():
 			line += "・接下的人：" + "、".join(takers.map(func(t): return town.world.who(t)))
@@ -483,14 +496,20 @@ func _build_shop() -> void:
 
 	shop_box.add_child(HSeparator.new())
 	shop_box.add_child(UiKit.heading("武器店"))
-	for id in WeaponData.SHOP:
-		var w := WeaponData.get_def(id)
+	for id in town.shop_items():
 		var st := town.weapon_state(id)
 		if st["owned"]:
 			continue
 		var row := UiKit.hbox(12)
-		row.add_child(_weapon_name(w, st["ok"]))
-		var b := UiKit.button("買（%d 銀）" % w["cost"], 170)
+		if BookData.is_book(id):
+			var bk := BookData.get_def(id)
+			var l := _tip(UiKit.label("《%s》" % bk["name"], 19), bk["desc"])
+			l.add_theme_color_override("font_color", Color(BookData.color(id)))
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(l)
+		else:
+			row.add_child(_weapon_name(WeaponData.get_def(id), st["ok"]))
+		var b := UiKit.button("買（%d 銀）" % town.price(id), 170)
 		b.disabled = not st["ok"]
 		b.tooltip_text = "、".join(st["why"])
 		b.pressed.connect(func(): _act(town.buy_weapon(id)))

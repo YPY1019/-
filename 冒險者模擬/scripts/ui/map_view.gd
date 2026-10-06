@@ -1,8 +1,8 @@
 class_name MapView
 extends HBoxContainer
 
-## 地圖分頁：左邊是地圖（用程式畫：地名、路、路上要走幾個月、你在哪、每個地方有幾個人），
-## 右邊是點選的地方：這裡有誰（名字用境界的顏色）、有沒有委託的怪物、走過去要幾個月。
+## 地圖分頁：左邊是地圖（用程式畫：地名、路、路上要走幾個月、你在哪、你這裡有幾個人、你接下的事在哪），
+## 右邊是點選的地方：你在這裡就看得到有誰；不在就只有聽說的（幾個月前聽說的）。接下的委託、要找的人標在地圖上。
 ## 遠不遠、要不要去，玩家看地圖自己判斷。只負責顯示和按鈕，規則都在 Town。
 
 signal travel_requested(place: String)
@@ -62,7 +62,9 @@ func refresh() -> void:
 	if MapData.is_city(selected):
 		side.add_child(UiKit.label("冒險者公會、練武場、獅心劍庭、武器店、旅店。", 16, 0.6, true))
 
-	var monsters := town.monsters_at(selected)
+	# 委託的怪物：你在這裡看得到；不在這裡，接下了才知道在哪。劍庭要你來打的人也是
+	var monsters := town.monsters_at(selected).filter(func(id): return here or town.took_job(id))
+	monsters.append_array(town.duels_at(selected))
 	if not monsters.is_empty():
 		side.add_child(HSeparator.new())
 		for id in monsters:
@@ -81,8 +83,11 @@ func refresh() -> void:
 				row.add_child(b)
 			side.add_child(row)
 
-	var people := town.world.at(selected)
 	side.add_child(HSeparator.new())
+	if not here:
+		_heard_here()
+		return
+	var people := town.world.at(selected)
 	if people.is_empty():
 		side.add_child(UiKit.label("沒看到什麼人。", 16, 0.6))
 	for p in people:
@@ -99,10 +104,55 @@ func refresh() -> void:
 			b.pressed.connect(func(): fight_requested.emit(p.id))
 			row.add_child(b)
 		side.add_child(row)
-	# 正在往這裡走的人
-	var coming := town.world.others().filter(func(p): return p.travel_left > 0 and p.travel_to == selected)
-	if not coming.is_empty():
-		side.add_child(UiKit.label("在往這裡的路上：" + "、".join(coming.map(func(p): return p.display_name)), 15, 0.6, true))
+
+
+
+## 你不在這裡：只寫聽說在這裡的人（最後聽說他在這裡，幾個月前）
+func _heard_here() -> void:
+	var list := heard_at(town, selected)
+	if list.is_empty():
+		side.add_child(UiKit.label("沒聽說有誰在這裡。", 16, 0.6))
+		return
+	side.add_child(UiKit.label("聽說", 16, 0.6))
+	for p in list:
+		var row := UiKit.hbox(8)
+		var name_button := LinkButton.new()
+		name_button.text = ("%s %s" % [p.title, p.display_name]).strip_edges()
+		name_button.add_theme_font_size_override("font_size", 18)
+		name_button.add_theme_color_override("font_color", Color(p.realm_color()))
+		name_button.pressed.connect(func(): person_selected.emit(p.id))
+		row.add_child(name_button)
+		row.add_child(UiKit.label(heard_when(town, p.id), 15, 0.55))
+		side.add_child(row)
+
+
+## 最後聽說在這個地方的人（活著的、不是你）
+static func heard_at(t: Town, place: String) -> Array:
+	var out := []
+	for id in t.hero.heard:
+		var p := t.world.person(id)
+		if p != null and not p.dead and t.hero.heard[id]["place"] == place:
+			out.append(p)
+	return out
+
+
+## 「三個月前」「這個月」
+static func heard_when(t: Town, id: String) -> String:
+	var ago: int = t.world.month() - t.hero.heard[id]["month"]
+	return "這個月" if ago <= 0 else "%s前" % LifeData.span_text(ago)
+
+
+## 你在找的人（接下的懸賞、劍庭要你討伐的人）
+static func tracked(t: Town) -> Array:
+	var out := []
+	for id in t.world.bounties:
+		if t.took_bounty(id):
+			out.append(id)
+	for j in t.hero.school_jobs:
+		var job: Dictionary = SchoolData.JOBS[j]
+		if job["kind"] == "kill" and not out.has(job["target"]):
+			out.append(job["target"])
+	return out
 
 
 ## 地圖本身：用程式畫
@@ -150,15 +200,28 @@ class MapCanvas extends Control:
 			var name: String = MapData.place_name(id)
 			var w := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 			draw_string(font, p + Vector2(-w / 2, -radius - 8), name, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("#e6e8eb"))
-			# 這裡的人：一個人一個點，用境界的顏色
-			var people := town.world.at(id)
+			# 你這裡的人：一個人一個點，用境界的顏色（別的地方看不到）
+			var people := town.world.at(id) if id == h.location and h.travel_left == 0 else []
 			for i in people.size():
 				var dot := p + Vector2(-((people.size() - 1) * 5.0) + i * 10.0, radius + 10)
 				draw_circle(dot, DOT_R, Color(people[i].realm_color()))
-			# 有委託的怪物：一個小三角
-			if not town.monsters_at(id).is_empty():
+			# 你接下的委託的怪物、劍庭要你去打的人：一個小三角
+			var jobs := town.monsters_at(id).filter(func(m): return town.took_job(m) or id == h.location)
+			if not jobs.is_empty() or not town.duels_at(id).is_empty():
 				var t := p + Vector2(radius + 8, 0)
 				draw_colored_polygon(PackedVector2Array([t + Vector2(0, -6), t + Vector2(6, 5), t + Vector2(-6, 5)]), Color("#d0574f"))
+			# 你在找的人：最後聽說他在哪，寫上名字
+			var row := 0
+			for tid in MapView.tracked(town):
+				var info: Dictionary = h.heard.get(tid, {})
+				if info.get("place", "") != id:
+					continue
+				var who := town.world.person(tid)
+				if who == null or who.dead:
+					continue
+				var at := p + Vector2(-radius - 6, radius + 24 + row * 18)
+				draw_string(font, at, "✕ " + who.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("#ff8a8a"))
+				row += 1
 
 	func _gui_input(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

@@ -150,12 +150,16 @@ func _build_info(p: Person) -> void:
 	UiKit.clear(info_grid)
 	var school := SchoolData.school_name(p.school) if p.rank > 0 else "無"
 	var where := ""
+	var me := p.id == town.world.hero_id
 	if p.dead:
 		where = "%d 歲死在%s" % [p.age_at(p.died_at), MapData.place_name(p.location)]
-	elif p.travel_left > 0:
-		where = "往%s的路上" % MapData.place_name(p.travel_to)
-	else:
+	elif me:
 		where = MapData.place_name(p.location)
+	elif town.hero.heard.has(p.id):
+		# 別人：最後聽說他在哪
+		where = "%s（%s）" % [MapData.place_name(town.hero.heard[p.id]["place"]), MapView.heard_when(town, p.id)]
+	else:
+		where = "不知道"
 	var realm := p.realm_text() if not p.dead else "—"
 	_info("性別", "女" if p.pron == "她" else "男", "流派", school)
 	_info("年紀", "%d 歲" % p.age() if not p.dead else "—", "身分", _identity(p))
@@ -193,12 +197,14 @@ func _build_buttons(p: Person, me: bool) -> void:
 			close()
 			fight_requested.emit(p.id))
 		button_box.add_child(f)
-	elif p.travel_left == 0 and p.location != h.location:
-		var go := UiKit.button("去%s（%s）" % [MapData.place_name(p.location), LifeData.span_text(MapData.distance(h.location, p.location))], 260)
+	elif h.heard.has(p.id) and h.heard[p.id]["place"] != h.location:
+		# 去最後聽說他在的地方（不一定還在）
+		var place: String = h.heard[p.id]["place"]
+		var go := UiKit.button("去%s（%s）" % [MapData.place_name(place), LifeData.span_text(MapData.distance(h.location, place))], 260)
 		go.disabled = h.dying()
 		go.pressed.connect(func():
 			close()
-			travel_requested.emit(p.location))
+			travel_requested.emit(place))
 		button_box.add_child(go)
 	if town.world.wanted(p.id):
 		var w := UiKit.label("公會懸賞%s。" % p.pron, 16)

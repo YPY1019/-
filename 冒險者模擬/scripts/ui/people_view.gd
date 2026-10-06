@@ -1,7 +1,7 @@
 class_name PeopleView
 extends ScrollContainer
 
-## 人物分頁：世界上有名字的人，名字用境界的顏色，旁邊寫在哪裡。點名字打開人物面板（PersonPanel）。
+## 人物分頁：你見過、聽說過的人，名字用境界的顏色，旁邊寫最後聽說他在哪（幾個月前）。點名字打開人物面板（PersonPanel）。
 ## 只負責顯示，規則都在 Town。
 
 signal person_requested(person_id: String)
@@ -23,12 +23,15 @@ func _init(p_town: Town) -> void:
 func refresh() -> void:
 	var w := town.world
 	UiKit.clear(box)
-	var alive: Array = w.others()
+	var known: Dictionary = town.hero.heard
+	var alive: Array = w.others().filter(func(p): return known.has(p.id))
 	alive.sort_custom(func(a, b): return a.power() > b.power())
+	if alive.is_empty():
+		box.add_child(UiKit.label("你還不認識什麼人。", 17, 0.6))
 	var grid := _grid()
 	for p in alive:
 		_entry(grid, p, 1.0)
-	var gone: Array = w.people.values().filter(func(p): return p.dead)
+	var gone: Array = w.people.values().filter(func(p): return p.dead and known.has(p.id))
 	if not gone.is_empty():
 		box.add_child(HSeparator.new())
 		box.add_child(UiKit.label("死了的人", 17, 0.5))
@@ -58,6 +61,7 @@ func _entry(grid: GridContainer, p: Person, alpha: float) -> void:
 	row.add_child(b)
 	var where := ""
 	if not p.dead:
-		where = "往%s" % MapData.place_name(p.travel_to) if p.travel_left > 0 else MapData.place_name(p.location)
+		var h: Dictionary = town.hero.heard[p.id]
+		where = "%s（%s）" % [MapData.place_name(h["place"]), MapView.heard_when(town, p.id)]
 	row.add_child(UiKit.label(where, 15, 0.55))
 	grid.add_child(row)

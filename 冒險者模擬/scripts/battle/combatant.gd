@@ -105,6 +105,10 @@ static func from_enemy(id: String) -> Combatant:
 		c.weapon_fx = WeaponData.fx(d["loot"])
 	c.enemy_def = d
 	c.enemy_id = id
+	if d.has("moves"):
+		c.enemy_def = d.duplicate()
+		var kinds: Array = d.get("kinds", [])
+		add_moves(c.enemy_def, d["moves"], kinds[0] if not kinds.is_empty() else "")
 	return c
 
 
@@ -132,16 +136,19 @@ static func from_person(p: Person, place: String, lethal := true) -> Combatant:
 	c.weapon = w.get("noun", w["name"])
 	c.weapon_id = p.weapon
 	c.weapon_fx = WeaponData.fx(p.weapon)
-	add_moves(d, p.learned, p.weapon)
+	# 打法本身的出手，加上他自己會的招（打法資料裡的 moves 不算，那是給沒有名字的人用的）
+	d["actions"] = EnemyData.ENEMIES[p.style]["actions"]
+	add_moves(d, p.learned, WeaponData.get_def(p.weapon)["kind"])
 	return c
 
 
 ## 世界上的人跟你用同一套招：他會的招（有 act 的、拿著的武器用得出來的）加進他的出手裡
-static func add_moves(d: Dictionary, learned: Array, weapon_id: String) -> void:
+static func add_moves(d: Dictionary, learned: Array, kind: String) -> void:
 	var actions: Dictionary = d["actions"].duplicate()
 	for id in learned:
 		var m: Dictionary = MoveData.MOVES[id]
-		if not m.has("act") or not MoveData.usable(id, weapon_id):
+		var kinds: Array = m.get("weapons", [])
+		if not m.has("act") or not (kinds.is_empty() or kinds.has(kind)):
 			continue
 		var a: Dictionary = m["act"].duplicate(true)
 		a["move"] = id

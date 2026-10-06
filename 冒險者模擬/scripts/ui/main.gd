@@ -13,8 +13,11 @@ var battle_view: BattleView
 var blocker: Control
 var life_view: LifeView
 var person_panel: PersonPanel
+var encounter: EncounterDialog
+## 找上門、正在跟你說話的人
+var _comer: Person
 var battle: Battle
-## 現在打的是 monster 委託的怪物 / person 世界上的人 / spar 庭主的入門考驗 / trial 劍庭的公開比試
+## 現在打的是 monster 委託的怪物（和劍庭要你去打的人）/ person 世界上的人 / spar 劍庭的選拔 / trial 劍庭的公開比試
 var fight_kind := ""
 var _settled := []
 ## 死去那一句停多久，才換到「這一生」
@@ -50,6 +53,7 @@ func _ready() -> void:
 	battle_view.closed.connect(_close_battle)
 	battle_view.loot_taken.connect(_take_loot)
 	battle_view.equip_requested.connect(_equip)
+	battle_view.fate_chosen.connect(_fate_chosen)
 	margin.add_child(battle_view)
 	life_view = LifeView.new()
 	life_view.continue_requested.connect(_continue_as_heir)
@@ -59,6 +63,9 @@ func _ready() -> void:
 	person_panel.travel_requested.connect(_travel)
 	person_panel.fight_requested.connect(_fight_person)
 	add_child(person_panel)
+	encounter = EncounterDialog.new()
+	encounter.chosen.connect(_answer_comer)
+	add_child(encounter)
 	blocker = Control.new()
 	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	blocker.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -121,10 +128,21 @@ func _after_time() -> void:
 		return
 	var comer := town.comer()
 	if comer != null:
-		town_view.add_messages([{"kind": "bad", "text": town.comer_text(comer)}])
-		_start_person(comer.id, "找上門來")
+		# 先跳對話：他說什麼、你怎麼回
+		_show(town_view)
+		_comer = comer
+		encounter.ask(comer, town.comer_text(comer), town.comer_options(comer))
 		return
 	_show(town_view)
+
+
+func _answer_comer(choice: String) -> void:
+	var p := _comer
+	_comer = null
+	var r := town.answer_comer(p, choice)
+	town_view.add_messages([{"kind": "bad", "text": town.comer_text(p)}] + r["msgs"])
+	if r["fight"]:
+		_start_person(p.id, "找上門來")
 
 
 # ---------- 走路、委託、找人打 ----------
@@ -163,7 +181,7 @@ func _start_person(id: String, why: String) -> void:
 func _start_spar() -> void:
 	fight_kind = "spar"
 	battle = town.start_spar()
-	play_log.battle_start("庭主的考驗：接住我三招", battle)
+	play_log.battle_start("劍庭的選拔", battle)
 	_show_battle()
 
 
@@ -193,6 +211,15 @@ func _on_battle_ended() -> void:
 	battle_view.show_settlement(_settled)
 	if not town.loot.is_empty():
 		battle_view.show_loot(town.hero, town.loot)
+	if fight_kind == "person" and town.fate_pending != null:
+		battle_view.show_fate(town.fate_pending.pron)
+
+
+## 殺了他，還是放他走
+func _fate_chosen(kill: bool) -> void:
+	var msgs := town.decide_fate(kill)
+	_settled.append_array(msgs)
+	battle_view.show_settlement(msgs)
 
 
 ## 拿到的東西接在結算後面，回主畫面時一起寫進紀錄
@@ -210,6 +237,9 @@ func _equip(id: String) -> void:
 
 ## 離開戰鬥畫面。打輸了要先躺幾個月（在主畫面裡跳年月），跳完才寫結算
 func _close_battle() -> void:
+	# 沒選就離開：放他走
+	if town.fate_pending != null:
+		_settled.append_array(town.decide_fate(false))
 	town.clear_loot()
 	var msgs := _settled + town.after_fight()
 	_settled = []

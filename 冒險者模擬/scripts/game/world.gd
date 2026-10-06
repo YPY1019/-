@@ -39,8 +39,10 @@ var people := {}
 var hero_id := ""
 ## 有懸賞的人 id -> {"reward", "text", "takers": [接下的人]}
 var bounties := {}
-## 委託板上的怪物 id -> {"count": 打過幾次, "back": 世界的第幾個月再出現}
+## 委託板上的怪物 id -> {"count": 打過幾次, "back": 世界的第幾個月再出現, "place": 這次在哪出沒}
 var monsters := {}
+## 武器店收來的東西（世界上的人用不到的稀有武器、秘笈）。你買得到
+var shop_stock: Array = []
 ## 這次推的時候傳到你耳裡的事
 var news: Array = []
 ## 已經傳過話給你的人（target id）
@@ -61,6 +63,8 @@ func _init(seed := -1) -> void:
 	for id in PeopleData.PEOPLE:
 		if PeopleData.PEOPLE[id].get("arrive", 0) == 0:
 			_spawn(id)
+	for id in TownData.COMMISSIONS:
+		monsters[id] = {"count": 0, "back": 0, "place": _monster_spot(id)}
 
 
 # ---------- 查 ----------
@@ -127,12 +131,39 @@ func monster_open(enemy_id: String) -> bool:
 	return monsters.get(enemy_id, {}).get("back", 0) <= month()
 
 
-## 打完一次怪物的委託：越打越久才再出現
+## 打完一次怪物的委託：越打越久才再出現，下次換個地方出沒
 func monster_done(enemy_id: String) -> void:
 	var m: Dictionary = monsters.get(enemy_id, {"count": 0, "back": 0})
 	m["back"] = month() + MONSTER_BACK[mini(m["count"], MONSTER_BACK.size() - 1)]
 	m["count"] += 1
+	m["place"] = _monster_spot(enemy_id)
 	monsters[enemy_id] = m
+
+
+## 委託的怪物這次在哪出沒
+func monster_place(enemy_id: String) -> String:
+	return monsters[enemy_id]["place"]
+
+
+func _monster_spot(enemy_id: String) -> String:
+	var places: Array = TownData.COMMISSIONS[enemy_id]["places"]
+	return places[rng.randi_range(0, places.size() - 1)]
+
+
+## 你聽說誰在哪（傳聞提到他、或你親眼看到）
+func hear(id: String, place := "") -> void:
+	if id == hero_id or not people.has(id) or not people.has(hero_id):
+		return
+	var p: Person = people[id]
+	hero().heard[id] = {"place": place if place != "" else (p.travel_to if p.travel_left > 0 else p.location), "month": month()}
+
+
+## 你所在的地方的人，你都看得到
+func look_around() -> void:
+	if not people.has(hero_id) or hero().travel_left > 0:
+		return
+	for p in at(hero().location):
+		hear(p.id)
 
 
 ## 現在找上門來要跟你打的人（在你待的地方，正在找你）
@@ -284,7 +315,31 @@ func tick() -> void:
 	for p in list:
 		if not p.dead and p.travel_left == 0:
 			_act(p)
+	if LifeData.month_of_year(month()) == SchoolData.SELECTION_MONTHS[-1]:
+		_spring()
+	look_around()
 
+
+## 春天：劍庭選拔新學徒（城裡夠結實的年輕人），劍庭的人各自往上學一招
+func _spring() -> void:
+	for p in others():
+		if p.school == "" and not p.expelled and p.role == "youth" and p.location == MapData.HOME and p.travel_left == 0 \
+				and maxi(p.body("str"), p.body("agi")) >= SchoolData.JOIN_BODY and p.selection_year != LifeData.year_of(month()) \
+				and rng.randf() < SchoolData.NPC_PASS:
+			join_school(p)
+		elif p.school == SchoolData.ID and p.rank > 0 and rng.randf() < SchoolData.NPC_LEARN:
+			for id in SchoolData.chain():
+				if not p.knows(id) and SchoolData.MOVES.has(id) and SchoolData.MOVES[id]["rank"] <= p.rank:
+					p.learn(id)
+					break
+
+
+## 通過選拔，成了劍庭的學徒
+func join_school(p: Person) -> void:
+	p.school = SchoolData.ID
+	p.rank = 1
+	p.note("通過獅心劍庭的選拔")
+	_tell(NewsData.JOINED.replace("{p:who}", "{p:%s}" % p.id))
 
 func _grow(p: Person) -> void:
 	if p.growth <= 0.0 or p.age() >= GROW_UNTIL:
@@ -531,7 +586,8 @@ func settle(w: Person, l: Person, kill: bool, told := true) -> Array:
 	return taken
 
 
-## 世界上的人贏了：拿走稀有的武器、秘笈，和比自己的好的同類武器。死了的人剩下的東西就沒了
+## 世界上的人贏了：拿走值錢的東西（稀有的武器、秘笈、比自己好的同類武器）。死了的人剩下的東西就沒了。
+## 用得上的留著（秘笈裡的招拿著自己的武器用得出來就學），用不上的拿去霜溪城的武器店賣掉（你買得到）
 func _take(w: Person, l: Person, kill: bool) -> Array:
 	var taken: Array = []
 	for it in l.items():
@@ -546,10 +602,26 @@ func _take(w: Person, l: Person, kill: bool) -> Array:
 	for it in taken:
 		l.remove_item(it)
 		w.give_item(it)
-		if BookData.is_book(it):
-			w.learn(BookData.get_def(it)["move"])
 	w.weapon = w.best_weapon()
+	for it in w.items():
+		if BookData.is_book(it):
+			var move: String = BookData.get_def(it)["move"]
+			if MoveData.usable(move, w.weapon):
+				w.learn(move)
+			elif not w.knows(move):
+				_sell(w, it)
+		elif it != w.weapon and WeaponData.is_rare(it):
+			_sell(w, it)
 	return taken
+
+
+## 用不上的好東西賣給武器店
+func _sell(p: Person, it: String) -> void:
+	p.remove_item(it)
+	if not shop_stock.has(it):
+		shop_stock.append(it)
+	var name: String = "《%s》" % BookData.get_def(it)["name"] if BookData.is_book(it) else WeaponData.get_def(it)["name"]
+	_tell(NewsData.SOLD.replace("{p:who}", "{p:%s}" % p.id).replace("{item}", name))
 
 
 ## 世界上的人打贏你：拿走你身上最值錢的一樣（稀有的武器 > 還沒讀的秘笈 > 比他好的武器）。最後一把武器不拿
@@ -688,6 +760,9 @@ func pass_on(heir_id: String) -> void:
 	heir.role = ""
 	heir.jobs.clear()
 	heir.school_jobs.clear()
+	heir.claims.clear()
+	heir.heard = old.heard.duplicate()
+	heir.seen = old.seen.duplicate()
 	heir.target = ""
 	heir.grudges.clear()
 	heir.vow = {}
@@ -732,6 +807,15 @@ func heir_candidates() -> Array:
 
 func _tell(text: String, kind := "news") -> void:
 	news.append({"month": month(), "text": fmt(text), "kind": kind})
+	# 傳聞提到的人、也說了在哪：你知道他大概在哪了
+	var said := fmt(text)
+	var i := text.find("{p:")
+	while i >= 0:
+		var j := text.find("}", i)
+		var p: Person = people.get(text.substr(i + 3, j - i - 3))
+		if p != null and said.contains(MapData.place_name(p.travel_to if p.travel_left > 0 else p.location)):
+			hear(p.id)
+		i = text.find("{p:", j)
 
 
 func _pick(list: Array) -> String:

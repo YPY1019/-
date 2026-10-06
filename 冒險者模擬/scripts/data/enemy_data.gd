@@ -33,6 +33,7 @@ extends RefCounted
 ## loot：打贏就拿到的武器（WeaponData）。稀有的劍拿在手上時，他打你也會發動那把劍的特效。
 ## books：身上帶的秘笈（BookData），打贏就在戰利品裡。
 ## parry：露出破綻時還拿兵器擋你的寫法（先吃虧，見 Battle.can_parry）。沒寫的不會擋。no_parry：這個破綻擋不了（兵器卡住）。
+## moves：會的招（MoveData，跟你同一套）。沒有名字的對手用；世界上的人用自己學會的。
 ## title：名號（有名的強者）。no_flee：再怎麼打不過也不會逃。fear / fear_flee：怕你時的句子。
 
 const FORCED_OPENING := {
@@ -118,7 +119,7 @@ const ENEMIES := {
 		"name": "盜匪頭子",
 		"blurb": "在路上攔人搶劫的盜匪頭目，大刀使得很兇，手段也很髒。",
 		"hp": 150, "str": 12, "agi": 12, "armor": "light", "traits": ["disarmable"], "kinds": ["blade", "sword"], "pron": "他",
-		"weapon": "大刀", "guard": "架勢", "loot": "bandit_blade",
+		"weapon": "大刀", "guard": "架勢", "loot": "bandit_blade", "moves": ["knee"],
 		"parry": ["{name}身子還歪著，大刀卻慌忙橫了過來。你的劍砍在刀背上，震得手腕發麻。", "你搶上去出劍，{name}把大刀往身前一擋，噹的一聲架住了。"],
 		"fear": ["{name}的笑容僵在臉上，握刀的手緊了又鬆：「……喂，有話好說。」"],
 		"fear_flee": ["{name}把大刀一扔，連滾帶爬地逃上了山。"],
@@ -164,7 +165,7 @@ const ENEMIES := {
 		"name": "逃兵騎士",
 		"blurb": "從戰場逃出來的騎士，一身鐵甲，盾牌很難打穿。",
 		"hp": 120, "str": 14, "agi": 10, "armor": "heavy", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
-		"weapon": "長劍", "guard": "盾牌", "loot": "knight_sword",
+		"weapon": "長劍", "guard": "盾牌", "loot": "knight_sword", "moves": ["lh_cross", "lh_advance"],
 		"parry": ["你搶上去出劍，{name}把盾牌往上一甩，你的劍砍在盾邊上滑開了。", "你的劍砍過去，{name}的長劍橫過來一格，兩把劍撞在一起。"],
 		"fear": ["{name}停下腳步，頭盔後面傳來一聲很輕的吸氣。"],
 		"fear_flee": ["{name}丟下盾牌，鐵甲叮噹作響地逃過了石橋。"],
@@ -499,16 +500,15 @@ const ENEMIES := {
 		"win_text": "{name}跪倒在中庭的石板上，戰錘從手裡滑了出去。城牆上他的手下一個個放下了弓。",
 	},
 
-	# 獅心劍庭的庭主：入門考驗「接住我三招」用（木劍）。不在委託板上
-	# 數值剛好是第二境入門：閃避、防禦都要比數值，差太多就撐不過
+	# 練劍的年輕人（劍庭的學徒、城裡的年輕人的打法）。沒有別的年輕人報名時，劍庭選拔跟你比的也是他
 	"master": {
-		"name": "庭主",
+		"name": "另一個報名的年輕人",
 		"blurb": "",
-		"hp": 999, "str": 15, "agi": 15, "armor": "light", "traits": [], "kinds": ["sword"], "pron": "他", "hide_hp": true, "no_flee": true,
-		"weapon": "木劍", "guard": "架勢",
-		"parry": ["你搶上去出劍，{name}的木劍輕輕一搭，就把你的劍帶偏了。"],
-		"scene": ["道場的木地板擦得發亮，牆上掛著一排木劍。窗外下著雪。"],
-		"start": ["{name}丟給你一把木劍，自己也拿起一把，隨手挽了個劍花：「三招。接住了，你就是獅心劍庭的人。」"],
+		"hp": 120, "str": 11, "agi": 11, "armor": "none", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他", "no_flee": true,
+		"weapon": "劍", "guard": "架勢", "moves": ["knee"],
+		"parry": ["你搶上去出劍，{name}慌忙把劍橫過來，擋住了。"],
+		"scene": ["城牆根下的空地，地上的沙被踩得很實。"],
+		"start": ["{name}握著劍，朝你點了點頭。"],
 		"actions": {
 			"cut": {"type": "sweep", "w": 35, "power": 1.0,
 				"tell": ["{name}腳下一錯，木劍從身側橫掃過來。"],
@@ -529,14 +529,46 @@ const ENEMIES := {
 			"heavy": ["{name}挑了挑眉：「不錯。」", "{name}被逼退了兩步，眼神亮了起來。"],
 			"dying": ["{name}抹了一下額頭的汗。"],
 		},
-		"lose_text": "你單膝跪地，喘得說不出話。{name}的木劍停在你的頸邊：「還不行。回去再練。」",
-		"survive_text": "三招過去，你還站著。{name}收起木劍，點了點頭：「接得住。從今天起，你是劍庭的學徒。」",
-		"flee_text": "你舉手認輸。{name}收起木劍：「想清楚了再來。」",
+	},
+	# 劍庭的委託：牧羊村那個說自己是劍庭出來的人。用的全是野路子，沒有一招是劍庭的
+	"impostor": {
+		"name": "劍術教師",
+		"blurb": "",
+		"hp": 170, "str": 13, "agi": 13, "armor": "light", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
+		"weapon": "長劍", "guard": "盾牌", "moves": ["knee", "dust", "fallstone"],
+		"parry": ["你搶上去出劍，{name}把盾往上一甩，擋住了。"],
+		"fear": ["{name}的眼睛往村口瞄了一下。"],
+		"fear_flee": ["{name}丟下盾，翻過籬笆跑了。"],
+		"scene": ["村裡的穀倉前，幾個孩子拿著木棍排成一排。"],
+		"start": ["{name}看見你的劍，臉色變了一下，又笑了：「同門？來，讓孩子們看看。」"],
+		"actions": {
+			"cut": {"type": "sweep", "w": 35, "power": 1.0, "armed": true,
+				"tell": ["{name}把劍往旁邊一拉，橫斬過來。"],
+				"hit": ["劍刃從你腰側拖過去。", "你被斬中手臂。"]},
+			"thrust": {"type": "thrust", "w": 25, "power": 1.0, "armed": true,
+				"tell": ["{name}壓低身子，劍尖朝你胸口刺來。"],
+				"hit": ["劍尖刺在你的肩窩上。"]},
+			"wall": {"type": "guard", "w": 15,
+				"tell": ["{name}把盾舉到眼前，學著劍庭的人站樁，腳下卻是虛的。"]},
+			"punch": {"type": "thrust", "w": 50, "power": 0.5, "unarmed": true,
+				"tell": ["{name}罵了一聲，揮拳朝你臉上打來。"],
+				"hit": ["一拳正中你的鼻樑。"]},
+			"pickup": {"type": "opening", "w": 50, "unarmed": true, "pickup": true,
+				"tell": ["{name}彎腰去撿地上的劍，盾垂了下來。"]},
+		},
+		"habits": [],
+		"pain": {
+			"light": ["{name}退了半步。", "圍觀的孩子叫了一聲。"],
+			"heavy": ["{name}的盾垂了下來，臉上的笑沒了。"],
+			"dying": ["{name}拄著劍喘氣：「好了，好了，我認輸。」"],
+		},
+		"win_text": "{name}坐倒在地上，把劍推開：「我在劍庭門口掃過三年地，就三年。」孩子們看著他，沒有人說話。",
 	},	# 公開比試（升熟手）：大師兄不在的時候，由劍庭的一個熟手下場
 	"lionheart_senior": {
 		"name": "劍庭的熟手",
 		"blurb": "",
 		"hp": 190, "str": 16, "agi": 16, "armor": "light", "traits": [], "kinds": ["sword"], "pron": "他", "no_flee": true,
+		"moves": ["lh_cross", "lh_pommel", "lh_half"],
 		"weapon": "長劍", "guard": "盾牌",
 		"parry": ["你搶上去出劍，{name}把盾一斜，你的劍滑了開去。"],
 		"scene": ["劍庭的中庭，學徒們圍成一圈。"],
@@ -567,6 +599,7 @@ const ENEMIES := {
 		"name": "庭主",
 		"blurb": "",
 		"hp": 320, "str": 21, "agi": 21, "armor": "light", "traits": [], "kinds": ["sword"], "pron": "他", "no_flee": true,
+		"moves": ["lh_cross", "lh_pommel", "lh_half", "lh_advance", "lh_bind"],
 		"weapon": "長劍", "guard": "架勢",
 		"parry": ["你搶上去出劍，{name}的劍輕輕一搭，就把你的劍帶偏了。", "你砍過去，{name}側身讓開半步，劍刃擦著他的衣服過去。"],
 		"scene": ["劍庭的中庭。人站滿了，連街上的人都擠在門口看。"],

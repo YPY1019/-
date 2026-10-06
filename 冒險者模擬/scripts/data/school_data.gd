@@ -3,8 +3,10 @@ extends RefCounted
 
 ## 流派：原型只有獅心劍庭（正統騎士，用劍）。只有資料。
 ##
-## 入門：通過考驗「接住庭主三招」，成為學徒。不收學費。
-## 貢獻：替劍庭辦事（JOBS：清剿、討伐紅鬃、拿回庭主師弟的劍譜）。用貢獻換招（MOVES）。
+## 入門：每年春天選拔（SELECTION_MONTHS），跟另一個報名的年輕人用木劍比一場，贏了收為學徒。不收學費。
+##   城裡夠結實的年輕人（世界上的人）也會去考（World._spring）。
+## 貢獻：替劍庭辦事（JOBS：送貨、查冒牌貨、守夜、討伐紅鬃、拿回庭主師弟的劍譜），辦完回劍庭交差才記上。用貢獻換招（MOVES）。
+## 對同門動手：被逐出劍庭（Person.expelled），不能再回來。學會的招還是你的。
 ##   不加入也能辦事、換第 1 階（藍）的招；更高的要加入、要階位。
 ## 階位：學徒 → 熟手 → 大師，靠公開比試（TRIALS）。累積的貢獻夠了才能比。
 ## 絕學「王權裁定」在庭主師弟的劍譜裡（BookData verdict_book）：拿回來交給庭主，他讓你留著讀。
@@ -41,13 +43,16 @@ const REQ := {
 	"lh_bind": {"agi": 15},
 }
 
-## 入門考驗：接住庭主三招。身體（比較高的那項）要到 JOIN_BODY 才收
+## 選拔：身體（比較高的那項）要到 JOIN_BODY 才收。一年一次，在這幾個月（一年的第幾月）
 const JOIN_BODY := 11
+const SELECTION_MONTHS := [3, 4]
+## 沒有別的年輕人報名時，跟你比的人（EnemyData）
 const SPAR_ENEMY := "master"
-const SPAR_MONTHS := 2
-const SPAR_ROUNDS := 3
-## 血掉到這個比例以下就算輸（掉超過四成）
-const SPAR_YIELD := 0.6
+const SPAR_MONTHS := 1
+const SELECTION_TEXT := "開春，劍庭的中庭擠滿了來報名的年輕人。庭主坐在廊下，一個一個看。"
+## 世界上的年輕人：考上的機率；劍庭的人每年春天學到下一招的機率
+const NPC_PASS := 0.6
+const NPC_LEARN := 0.5
 
 ## 公開比試：升到這個階位要打贏誰（世界上的人；他不在了就換 EnemyData 的 fallback）、累積貢獻要多少
 ## 比試打到一方剩 MATCH_YIELD 的血就停，不會死、不會被搶
@@ -105,18 +110,18 @@ static func rank_name(p: Person) -> String:
 	return s["ranks"][mini(p.rank, s["ranks"].size() - 1)]
 
 
-## 劍庭的委託。kind：monster 打委託板上的怪物、kill 討伐某人、book 拿回劍譜（入門後庭主交代才有）
+## 劍庭自己的事（跟公會的委託不重疊）。辦完回劍庭交差才記上貢獻（拿回劍譜、守夜是當面交的）。
+## kind：deliver 把東西送到 place；duel 到 place 跟 enemy 打一場（不殺）；watch 在劍庭守夜 months 個月；
+##   kill 討伐某人；book 拿回劍譜（入門後庭主交代才有）
+## again：辦完過幾個月才會再有（沒寫 = 只有一次）
 const JOBS := {
-	"wolves": {"kind": "monster", "enemy": "wolf", "merit": 6,
-		"text": "劍庭在牧羊村的農莊，羊又被狼咬死了。"},
-	"bandits": {"kind": "monster", "enemy": "bandit_leader", "merit": 10,
-		"text": "麥田鎮林道上的盜匪，劫了劍庭送去鐵匠鋪的劍。"},
-	"deserter": {"kind": "monster", "enemy": "deserter", "merit": 14,
-		"text": "石橋上那個逃兵騎士，盾牌上畫著一頭獅子。庭主說，獅心的紋章不能讓這種人用。"},
-	"bear": {"kind": "monster", "enemy": "bear", "merit": 18,
-		"text": "獵人小屋的熊咬傷了劍庭的一個學徒。"},
-	"ogre": {"kind": "monster", "enemy": "ogre", "merit": 30,
-		"text": "舊城牆的食人魔抓走了人。劍庭要派人去。"},
+	"deliver": {"kind": "deliver", "place": "wheat", "merit": 6, "again": 6,
+		"text": "把劍庭新打的一批劍送到麥田鎮的鐵匠鋪，順便把上次送修的盾帶回來。",
+		"done": "鐵匠點完了劍，把修好的盾交給你。盾面上的獅子重新上過漆。"},
+	"impostor": {"kind": "duel", "enemy": "impostor", "place": "pasture", "merit": 10,
+		"text": "牧羊村有個人收學費教劍，說自己是獅心劍庭出來的。去看看他是什麼人。"},
+	"watch": {"kind": "watch", "months": 2, "merit": 5, "again": 4,
+		"text": "城裡最近不太平，劍庭輪流派人守夜。"},
 	"magnus": {"kind": "kill", "target": "magnus", "merit": 25,
 		"text": "紅鬃的副隊長馬格努斯。十年前那一夜，他也在。"},
 	"roderick": {"kind": "kill", "target": "roderick", "merit": 50,

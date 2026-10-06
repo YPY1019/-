@@ -57,6 +57,16 @@ var errand_given := false
 var errand_reported := false
 ## 跟誰打過（看過他出手，人物面板才列得出他會的招）
 var fought: Array[String] = []
+## 辦完還沒回去交差的事：[{"from": guild 公會 / school 劍庭, "what", "money", "merit"}]
+var claims: Array = []
+## 劍庭的事：辦完之後第幾個月才會再有（世界的月）
+var job_back := {}
+## 被逐出流派了（不能再回去）
+var expelled := false
+## 哪一年考過劍庭的選拔（一年一次）
+var selection_year := -999
+## 聽說誰在哪：人 id -> {"place", "month"}（玩家角色才用。地圖、人物分頁只寫這個，不寫他真正在哪）
+var heard := {}
 ## 看過誰用過哪些招：人 id -> [招 id]（人物面板只寫看過的）
 var seen := {}
 ## 接下的一般委託（怪物 id）。打贏才拿得到報酬

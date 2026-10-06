@@ -54,6 +54,8 @@ func _build_school() -> void:
 	# 你在劍庭的位置
 	var head := UiKit.hbox(16)
 	var status := "你不是劍庭的人。" if not town.member() else "你是劍庭的%s。" % SchoolData.RANKS[h.rank]
+	if h.expelled:
+		status = "你被逐出了劍庭。"
 	head.add_child(UiKit.label(status, 19))
 	if h.merit > 0 or town.member():
 		head.add_child(UiKit.label("貢獻 %d" % h.merit, 19, 0.8))
@@ -66,9 +68,9 @@ func _build_school() -> void:
 
 	# 入門考驗、公開比試
 	var spar := town.spar_state()
-	if not spar["passed"]:
-		box.add_child(UiKit.label("庭主：" + "「三招。接住了，你就是獅心劍庭的人。」", 17, 0.8, true))
-		var b := UiKit.button("接庭主三招（%s）" % LifeData.span_text(SchoolData.SPAR_MONTHS), 230)
+	if not spar["passed"] and not h.expelled:
+		box.add_child(UiKit.label("劍庭門口的告示：開春選拔新學徒。", 17, 0.8, true))
+		var b := UiKit.button("參加選拔", 230)
 		b.disabled = not spar["ok"]
 		b.tooltip_text = spar["why"]
 		b.pressed.connect(func(): spar_requested.emit())
@@ -83,8 +85,18 @@ func _build_school() -> void:
 			b.pressed.connect(func(): trial_requested.emit())
 			box.add_child(_wrap(b))
 
-	# 委託
-	box.add_child(UiKit.heading("劍庭的委託"))
+	# 劍庭的事
+	box.add_child(UiKit.heading("劍庭的事"))
+	var done := town.claims("school")
+	if not done.is_empty():
+		var row := UiKit.hbox(12)
+		var l := UiKit.label("辦完了%d件事。" % done.size(), 17, 1.0, true)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(l)
+		var tb := UiKit.button("交差", 110, 44)
+		tb.pressed.connect(func(): act.call(town.turn_in("school")))
+		row.add_child(tb)
+		box.add_child(row)
 	var jobs := town.school_jobs()
 	if jobs.is_empty():
 		box.add_child(UiKit.label("現在沒有。", 17, 0.6))
@@ -94,12 +106,15 @@ func _build_school() -> void:
 		var info := UiKit.vbox(2)
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		info.add_child(UiKit.label(j["text"], 17, 0.9, true))
-		var where := ""
-		if j["kind"] == "monster":
-			where = MapData.place_name(TownData.COMMISSIONS[j["enemy"]]["place"]) + "・"
-		info.add_child(UiKit.label("%s貢獻 %d" % [where, j["merit"]], 15, 0.6))
+		info.add_child(UiKit.label("貢獻 %d" % j["merit"], 15, 0.6))
 		row.add_child(info)
-		if town.took_school_job(id):
+		if j["kind"] == "watch":
+			var wb := UiKit.button("守夜（%s）" % LifeData.span_text(j["months"]), 160, 44)
+			wb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			wb.disabled = not town.in_city()
+			wb.pressed.connect(func(): act.call(town.watch(id)))
+			row.add_child(wb)
+		elif town.took_school_job(id):
 			var l := UiKit.label("你接下了", 17)
 			l.add_theme_color_override("font_color", Color("#9be39b"))
 			l.size_flags_vertical = Control.SIZE_SHRINK_CENTER

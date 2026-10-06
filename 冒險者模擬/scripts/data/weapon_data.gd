@@ -22,7 +22,7 @@ const START := "old_sword"
 const FIST := "fist"
 
 ## 武器店賣的
-const SHOP := ["steel_sword"]
+const SHOP := ["steel_sword", "hand_axe", "rapier"]
 
 ## 特效發動的機率、twin 多咬一口的傷害比例和上限（不然碰上絕學會多咬一百多）
 const FX_CHANCE := 0.35
@@ -42,9 +42,9 @@ const WEAPONS := {
 		"look": "一把刀背生鏽的大刀。", "desc": "盜匪愛用的大刀。刀背生鏽，刀口倒是磨得很利。"},
 	"knight_sword": {"grade": 2, "name": "騎士長劍", "noun": "長劍", "kind": "sword", "power": 1.5, "cost": 0, "str": 14,
 		"look": "一把騎士的長劍。", "desc": "騎士的長劍，又長又重，砍下去很實在。"},
-	"rapier": {"grade": 1, "name": "細劍", "noun": "細劍", "kind": "rapier", "power": 1.3, "cost": 0, "str": 0,
+	"rapier": {"grade": 1, "name": "細劍", "noun": "細劍", "kind": "rapier", "power": 1.3, "cost": 120, "str": 0,
 		"look": "一把細劍和一把短劍。", "desc": "南方決鬥家用的細劍，又輕又快。"},
-	"hand_axe": {"grade": 1, "name": "手斧", "noun": "斧頭", "kind": "axe", "power": 1.3, "cost": 0, "str": 13,
+	"hand_axe": {"grade": 1, "name": "手斧", "noun": "斧頭", "kind": "axe", "power": 1.3, "cost": 110, "str": 13,
 		"look": "一把手斧。", "desc": "北方海上來的人愛用的斧頭。"},
 	"warhammer": {"grade": 2, "name": "戰錘", "noun": "戰錘", "kind": "hammer", "power": 1.5, "cost": 0, "str": 18,
 		"look": "一把戰錘和一面塔盾。", "desc": "很沉的戰錘。"},

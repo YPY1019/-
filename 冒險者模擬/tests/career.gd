@@ -121,7 +121,7 @@ func _career(run: int) -> Dictionary:
 			fails.clear()
 			town._pass_months(1)
 			continue
-		var place: String = TownData.COMMISSIONS[mon]["place"]
+		var place: String = w.monster_place(mon)
 		if not town.took_job(mon):
 			if not town.in_city():
 				town.travel(MapData.HOME)
@@ -155,6 +155,8 @@ func _career(run: int) -> Dictionary:
 
 ## 不在城裡時，城裡有沒有事可做（只看「要在城裡」以外的條件）
 func _city_wanted(town: Town) -> bool:
+	if not town.hero.claims.is_empty():
+		return true
 	for id in TownData.TRAINING:
 		var st := town.training_state(id)
 		if not st["learned"] and st["why"] == ["要在城裡"]:
@@ -172,6 +174,9 @@ func _city_wanted(town: Town) -> bool:
 ## 城裡的事：練武場學招、劍庭入門、接劍庭的委託、換招、比試、讀秘笈、買劍、換劍。做了一件就回傳 true
 func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar_tries: int) -> bool:
 	var h := town.hero
+	if not h.claims.is_empty():
+		town.turn_in("guild")
+		town.turn_in("school")
 	for id in TownData.TRAINING:
 		if town.training_state(id)["ok"]:
 			town.learn_training(id)
@@ -197,7 +202,7 @@ func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar
 		if WeaponData.get_def(wid)["power"] > WeaponData.get_def(h.weapon)["power"] and town.weapon_state(wid)["ok"]:
 			town.buy_weapon(wid)
 			return true
-	if town.spar_state()["ok"] and h.learned.size() >= 1 and spar_tries < 3:
+	if town.spar_state()["ok"] and h.learned.size() >= 1:
 		var sb := town.start_spar()
 		sb.rng.seed = rng.randi()
 		pilot.play(sb)
@@ -219,6 +224,8 @@ func _fight(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, start: Cal
 	var r := pilot.play(b)
 	if kind == "person":
 		town.finish_person(b)
+		if town.fate_pending != null:
+			town.decide_fate(town.world.bounties.has(town.fate_pending.id) or town.fate_pending.target == h.id)
 	else:
 		town.finish_monster(b)
 	for id in town.loot.duplicate():

@@ -39,6 +39,9 @@ func _init() -> void:
 	tv._act(town.learn_training("fallstone"))
 	await _idle()
 	h.stats = {"str": 12, "agi": 12}
+	# 選拔在春天
+	while not SchoolData.SELECTION_MONTHS.has(LifeData.month_of_year(w.month())):
+		w.clock.month += 1
 	main._start_spar()
 	main.battle_view._skip()
 	await _frames(3)
@@ -52,7 +55,7 @@ func _init() -> void:
 	await _frames(3)
 	_save("04d_me_panel")
 	main.person_panel.tabs.current_tab = 1
-	main.person_panel.move_kind = "sword"
+	main.person_panel.move_kind = "劍"
 	main.person_panel.refresh()
 	await _frames(3)
 	_save("04e_me_moves")
@@ -90,16 +93,20 @@ func _init() -> void:
 		h.learn(m)
 	h.hp = h.max_hp()
 	var bran := w.person("bran")
-	bran.travel_left = 0
-	bran.location = "bridge"
 	main._travel("bridge")
 	await _idle()
+	bran.travel_left = 0
+	bran.location = "bridge"
+	bran.stay_left = 99
 	_save("09_at_bridge")
 	main._fight_person("bran")
 	await _frames(3)
 	main.battle_view._skip()
 	await _frames(3)
 	_save("10_bran_done")
+	main._fate_chosen(true)
+	await _frames(3)
+	_save("10b_bran_fate")
 	for id in town.loot.duplicate():
 		main._take_loot(id)
 	await _frames(3)
@@ -116,6 +123,10 @@ func _init() -> void:
 	gray.location = h.location
 	main._after_time()
 	await _frames(3)
+	_save("13a_grayson_dialog")
+	main.encounter.visible = false
+	main._answer_comer("fight")
+	await _frames(3)
 	await create_timer(1.5).timeout
 	_save("13_grayson_comes")
 	main.battle_view._skip()
@@ -131,6 +142,24 @@ func _init() -> void:
 
 	# 劍庭的委託、公開比試
 	tv.add_messages(town.accept_school_job("roderick"))
+	tv.add_messages(town.accept_school_job("impostor"))
+	tv.add_messages(town.accept_school_job("deliver"))
+	tv.show_map()
+	await _frames(3)
+	_save("15b_map_tracked")
+	main._travel("pasture")
+	await _idle()
+	_save("15c_pasture_impostor")
+	main._start_monster("impostor")
+	main.battle_view._skip()
+	await _frames(3)
+	_save("15d_impostor")
+	main._close_battle()
+	await _idle()
+	main._travel("wheat")
+	await _idle()
+	main._travel(MapData.HOME)
+	await _idle()
 	h.school = SchoolData.ID
 	h.rank = max(h.rank, 1)
 	h.merit_total = 40
@@ -144,6 +173,12 @@ func _init() -> void:
 	tv.tabs.current_tab = tv.school_view.get_index()
 	await _frames(3)
 	_save("16b_school_after")
+	tv.tabs.current_tab = 0
+	await _frames(3)
+	_save("16b2_board_claims")
+	tv.tabs.current_tab = tv.people_view.get_index()
+	await _frames(3)
+	_save("16b3_people")
 	main.person_panel.show_person("grayson")
 	main.person_panel.tabs.current_tab = 1
 	main.person_panel.refresh()

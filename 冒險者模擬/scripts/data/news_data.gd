@@ -24,6 +24,10 @@ const ROB := [
 const ROB_ANON := [
 	"{p:loser}在{place}被人打成重傷，醒來的時候，身上的東西不見了。",
 ]
+## 有人通過了劍庭的春季選拔
+const JOINED := "開春，{p:who}通過了獅心劍庭的選拔，換上了學徒的灰衣。"
+## 有人把用不上的好東西賣給了武器店
+const SOLD := "{p:who}把{item}賣給了霜溪城的武器店。"
 ## 決鬥
 const DUEL := [
 	"{p:a}向{p:b}下了戰書。",
