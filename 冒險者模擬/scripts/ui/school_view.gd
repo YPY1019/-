@@ -43,7 +43,7 @@ func _build_training() -> void:
 	box.add_child(HSeparator.new())
 	for id in TownData.TRAINING:
 		var st := town.training_state(id)
-		box.add_child(_move_row(id, st, "學（%d 銀・%s）" % [st["cost"], LifeData.span_text(st["months"])],
+		box.add_child(_move_row(id, st, "花 %d 銀學" % st["cost"],
 			func(): act.call(town.learn_training(id))))
 
 
@@ -109,7 +109,7 @@ func _build_school() -> void:
 		info.add_child(UiKit.label("貢獻 %d" % j["merit"], 15, 0.6))
 		row.add_child(info)
 		if j["kind"] == "watch":
-			var wb := UiKit.button("守夜（%s）" % LifeData.span_text(j["months"]), 160, 44)
+			var wb := UiKit.button("守夜", 120, 44)
 			wb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			wb.disabled = not town.in_city()
 			wb.pressed.connect(func(): act.call(town.watch(id)))
@@ -130,7 +130,7 @@ func _build_school() -> void:
 	box.add_child(UiKit.heading("換招"))
 	for id in SchoolData.MOVES:
 		var st := town.school_move_state(id)
-		box.add_child(_move_row(id, st, "換（貢獻 %d・%s）" % [st["merit"], LifeData.span_text(st["months"])],
+		box.add_child(_move_row(id, st, "用 %d 貢獻換" % st["merit"],
 			func(): act.call(town.learn_school_move(id))))
 	# 絕學在劍譜裡，讀完才列出招名
 	if h.knows(SchoolData.ULT):

@@ -44,6 +44,10 @@ func _init() -> void:
 	tv.tabs.current_tab = tv.training_view.get_index()
 	await _frames(3)
 	_save("04a_training")
+	tv._ask_rest()
+	await _frames(3)
+	_save("04a2_rest_dialog")
+	main.encounter.visible = false
 	tv._act(town.learn_training("fallstone"))
 	await _idle()
 	h.stats = {"str": 12, "agi": 12}
@@ -82,8 +86,9 @@ func _init() -> void:
 	tv.add_messages(town.accept_job("wolf"))
 	main._travel("pasture")
 	await _idle()
-	_save("05b_pasture_tabs")
-	main._start_monster("wolf")
+	_save("05b_wolf_event")
+	main.encounter.visible = false
+	main._answer_monster("fight", "wolf")
 	await _until(func(): return main.battle_view.visible)
 	await create_timer(1.5).timeout
 	_save("06_battle_wolf")
@@ -158,7 +163,8 @@ func _init() -> void:
 	main._travel("pasture")
 	await _idle()
 	_save("15c_pasture_impostor")
-	main._start_monster("impostor")
+	main.encounter.visible = false
+	main._answer_monster("fight", "impostor")
 	main.battle_view._skip()
 	await _frames(3)
 	_save("15d_impostor")

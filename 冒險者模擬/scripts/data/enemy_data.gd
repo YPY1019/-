@@ -34,6 +34,7 @@ extends RefCounted
 ## books：身上帶的秘笈（BookData），打贏就在戰利品裡。
 ## parry：露出破綻時還拿兵器擋你的寫法（先吃虧，見 Battle.can_parry）。沒寫的不會擋。no_parry：這個破綻擋不了（兵器卡住）。
 ## moves：會的招（MoveData，跟你同一套）。move_pool / pool_n：每次碰上時從裡面隨機會幾招（同一種對手，每個人會的不一樣）。沒有名字的對手用；世界上的人用自己學會的。
+## approach：走到委託的地方、碰上牠之前看到的（跳出對話，再決定打不打）。toll：攔路收錢的，付了就讓你過（不用打）。
 ## title：名號（有名的強者）。no_flee：再怎麼打不過也不會逃。fear / fear_flee：怕你時的句子。
 
 const FORCED_OPENING := {
@@ -89,6 +90,7 @@ const ARMOR_MULT := {"none": 1.0, "light": 0.8, "heavy": 0.5}
 const ENEMIES := {
 	"wolf": {
 		"name": "野狼",
+		"approach": "村外的草地上，幾頭羊倒在血裡。草叢動了一下。",
 		"blurb": "森林裡常見的野獸。會撲、會咬住不放。",
 		"hp": 50, "str": 7, "agi": 11, "armor": "none", "traits": ["beast"], "pron": "牠",
 		"weapon": "利牙", "guard": "架勢",
@@ -120,6 +122,7 @@ const ENEMIES := {
 	},
 	"bandit_leader": {
 		"name": "盜匪頭子",
+		"approach": "林道上橫著一根木頭，兩邊的樹後有人影。", "toll": {"cost": 20, "text": "你把 20 銀丟過去。盜匪頭子掂了掂錢袋，讓開了路。"},
 		"blurb": "在路上攔人搶劫的盜匪頭目，大刀使得很兇，手段也很髒。",
 		"hp": 150, "str": 12, "agi": 12, "armor": "light", "traits": ["disarmable"], "kinds": ["blade", "sword"], "pron": "他",
 		"weapon": "大刀", "guard": "架勢", "loot": "bandit_blade", "moves": ["knee"],
@@ -166,6 +169,7 @@ const ENEMIES := {
 	},
 	"deserter": {
 		"name": "逃兵騎士",
+		"approach": "橋頭站著一個穿鐵甲的人，盾牌靠在腿邊，腳邊放著一個收錢的木箱。", "toll": {"cost": 30, "text": "你把 30 銀放進木箱。逃兵騎士沒說話，側身讓你過去。"},
 		"blurb": "從戰場逃出來的騎士，一身鐵甲，盾牌很難打穿。",
 		"hp": 120, "str": 14, "agi": 10, "armor": "heavy", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
 		"weapon": "長劍", "guard": "盾牌", "loot": "knight_sword", "moves": ["lh_cross", "lh_advance"],
@@ -202,6 +206,7 @@ const ENEMIES := {
 	},
 	"bear": {
 		"name": "熊",
+		"approach": "樹幹上有新的爪痕，比你的頭還高。山洞口散著骨頭。",
 		"blurb": "比人還高的大熊，皮又厚又硬。被牠抱住就麻煩了。",
 		"hp": 220, "str": 17, "agi": 9, "armor": "light", "traits": ["beast", "big"], "pron": "牠",
 		"weapon": "熊掌", "guard": "架勢",
@@ -249,6 +254,7 @@ const ENEMIES := {
 	},
 	"ogre": {
 		"name": "食人魔",
+		"approach": "地上有很大的腳印，一路往城牆的缺口裡去。",
 		"blurb": "兩個人高的怪物，拖著一根大木棍。力氣大得能把人抓起來摔。",
 		"hp": 520, "str": 23, "agi": 8, "armor": "none", "traits": ["big"], "pron": "牠",
 		"weapon": "木棍", "guard": "架勢", "no_flee": true,
@@ -286,6 +292,7 @@ const ENEMIES := {
 	# ---------- 2026-10-06 加的委託怪物（每一境 2～3 種） ----------
 	"boar": {
 		"name": "野豬",
+		"approach": "路邊的田被拱得亂七八糟。灌木叢後面傳來哼哼的聲音。",
 		"blurb": "",
 		"hp": 90, "str": 11, "agi": 9, "armor": "none", "traits": ["beast"], "pron": "牠",
 		"weapon": "獠牙", "guard": "架勢",
@@ -319,6 +326,7 @@ const ENEMIES := {
 	},
 	"poacher": {
 		"name": "盜獵人",
+		"approach": "樹上掛著剝了皮的鹿，地上有一排套子。林子裡很安靜。",
 		"blurb": "",
 		"hp": 150, "str": 12, "agi": 15, "armor": "light", "traits": ["disarmable"], "kinds": ["blade"], "pron": "他",
 		"weapon": "獵刀", "guard": "架勢", "move_pool": ["dust", "knee", "needle", "deflect"], "pool_n": 2,
@@ -354,6 +362,7 @@ const ENEMIES := {
 	},
 	"smuggler": {
 		"name": "走私頭子",
+		"approach": "碼頭上幾個人正把木箱往小船上搬，看見你就停了手。",
 		"blurb": "",
 		"hp": 180, "str": 15, "agi": 12, "armor": "light", "traits": ["disarmable"], "kinds": ["blade"], "pron": "他",
 		"weapon": "彎刀", "guard": "架勢", "move_pool": ["fallstone", "triple", "shed", "dust"], "pool_n": 2,
@@ -393,6 +402,7 @@ const ENEMIES := {
 	},
 	"pikeman": {
 		"name": "長槍兵",
+		"approach": "驛站門口橫著一輛翻倒的馬車，一個人拄著長槍坐在車上。", "toll": {"cost": 40, "text": "你數了 40 銀給他。長槍兵把槍收了回去，讓你過去。"},
 		"blurb": "",
 		"hp": 230, "str": 16, "agi": 15, "armor": "light", "traits": ["disarmable"], "pron": "他",
 		"weapon": "長槍", "guard": "槍桿", "move_pool": ["knee", "deflect", "dust", "shed"], "pool_n": 2,
@@ -432,6 +442,7 @@ const ENEMIES := {
 	},
 	"alpha_wolf": {
 		"name": "頭狼",
+		"approach": "草地上趴著幾頭狼，中間那頭抬起了頭，看著你。",
 		"blurb": "",
 		"hp": 270, "str": 14, "agi": 18, "armor": "none", "traits": ["beast"], "pron": "牠",
 		"weapon": "利牙", "guard": "架勢",
@@ -476,6 +487,7 @@ const ENEMIES := {
 	},
 	"elk": {
 		"name": "巨角鹿",
+		"approach": "山路上有被撞翻的車輪。林子裡傳來樹枝斷掉的聲音。",
 		"blurb": "",
 		"hp": 330, "str": 20, "agi": 13, "armor": "none", "traits": ["beast", "big"], "pron": "牠",
 		"weapon": "鹿角", "guard": "鹿角",
@@ -514,6 +526,7 @@ const ENEMIES := {
 	},
 	"butcher": {
 		"name": "屠夫",
+		"approach": "城牆的缺口裡飄出一股腥味，地上有拖過東西的痕跡。",
 		"blurb": "",
 		"hp": 340, "str": 21, "agi": 14, "armor": "light", "traits": ["disarmable"], "kinds": ["blade"], "pron": "他", "no_flee": true,
 		"weapon": "剁肉刀", "guard": "架勢", "move_pool": ["fallstone", "triple", "shed", "knee"], "pool_n": 2,
@@ -553,6 +566,7 @@ const ENEMIES := {
 	},
 	"croc": {
 		"name": "老鱷",
+		"approach": "退潮的泥灘上有一道拖痕，一直通到水邊。",
 		"blurb": "",
 		"hp": 580, "str": 24, "agi": 11, "armor": "light", "traits": ["beast", "big"], "pron": "牠",
 		"weapon": "大嘴", "guard": "鱗甲",
@@ -589,6 +603,7 @@ const ENEMIES := {
 	},
 	"troll": {
 		"name": "巨魔",
+		"approach": "山口的雪地上有一串很大的腳印，旁邊散著砸碎的石頭。",
 		"blurb": "",
 		"hp": 800, "str": 28, "agi": 14, "armor": "light", "traits": ["big"], "pron": "牠", "no_flee": true,
 		"weapon": "石頭", "guard": "手臂",
@@ -881,6 +896,7 @@ const ENEMIES := {
 	# 劍庭的委託：牧羊村那個說自己是劍庭出來的人。用的全是野路子，沒有一招是劍庭的
 	"impostor": {
 		"name": "劍術教師",
+		"approach": "穀倉前，一個人正拿著長劍教幾個孩子比劃。他身上的灰衣，跟劍庭的很像。",
 		"blurb": "",
 		"hp": 170, "str": 13, "agi": 13, "armor": "light", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
 		"weapon": "長劍", "guard": "盾牌", "moves": ["knee", "dust", "fallstone"],

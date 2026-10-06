@@ -254,17 +254,17 @@ func _append(events: Array) -> void:
 			"round", "intent", "stat":
 				pass  # 回合數、對手一般的架勢、雙方數值只寫進試玩紀錄
 			"scene":
-				log_label.append_text("[i][color=%s]%s[/color][/i]\n" % [COLOR["scene"], text])
+				log_label.append_text("[color=%s]%s[/color]\n" % [COLOR["scene"], text])
 			"tell":
 				_flush(damage)
 				_para.append(text)
 			"end":
 				_flush(damage)
-				log_label.append_text("\n[b][font_size=26]%s[/font_size][/b]\n" % text)
+				log_label.append_text("\n[b]%s[/b]\n" % text)
 			"ult":
 				# 絕學喊出招名：自己一行、字很大
 				_flush(damage)
-				log_label.append_text("[center][b][font_size=34][color=%s]%s[/color][/font_size][/b][/center]\n" % [COLOR["ult"], text])
+				log_label.append_text("[b][color=%s]%s[/color][/b]\n" % [COLOR["ult"], text])
 			"big":
 				_flush(damage)
 				log_label.append_text("[color=%s]%s[/color]\n" % [COLOR["big"], text])
@@ -285,7 +285,7 @@ func _flush(damage: Array) -> void:
 		log_label.append_text("\n" + "".join(_para) + "\n")
 		_para.clear()
 	if not damage.is_empty():
-		log_label.append_text("[font_size=16]%s[/font_size]\n" % "　".join(damage))
+		log_label.append_text("%s\n" % "　".join(damage))
 		damage.clear()
 
 

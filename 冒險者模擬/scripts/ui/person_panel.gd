@@ -159,7 +159,7 @@ func _build_info(p: Person) -> void:
 		where = MapData.place_name(p.location)
 	elif town.hero.heard.has(p.id):
 		# 別人：最後聽說他在哪
-		where = "%s（%s）" % [MapData.place_name(town.hero.heard[p.id]["place"]), MapView.heard_when(town, p.id)]
+		where = "%s，%s聽說的" % [MapData.place_name(town.hero.heard[p.id]["place"]), MapView.heard_when(town, p.id)]
 	else:
 		where = "不知道"
 	var realm := p.realm_text() if not p.dead else "—"
@@ -202,7 +202,7 @@ func _build_buttons(p: Person, me: bool) -> void:
 	elif h.heard.has(p.id) and h.heard[p.id]["place"] != h.location:
 		# 去最後聽說他在的地方（不一定還在）
 		var place: String = h.heard[p.id]["place"]
-		var go := UiKit.button("去%s（%s）" % [MapData.place_name(place), LifeData.span_text(MapData.distance(h.location, place))], 260)
+		var go := UiKit.button("去%s" % MapData.place_name(place), 260)
 		go.disabled = h.dying()
 		go.pressed.connect(func():
 			close()
@@ -213,7 +213,7 @@ func _build_buttons(p: Person, me: bool) -> void:
 	if iq["tracking"]:
 		button_box.add_child(UiKit.label("公會有%s的消息。" % p.pron, 16, 0.7))
 	elif iq["why"] != "-":
-		var ib := UiKit.button("打聽%s的下落（%d 銀）" % [p.pron, iq["cost"]], 260)
+		var ib := UiKit.button("花 %d 銀打聽%s的下落" % [iq["cost"], p.pron], 260)
 		ib.disabled = not iq["ok"]
 		ib.tooltip_text = iq["why"]
 		ib.pressed.connect(func():

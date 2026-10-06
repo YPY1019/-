@@ -42,6 +42,8 @@ var log_label: RichTextLabel
 var tabs: TabContainer
 var map_view: MapView
 var people_view: PeopleView
+## 跳出來的選擇（main 給的）
+var dialog: EncounterDialog
 ## 臨終時換掉中間的分頁
 var deathbed_box: VBoxContainer
 var deathbed_panel: Control
@@ -172,7 +174,7 @@ func play_wait(w: Dictionary, after: Callable) -> void:
 			await get_tree().create_timer(step).timeout
 			_show_month(from + tick)
 			if schedule.has(tick):
-				log_label.append_text("[i][color=%s]%s[/color][/i]\n" % [LINE_COLOR, schedule[tick]])
+				log_label.append_text("[color=%s]%s[/color]\n" % [LINE_COLOR, schedule[tick]])
 			var told := news.filter(func(e): return e["month"] == from + tick)
 			if not told.is_empty():
 				log_label.append_text(UiKit.messages_bbcode(told) + "\n")
@@ -211,7 +213,7 @@ func refresh() -> void:
 	place_label.text = MapData.place_name(h.location)
 	var home := MapData.distance(h.location, MapData.HOME)
 	home_button.visible = home > 0 and not h.dying()
-	home_button.text = "回城（%s）" % LifeData.span_text(home)
+	home_button.text = "回城"
 	tabs.visible = not h.dying()
 	# 旅店在城裡：城外不能休養
 	rest_row.visible = town.in_city() and not h.dying()
@@ -262,21 +264,29 @@ func _act(msgs: Array) -> void:
 
 # ---------- 休養 ----------
 
+## 一個「休養」鍵：按了再選要休多久
 func _build_rest() -> void:
 	UiKit.clear(rest_row)
 	var full := town.months_to_full()
 	var away := not town.in_city() or town.hero.dying()
-	var one := UiKit.button("休養 1 個月", 150)
-	one.disabled = full == 0 or away
-	one.pressed.connect(func(): _act(town.rest(1)))
-	rest_row.add_child(one)
-	var all := UiKit.button("休養到痊癒（%s）" % LifeData.span_text(full) if full > 0 else "不用休養", 230)
-	all.disabled = full == 0 or away
+	var b := UiKit.button("休養", 150)
+	b.disabled = full == 0 or away
 	if away and not town.hero.dying():
-		one.tooltip_text = "要在城裡"
-		all.tooltip_text = "要在城裡"
-	all.pressed.connect(func(): _act(town.rest(town.months_to_full())))
-	rest_row.add_child(all)
+		b.tooltip_text = "要在城裡"
+	b.pressed.connect(_ask_rest)
+	rest_row.add_child(b)
+
+
+func _ask_rest() -> void:
+	dialog.show_choice("", Color.WHITE, "在旅店住多久？",
+		[["1", "一個月"], ["3", "三個月"], ["6", "半年"], ["full", "住到傷好"], ["no", "算了"]], _on_rest_choice)
+
+
+func _on_rest_choice(c: String) -> void:
+	if c == "no":
+		return
+	var full := town.months_to_full()
+	_act(town.rest(full if c == "full" else mini(int(c), full)))
 
 
 # ---------- 你 ----------
@@ -350,7 +360,7 @@ func _build_me() -> void:
 			if st["read"]:
 				row.add_child(UiKit.label("讀過", 16, 0.5))
 			else:
-				var b := UiKit.button("讀（%s）" % LifeData.span_text(st["months"]), 130)
+				var b := UiKit.button("讀", 100)
 				b.disabled = not st["ok"]
 				b.tooltip_text = st["why"]
 				b.pressed.connect(func(): _act(town.read_book(id)))
@@ -516,7 +526,7 @@ func _build_shop() -> void:
 			row.add_child(l)
 		else:
 			row.add_child(_weapon_name(WeaponData.get_def(id), st["ok"]))
-		var b := UiKit.button("買（%d 銀）" % town.price(id), 170)
+		var b := UiKit.button("花 %d 銀買" % town.price(id), 170)
 		b.disabled = not st["ok"]
 		b.tooltip_text = "、".join(st["why"])
 		b.pressed.connect(func(): _act(town.buy_weapon(id)))

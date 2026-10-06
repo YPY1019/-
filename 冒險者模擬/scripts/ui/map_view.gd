@@ -53,7 +53,7 @@ func refresh() -> void:
 		side.add_child(UiKit.label("你在這裡。", 16, 0.6))
 	else:
 		var months := MapData.distance(h.location, selected)
-		var go := UiKit.button("走過去（%s）" % LifeData.span_text(months), 200)
+		var go := UiKit.button("走過去", 200)
 		go.disabled = h.dying()
 		go.pressed.connect(func(): travel_requested.emit(selected))
 		var row := UiKit.hbox(0)
@@ -78,7 +78,7 @@ func refresh() -> void:
 			if town.took_job(id):
 				row.add_child(UiKit.label("你接下了", 15, 0.7))
 			if here:
-				var b := UiKit.button("動手", 90, 36)
+				var b := UiKit.button("去找", 90, 36)
 				b.pressed.connect(func(): monster_requested.emit(id))
 				row.add_child(b)
 			side.add_child(row)
@@ -99,10 +99,6 @@ func refresh() -> void:
 		name_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_button.pressed.connect(func(): person_selected.emit(p.id))
 		row.add_child(name_button)
-		if here and town.can_fight(p.id):
-			var b := UiKit.button("動手", 90, 36)
-			b.pressed.connect(func(): fight_requested.emit(p.id))
-			row.add_child(b)
 		side.add_child(row)
 
 
@@ -122,7 +118,6 @@ func _heard_here() -> void:
 		name_button.add_theme_color_override("font_color", Color(p.realm_color()))
 		name_button.pressed.connect(func(): person_selected.emit(p.id))
 		row.add_child(name_button)
-		row.add_child(UiKit.label(heard_when(town, p.id), 15, 0.55))
 		side.add_child(row)
 
 

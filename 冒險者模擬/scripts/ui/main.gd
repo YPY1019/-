@@ -38,7 +38,7 @@ func _ready() -> void:
 	add_child(margin)
 
 	town_view = TownView.new(town)
-	town_view.monster_requested.connect(_start_monster)
+	town_view.monster_requested.connect(_meet_monster)
 	town_view.fight_requested.connect(_fight_person)
 	town_view.travel_requested.connect(_travel)
 	town_view.spar_requested.connect(_start_spar)
@@ -67,6 +67,7 @@ func _ready() -> void:
 	encounter = EncounterDialog.new()
 	encounter.chosen.connect(_answer_comer)
 	add_child(encounter)
+	town_view.dialog = encounter
 	blocker = Control.new()
 	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
 	blocker.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -156,7 +157,27 @@ func _travel(place: String) -> void:
 		town_view.add_messages(msgs)
 		if not town.hero.dying() and not town.hero.dead:
 			town_view.show_map()
-		_after_time())
+		_after_time()
+		# 走到接了委託的地方：碰上了（有人找上門的話，先處理那邊）
+		if town_view.visible and not encounter.visible and not town.hero.dying() and not town.hero.dead:
+			var jobs := town.jobs_here()
+			if not jobs.is_empty():
+				_meet_monster(jobs[0]))
+
+
+## 走到委託的地方、或在地圖上按「去找」：先跳出看到的情況，再決定打不打
+func _meet_monster(enemy_id: String) -> void:
+	var ev := town.monster_event(enemy_id)
+	var e: Dictionary = EnemyData.ENEMIES[enemy_id]
+	var dg := EnemyData.danger(enemy_id)
+	encounter.show_choice(ev["title"], Color(dg["color"]), ev["text"], ev["options"], _answer_monster.bind(enemy_id))
+
+
+func _answer_monster(choice: String, enemy_id: String) -> void:
+	var r := town.answer_monster(enemy_id, choice)
+	town_view.add_messages(r["msgs"])
+	if r["fight"]:
+		_start_monster(enemy_id)
 
 
 func _start_monster(enemy_id: String) -> void:

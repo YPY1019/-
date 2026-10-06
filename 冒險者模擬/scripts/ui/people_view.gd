@@ -1,7 +1,7 @@
 class_name PeopleView
 extends ScrollContainer
 
-## 人物分頁：你見過、聽說過的人，名字用境界的顏色，旁邊寫最後聽說他在哪（幾個月前）。點名字打開人物面板（PersonPanel）。
+## 人物分頁：你見過、聽說過的人，名字用境界的顏色。在哪寫在人物面板裡（點名字打開 PersonPanel）。
 ## 只負責顯示，規則都在 Town。
 
 signal person_requested(person_id: String)
@@ -59,9 +59,4 @@ func _entry(grid: GridContainer, p: Person, alpha: float) -> void:
 	b.add_theme_color_override("font_color", Color(p.realm_color(), alpha))
 	b.pressed.connect(func(): person_requested.emit(p.id))
 	row.add_child(b)
-	var where := ""
-	if not p.dead:
-		var h: Dictionary = town.hero.heard[p.id]
-		where = "%s（%s）" % [MapData.place_name(h["place"]), MapView.heard_when(town, p.id)]
-	row.add_child(UiKit.label(where, 15, 0.55))
 	grid.add_child(row)

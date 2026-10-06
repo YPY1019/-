@@ -128,6 +128,39 @@ func took_job(enemy_id: String) -> bool:
 	return hero.jobs.has(enemy_id)
 
 
+## 走到委託的地方，碰上了：先看到牠，再決定怎麼辦。{"text", "options": [[id, 按鈕的字]]}
+## fight 動手；toll 付錢過路（攔路收錢的才有）；leave 先離開
+func monster_event(enemy_id: String) -> Dictionary:
+	var e: Dictionary = EnemyData.ENEMIES[enemy_id]
+	var options := [["fight", "動手"]]
+	if e.has("toll"):
+		options.append(["toll", "給他 %d 銀" % e["toll"]["cost"]])
+	options.append(["leave", "先離開"])
+	return {"title": e["name"], "text": e.get("approach", ""), "options": options}
+
+
+## 回應：{"fight": 要不要開打, "msgs"}
+func answer_monster(enemy_id: String, choice: String) -> Dictionary:
+	var e: Dictionary = EnemyData.ENEMIES[enemy_id]
+	match choice:
+		"fight":
+			return {"fight": true, "msgs": []}
+		"toll":
+			var toll: Dictionary = e["toll"]
+			if hero.money < toll["cost"]:
+				return {"fight": true, "msgs": [_m("bad", "你身上的錢不夠。%s往前一步。" % e["name"])]}
+			hero.money -= toll["cost"]
+			return {"fight": false, "msgs": [_m("info", toll["text"])]}
+	return {"fight": false, "msgs": [_m("info", "你退了回去，沒有驚動%s。" % ("牠" if e.get("pron", "牠") == "牠" else "他"))]}
+
+
+## 走到這裡碰得上的委託對手（接下的委託、劍庭要你打的人）
+func jobs_here() -> Array:
+	var list := monsters_at(hero.location).filter(func(id): return took_job(id))
+	list.append_array(duels_at(hero.location))
+	return list
+
+
 ## 開打：場景照所在的地方寫
 func start_monster(enemy_id: String) -> Battle:
 	_fight_enemy = enemy_id

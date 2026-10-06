@@ -70,8 +70,8 @@ static func messages_bbcode(msgs: Array) -> String:
 	var lines := []
 	for m in msgs:
 		if m["kind"] == "epic":
-			# 一輩子記得的大事：字大一點，前後空一行
-			lines.append("\n[font_size=22][color=%s]%s[/color][/font_size]\n" % [MSG_COLOR["epic"], m["text"]])
+			# 一輩子記得的大事：前後空一行（字一樣大，只換顏色）
+			lines.append("\n[color=%s]%s[/color]\n" % [MSG_COLOR["epic"], m["text"]])
 		else:
 			lines.append("[color=%s]%s[/color]" % [MSG_COLOR.get(m["kind"], "#ffffff"), m["text"]])
 	return "\n".join(lines)
@@ -83,7 +83,7 @@ static func book_label(id: String, size := 18) -> Label:
 	# 殘頁不寫書名號（還不知道是哪一本）
 	var l := label(b["name"] if b.has("page_of") else "《%s》" % b["name"], size)
 	l.add_theme_color_override("font_color", Color(BookData.color(id)))
-	l.tooltip_text = b["desc"] if b.has("page_of") else "%s\n讀完要 %s" % [b["desc"], LifeData.span_text(b["months"])]
+	l.tooltip_text = b["desc"]
 	l.mouse_filter = Control.MOUSE_FILTER_STOP
 	return l
 

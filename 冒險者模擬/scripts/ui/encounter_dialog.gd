@@ -1,8 +1,8 @@
 class_name EncounterDialog
 extends Control
 
-## 有人找上門：先跳一個對話（他說什麼、你怎麼回），選了才決定打不打。
-## 只負責顯示和按鈕：選項和結果都由 Town 決定（Town.comer_options / answer_comer）。
+## 跳出來的對話：一段文字、幾個選項。有人找上門、走到委託的地方遇到怪物、休養要休多久，都用它。
+## 只負責顯示和按鈕：選項和結果都由 Town 決定。
 
 ## 選了哪一個（選項的 id）
 signal chosen(choice: String)
@@ -44,16 +44,24 @@ func _init() -> void:
 	box.add_child(button_row)
 
 
-## who：找上門的人。options：[[id, 按鈕的字]]
+## who：找上門的人。options：[[id, 按鈕的字]]。選了發 chosen
 func ask(who: Person, text: String, options: Array) -> void:
-	name_label.text = ("%s %s" % [who.title, who.display_name]).strip_edges()
-	name_label.add_theme_color_override("font_color", Color(who.realm_color()))
+	show_choice(("%s %s" % [who.title, who.display_name]).strip_edges(), Color(who.realm_color()), text, options,
+		func(c): chosen.emit(c))
+
+
+## 一般的選擇：選了呼叫 on_choose(選項 id)
+func show_choice(title: String, color: Color, text: String, options: Array, on_choose: Callable) -> void:
+	name_label.text = title
+	name_label.visible = title != ""
+	name_label.add_theme_color_override("font_color", color)
 	text_label.text = text
+	text_label.visible = text != ""
 	UiKit.clear(button_row)
 	for o in options:
-		var b := UiKit.button(o[1], 170, 48)
+		var b := UiKit.button(o[1], 150, 48)
 		b.pressed.connect(func():
 			visible = false
-			chosen.emit(o[0]))
+			on_choose.call(o[0]))
 		button_row.add_child(b)
 	visible = true
