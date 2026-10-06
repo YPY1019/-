@@ -305,9 +305,10 @@ func _maybe_break_through(foe_best: int) -> Array:
 ## 打輸了：重傷，被人撿回城裡
 func _knocked_out() -> Array:
 	hero.hp = maxi(1, roundi(hero.max_hp() * TownData.INJURED_HP))
+	# 在路上被打倒也算在外面（走路時 location 已經是要去的地方）
+	var away := hero.location != MapData.HOME or hero.travel_left > 0
 	road = {}
 	hero.travel_left = 0
-	var away := hero.location != MapData.HOME
 	hero.location = MapData.HOME
 	if away:
 		return [_m("bad", "路過的商隊把你撿了回來。醒來時你躺在霜溪城的旅店，身上纏滿了繃帶。")]

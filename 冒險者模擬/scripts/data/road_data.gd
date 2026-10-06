@@ -55,7 +55,7 @@ const CHANCE := {
 const AMBUSH_IDLE := 0.06
 ## 同一件事隔多久才會再碰到（月）；同一個人隔多久才會再找你（月）。寫好的事一輩子一次（ONCE）
 const AGAIN := {"robbers": 10, "robbers_shy": 10, "challenge": 18, "kin_help": 36, "merchant": 24, "repay": 18, "traveler": 12,
-	"caravan": 30, "stalked": 24, "thug": 18, "raided": 12, "corpse": 0, "ambush": 0}
+	"caravan": 60, "stalked": 60, "thug": 18, "raided": 12, "corpse": 0, "ambush": 0}
 const PERSON_AGAIN := 24
 const ONCE := ["corpse"]
 ## 你比他強這麼多（Person.power），攔路的就不敢出來
