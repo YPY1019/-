@@ -224,7 +224,7 @@ func _build_buttons(p: Person, me: bool) -> void:
 	if rank >= 0:
 		button_box.add_child(UiKit.label("強者榜上第 %d 個名字。" % (rank + 1), 16, 0.8))
 	if town.world.wanted(p.id):
-		var w := UiKit.label("公會懸賞%s。" % p.pron, 16)
+		var w := UiKit.label("公會懸賞%s。" % ("你" if p.id == town.world.hero_id else p.pron), 16)
 		w.add_theme_color_override("font_color", Color(TownView.GOLD))
 		button_box.add_child(w)
 

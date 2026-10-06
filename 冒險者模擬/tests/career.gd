@@ -13,12 +13,19 @@ const PRIZES := ["red_fang", "knell", "gatebreaker", "nightwatch", "verdict_1", 
 const LADDER := EnemyData.ORDER
 
 var verbose := false
+## 這一輪上次考公開比試是哪一年
+var trial_year := -1
+## 印出路上的事（環境變數 ROADLOG=1）；每輪走了幾趟、碰上哪些事
+var road_log := false
+var trips := 0
+var road_counts := {}
 
 
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	var runs := int(args[0]) if args.size() > 0 else 20
 	verbose = args.size() > 1 and args[1] == "1"
+	road_log = OS.get_environment("ROADLOG") == "1"
 	var got_ages := {}
 	var counts := []
 	var lost := {}
@@ -42,13 +49,16 @@ func _init() -> void:
 			print("　%s：%d 歲（%d/%d 輪），%d 輪被別人拿走／下葬" % [name, v[v.size() / 2], v.size(), runs, lost.get(k, 0)])
 	counts.sort()
 	deaths.sort()
+	var ids := road_counts.keys()
+	ids.sort_custom(func(a, b): return road_counts[a] > road_counts[b])
+	print("走了 %d 趟，碰上 %d 件事：%s" % [trips, road_counts.values().reduce(func(a, b): return a + b, 0), "、".join(ids.map(func(k): return "%s %d" % [k, road_counts[k]]))])
 	print("一輩子拿到幾樣：最少 %d、中位數 %d、最多 %d（死在 %d～%d 歲）" % [counts[0], counts[counts.size() / 2], counts[-1], deaths[0], deaths[-1]])
 	quit()
 
 
 func _career(run: int) -> Dictionary:
 	var town := Town.new(run + 1)
-	town.road_chance = float(OS.get_environment("ROAD") if OS.get_environment("ROAD") != "" else str(RoadData.CHANCE_PER_MONTH))
+	town.road_boost = float(OS.get_environment("ROAD")) if OS.get_environment("ROAD") != "" else 1.0
 	var w := town.world
 	var h := town.hero
 	var pilot := AutoPilot.new()
@@ -58,7 +68,7 @@ func _career(run: int) -> Dictionary:
 	var got := {}
 	var lost := {}
 	var fails := {}  # 對手 id -> 在目前實力下輸了幾次
-	var spar_tries := 0
+	trial_year = -1
 	var guard := 0
 	while not h.dying() and guard < 2000:
 		guard += 1
@@ -78,8 +88,7 @@ func _career(run: int) -> Dictionary:
 		if not town.in_city() and _city_wanted(town):
 			_go(town, pilot, rng, got, MapData.HOME)
 			continue
-		if town.in_city() and _city_chores(town, pilot, rng, spar_tries):
-			spar_tries += 1 if town.spar_state()["ok"] or town.trial_state()["ok"] else 0
+		if town.in_city() and _city_chores(town, pilot, rng):
 			continue
 		# 挑懸賞：打得過的（看粗略的強弱），在目前實力下輸了兩次的先不去
 		# 會的招多，比粗略的強弱估得強一點
@@ -87,7 +96,7 @@ func _career(run: int) -> Dictionary:
 		var target := ""
 		for id in w.bounties:
 			var p := w.person(id)
-			if p.power() <= me + 0.5 and fails.get(id, 0) < 2 and (target == "" or p.power() > w.person(target).power()):
+			if id != w.hero_id and p.power() <= me + 0.5 and fails.get(id, 0) < 2 and (target == "" or p.power() > w.person(target).power()):
 				target = id
 		if target != "":
 			if not town.took_bounty(target):
@@ -173,7 +182,7 @@ func _city_wanted(town: Town) -> bool:
 
 
 ## 城裡的事：練武場學招、劍庭入門、接劍庭的委託、換招、比試、讀秘笈、買劍、換劍。做了一件就回傳 true
-func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar_tries: int) -> bool:
+func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator) -> bool:
 	var h := town.hero
 	if not h.claims.is_empty():
 		town.turn_in("guild")
@@ -213,7 +222,10 @@ func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar
 		pilot.play(sb)
 		town.finish_spar(sb)
 		return true
-	if town.trial_state()["ok"] and spar_tries < 6:
+	# 公開比試一年考一次（打輸受傷，傷好了不會馬上再考）
+	var year := LifeData.year_of(town.world.month())
+	if town.trial_state()["ok"] and year != trial_year:
+		trial_year = year
 		var tb := town.start_trial()
 		tb.rng.seed = rng.randi()
 		pilot.play(tb)
@@ -225,18 +237,26 @@ func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar
 ## 走路；路上碰上事：攔路的打得過就打、不然給錢；跟在後面的就回頭打；其他選第一個
 func _go(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, got: Dictionary, place: String) -> void:
 	town.travel(place)
+	trips += 1
+	if not town.road.is_empty():
+		road_counts[town.road["id"]] = road_counts.get(town.road["id"], 0) + 1
+		if road_log:
+			print("\n【%s　%s】" % [town.hero.date_text(), town.road["id"]])
 	var guard := 0
 	while not town.road.is_empty() and not town.hero.dying() and guard < 20:
 		guard += 1
 		if town.road["step"] == "":
 			town.continue_travel()
 			break
-		# 選第一個看得到的選項；攔路的、跟在後面的，血少就不打
+		# 隨便選一個看得到的選項（看得到每一種結果）
 		var ev := town.road_event()
-		var choice: String = ev["options"][0][0]
-		if town.hero.hp < town.hero.max_hp() * 0.5 and ev["options"].size() > 1:
-			choice = ev["options"][1][0]
+		var pick: Array = ev["options"][rng.randi_range(0, ev["options"].size() - 1)]
+		var choice: String = pick[0]
 		var r := town.answer_road(choice)
+		if road_log:
+			print("　%s｜%s\n　→ %s" % [ev["title"], ev["text"].replace("\n", " "), pick[1]])
+			for m in r["msgs"]:
+				print("　　", m["text"])
 		var fight: String = r["fight"]
 		if fight.begins_with("enemy:"):
 			var eid := fight.substr(6)
@@ -244,6 +264,9 @@ func _go(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, got: Dictiona
 		elif fight.begins_with("person:"):
 			var pid := fight.substr(7)
 			_fight(town, pilot, rng, func(): return town.start_person(pid), "person", got, town.hero)
+		elif fight.begins_with("duel:"):
+			var did := fight.substr(5)
+			_fight(town, pilot, rng, func(): return town.start_duel(did), "duel", got, town.hero)
 
 
 ## 打一場、拿光戰利品、結算。回傳勝負
@@ -251,12 +274,21 @@ func _fight(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, start: Cal
 	var b: Battle = start.call()
 	b.rng.seed = rng.randi()
 	var r := pilot.play(b)
+	var res := []
 	if kind == "person":
-		town.finish_person(b)
+		res = town.finish_person(b)
 		if town.fate_pending != null:
-			town.decide_fate(town.world.bounties.has(town.fate_pending.id) or town.fate_pending.target == h.id)
+			var on_road := not town.road.is_empty()
+			var fm := town.decide_fate(town.world.bounties.has(town.fate_pending.id) or town.fate_pending.target == h.id or on_road and rng.randf() < 0.3)
+			if road_log and on_road:
+				for m in fm:
+					print("　　", m["text"])
+	elif kind == "duel":
+		res = town.finish_duel(b)
 	else:
-		town.finish_monster(b)
+		res = town.finish_monster(b)
+	if road_log and not town.road.is_empty():
+		print("　　（打：%s，%s）" % [b.enemies[0].display_name, r["outcome"]])
 	for id in town.loot.duplicate():
 		town.take_loot(id)
 		if PRIZES.has(id) and not got.has(id):

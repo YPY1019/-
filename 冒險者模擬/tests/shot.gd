@@ -20,7 +20,7 @@ func _init() -> void:
 	var w: World = town.world
 	var h: Person = town.hero
 	# 路上的事另外截一張，其他時候不要碰上（不然會擋住流程）
-	town.road_chance = 0.0
+	town.road_boost = 0.0
 
 	# 委託板、地圖、人物
 	tv.tabs.current_tab = 0

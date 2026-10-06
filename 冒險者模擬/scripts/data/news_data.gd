@@ -83,3 +83,6 @@ const REMEMBER := [
 ]
 ## 上一個人的仇人，找上了接手的人
 const GRUDGE_PASSED := "{p:who}聽說{p:old}死了，東西到了{p:heir}手上。"
+## 你殺了不該殺的人：公會貼出你的懸賞（懸賞板上的字、傳到你耳裡的話）
+const MURDER_BOUNTY := "{p:who}在{place}殺了{p:victim}。苦主湊了一筆錢，懸賞{p:who}的人頭。"
+const MURDER_POSTED := "公會的牆上多了一張懸賞。上面畫的是你，畫得不太像。"

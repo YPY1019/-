@@ -38,6 +38,8 @@ const WEAPONS := {
 		"look": "一把舊鐵劍，刃口有好幾個缺口。", "desc": "從老家帶出來的劍，刃口有好幾個缺口。"},
 	"steel_sword": {"grade": 1, "name": "鋼劍", "noun": "鋼劍", "kind": "sword", "power": 1.3, "cost": 100, "str": 12,
 		"look": "一把鋼劍。", "desc": "鐵匠鋪最常見的好劍，比你那把舊鐵劍利多了。"},
+	"chopper": {"grade": 0, "name": "柴刀", "noun": "柴刀", "kind": "blade", "power": 1.0, "cost": 0, "str": 0,
+		"look": "一把柴刀，刀刃上全是缺口。", "desc": "砍柴的刀，拿來攔路。"},
 	"bandit_blade": {"grade": 1, "name": "盜匪的大刀", "noun": "大刀", "kind": "blade", "power": 1.2, "cost": 0, "str": 0,
 		"look": "一把刀背生鏽的大刀。", "desc": "盜匪愛用的大刀。刀背生鏽，刀口倒是磨得很利。"},
 	"knight_sword": {"grade": 2, "name": "騎士長劍", "noun": "長劍", "kind": "sword", "power": 1.5, "cost": 0, "str": 14,

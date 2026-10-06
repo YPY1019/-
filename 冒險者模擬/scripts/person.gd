@@ -84,6 +84,8 @@ var selection_year := -999
 var heard := {}
 ## 看過誰用過哪些招：人 id -> [招 id]（人物面板只寫看過的）
 var seen := {}
+## 路上碰過的事：事件 id 或「事件 id:人 id」-> 世界的第幾個月（同一件事不重複，見 Road）
+var road_seen := {}
 ## 接下的一般委託（怪物 id）。打贏才拿得到報酬
 var jobs: Array[String] = []
 ## 打贏過的對手（委託的怪物 id、人的 id）
@@ -110,6 +112,10 @@ var follows := ""
 var relations := {}
 ## 要找誰算帳（仇人的 id）。有仇人的人會去找他
 var grudges: Array = []
+## 為什麼記仇：仇人 id -> {"kind": kin 殺了他的家人 / beaten 打傷他、拿走他的東西, "victim": 死的是誰, "place", "month"}
+var grudge_why := {}
+## 欠誰一份情（被他放過一條命、被他救過）：人 id 的清單
+var grateful: Array = []
 ## 正在追的人（懸賞、仇人、決鬥的對象）
 var target := ""
 ## 身體還能長到哪（世界上的人）、一年大約長幾點

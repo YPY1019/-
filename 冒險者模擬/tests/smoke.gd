@@ -17,7 +17,7 @@ func _init() -> void:
 	root.add_child(main)
 	await process_frame
 	var town: Town = main.town
-	town.road_chance = 0.5
+	town.road_boost = 4.0
 	var tv: TownView = main.town_view
 	for i in steps:
 		var h := town.hero

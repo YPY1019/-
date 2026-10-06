@@ -92,3 +92,35 @@ static func _distances(from: String) -> Dictionary:
 				if not todo.has(other):
 					todo.append(other)
 	return dist
+
+
+## 從 a 走到 b 經過的地方（含 a、b，沿最近的路）
+static func path(a: String, b: String) -> Array:
+	var dist := _distances(a)
+	if not dist.has(b):
+		return [a]
+	var out := [b]
+	var cur := b
+	while cur != a:
+		for r in ROADS:
+			var other := ""
+			if r[0] == cur:
+				other = r[1]
+			elif r[1] == cur:
+				other = r[0]
+			if other != "" and dist.has(other) and dist[other] + r[2] == dist[cur]:
+				cur = other
+				break
+		out.push_front(cur)
+	return out
+
+
+## 跟這個地方有路直接連的地方
+static func neighbors(id: String) -> Array:
+	var out := []
+	for r in ROADS:
+		if r[0] == id:
+			out.append(r[1])
+		elif r[1] == id:
+			out.append(r[0])
+	return out

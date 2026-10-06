@@ -454,10 +454,12 @@ func _build_board() -> void:
 			line += "・接下的人：" + "、".join(takers.map(func(t): return town.world.who(t)))
 		info.add_child(UiKit.label(line, 15, 0.6))
 		row.add_child(info)
-		var buttons := UiKit.vbox(4)
-		buttons.add_child(_take_button(town.took_bounty(id), func(): add_messages(town.accept_bounty(id))))
-		buttons.add_child(_inquire_button(id))
-		row.add_child(buttons)
+		# 懸賞的是你：牆上畫的是你，不能自己接
+		if id != town.world.hero_id:
+			var buttons := UiKit.vbox(4)
+			buttons.add_child(_take_button(town.took_bounty(id), func(): add_messages(town.accept_bounty(id))))
+			buttons.add_child(_inquire_button(id))
+			row.add_child(buttons)
 		board_box.add_child(row)
 		board_box.add_child(HSeparator.new())
 

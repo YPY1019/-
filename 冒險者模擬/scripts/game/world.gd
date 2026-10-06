@@ -81,6 +81,12 @@ var warned: Array = []
 var _mail: Array = []
 ## 以前的玩家角色（照順序）
 var lives: Array = []
+## 最近死在外面的人（路上的事用）：[{"id", "killer", "place", "month", "weapon": 下手的人拿的武器}]
+var recent_deaths: Array = []
+## 最近有懸賞的人做壞事的地方（路上的事用）：[{"who", "place", "month"}]
+var recent_crimes: Array = []
+## 最近的事留幾個月
+const RECENT_MONTHS := 12
 var rng := RandomNumberGenerator.new()
 
 
@@ -345,6 +351,8 @@ func tick() -> void:
 		p.fame *= FAME_FADE
 	_births()
 	_replenish()
+	recent_deaths = recent_deaths.filter(func(e): return month() - e["month"] <= RECENT_MONTHS)
+	recent_crimes = recent_crimes.filter(func(e): return month() - e["month"] <= RECENT_MONTHS)
 	if LifeData.month_of_year(month()) == SchoolData.SELECTION_MONTHS[-1]:
 		_spring()
 	look_around()
@@ -481,6 +489,7 @@ func _crime(p: Person) -> void:
 	if lines.is_empty():
 		return
 	bounties[p.id]["reward"] += CRIME_RAISE
+	recent_crimes.append({"who": p.id, "place": p.location, "month": month()})
 	# 同一個人的壞事，傳聞隔一陣子才再傳一次（不然同一句一直出現）
 	if month() - _crime_told.get(p.id, -999) < CRIME_NEWS_GAP:
 		return
@@ -499,6 +508,7 @@ func _rob(p: Person) -> void:
 			prey.append(o)
 	if prey.is_empty():
 		return
+	recent_crimes.append({"who": p.id, "place": p.location, "month": month()})
 	fight(p, prey[rng.randi_range(0, prey.size() - 1)])
 
 
@@ -762,13 +772,7 @@ func _death_chance(w: Person, l: Person) -> float:
 
 ## 比劍分出勝負：輸的人認輸，名聲換一點過去
 func _duel_done(w: Person, l: Person) -> void:
-	_gain_fame(w, l, 0.6)
-	if w.target == l.id:
-		w.target = ""
-	if l.target == w.id:
-		l.target = ""
-	w.rest_left = rng.randi_range(DUEL_EVERY[0], DUEL_EVERY[1]) if w.role == "duelist" else rng.randi_range(REST_AFTER[0], REST_AFTER[1])
-	l.rest_left = rng.randi_range(REST_AFTER[0], REST_AFTER[1])
+	duel_done(w, l)
 	l.hp = maxi(1, roundi(l.max_hp() * 0.5))
 	w.note("在%s跟{p:%s}比劍，贏了" % [MapData.place_name(w.location), l.id])
 	l.note("在%s跟{p:%s}比劍，認輸了" % [MapData.place_name(w.location), w.id])
@@ -793,6 +797,7 @@ func settle(w: Person, l: Person, kill: bool, told := true) -> Array:
 		taken = _take_from_hero(w, l)
 	_gain_fame(w, l, 1.2 if kill else 1.0)
 	w.grudges.erase(l.id)
+	w.grudge_why.erase(l.id)
 	if w.target == l.id:
 		w.target = ""
 	w.rest_left = rng.randi_range(REST_AFTER[0], REST_AFTER[1])
@@ -814,12 +819,14 @@ func settle(w: Person, l: Person, kill: bool, told := true) -> Array:
 		w.note("在%s殺了{p:%s}" % [place, l.id], told)
 		if told:
 			l.note("在%s被{p:%s}殺了" % [place, w.id])
+		recent_deaths.append({"id": l.id, "killer": w.id, "place": l.location, "month": month(), "weapon": w.weapon})
 		_kill(l, w)
 	else:
 		if l.id != hero_id:
 			l.hp = maxi(1, roundi(l.max_hp() * ROBBED_HP))
-			if not l.grudges.has(w.id):
-				l.grudges.append(w.id)
+			# 你打贏了、放他走：記不記仇看你拿不拿他的東西（Town 結算）
+			if w.id != hero_id:
+				add_grudge(l, w.id, "beaten")
 			l.target = ""
 			l.rest_left = rng.randi_range(REST_AFTER[0], REST_AFTER[1])
 		if w.id != hero_id and l.id != hero_id:
@@ -911,7 +918,7 @@ func _kill(l: Person, killer: Person) -> void:
 		if p == null or p.dead or p == killer or not l.relations[r] in AVENGER_RELATIONS:
 			continue
 		if killer != null and not p.grudges.has(killer.id) and p.id != hero_id:
-			p.grudges.append(killer.id)
+			add_grudge(p, killer.id, "kin", l.id)
 			p.note("{p:%s}死了" % l.id)
 			_tell(NewsData.GRIEF.replace("{p:who}", "{p:%s}" % p.id).replace("{p:victim}", "{p:%s}" % l.id), "info")
 	_takeover(l)
@@ -967,6 +974,87 @@ func _die(p: Person) -> void:
 
 
 # ---------- 跟你有關的 ----------
+
+## 比劍分完勝負（你也一樣）：名聲換一點過去，雙方各自歇一陣子
+func duel_done(w: Person, l: Person) -> void:
+	_gain_fame(w, l, 0.6)
+	if w.target == l.id:
+		w.target = ""
+	if l.target == w.id:
+		l.target = ""
+	w.rest_left = rng.randi_range(DUEL_EVERY[0], DUEL_EVERY[1]) if w.role == "duelist" else rng.randi_range(REST_AFTER[0], REST_AFTER[1])
+	l.rest_left = rng.randi_range(REST_AFTER[0], REST_AFTER[1])
+
+## 記仇（為什麼記仇也記下來，路上找上你時說得出來）
+func add_grudge(p: Person, enemy_id: String, kind: String, victim := "") -> void:
+	if p.id == enemy_id:
+		return
+	if not p.grudges.has(enemy_id):
+		p.grudges.append(enemy_id)
+	p.grudge_why[enemy_id] = {"kind": kind, "victim": victim, "place": p.location, "month": month()}
+	p.grateful.erase(enemy_id)
+
+
+## 你殺了不該殺的人（沒有懸賞、跟你沒仇、不是他先找上你）：公會懸賞你；他的同門（熟手以上）也記仇。
+## 家人記仇在 _kill 裡（跟世界上的人一樣）
+const MURDER_REWARD := 80
+const MURDER_PER_REALM := 40
+
+
+func hero_murdered(victim: Person, place: String) -> void:
+	var h := hero()
+	var reward := MURDER_REWARD + MURDER_PER_REALM * victim.realm
+	var text := NewsData.MURDER_BOUNTY.replace("{place}", place).replace("{p:victim}", victim.display_name).replace("{p:who}", h.display_name)
+	if bounties.has(hero_id):
+		bounties[hero_id]["reward"] += reward
+		bounties[hero_id]["text"] += "\n" + text
+	else:
+		bounties[hero_id] = {"reward": reward, "text": text, "takers": []}
+	h.note("在%s殺了{p:%s}，公會懸賞%s" % [place, victim.id, h.pron])
+	if victim.school != "":
+		for o in others():
+			if o != victim and o.school == victim.school and o.rank >= 2:
+				add_grudge(o, hero_id, "kin", victim.id)
+	_tell(NewsData.MURDER_POSTED, "bad")
+
+
+## 你被來收懸賞的人打倒：押回城裡關一陣子，身上的錢賠給苦主，懸賞撤下。回傳賠了多少
+func hero_captured(hunter: Person) -> int:
+	var h := hero()
+	var b: Dictionary = bounties.get(hero_id, {})
+	var fine := mini(h.money, b.get("reward", 0))
+	h.money -= fine
+	_gain_fame(hunter, h)
+	hunter.target = ""
+	hunter.rest_left = rng.randi_range(HUNT_REST[0], HUNT_REST[1])
+	hunter.note("抓到了{p:%s}，領了懸賞" % hero_id)
+	h.note("被{p:%s}抓到，押回霜溪城" % hunter.id)
+	bounties.erase(hero_id)
+	return fine
+
+
+## 路上沒名字的人活下來，就變成世界上的人（攔路的小賊：在那一帶出沒、搶比自己弱的人）
+func make_drifter(place: String) -> Person:
+	var pick := _fresh_name(PeopleData.NEWCOMER_NAMES.filter(func(n): return n[1] == "他"))
+	var age := rng.randi_range(18, 30)
+	var p := _new_person(pick[0], pick[1], "highwayman", "villain", LifeData.year_of(month()) - age)
+	p.title = "攔路的"
+	p.location = place
+	p.haunts = [place] + MapData.neighbors(place).filter(func(x): return not MapData.is_city(x))
+	p.stats = {"str": rng.randi_range(11, 13), "agi": rng.randi_range(10, 12)}
+	p.potential = {"str": p.stats["str"] + rng.randi_range(1, 4), "agi": p.stats["agi"] + rng.randi_range(1, 4)}
+	p.growth = 0.6
+	p.realm = GrowthData.realm_of_stats(p.stats)
+	p.base_hp = EnemyData.ENEMIES["highwayman"]["hp"]
+	p.base_sum = p.stats["str"] + p.stats["agi"]
+	p.owned_weapons.clear()
+	p.owned_weapons.append("chopper")
+	p.weapon = "chopper"
+	p.learn(["knee", "dust", "fallstone"][rng.randi_range(0, 2)])
+	p.stay_left = rng.randi_range(4, 10)
+	p.hp = p.max_hp()
+	p.fame = p.power() * 0.3
+	return p
 
 ## 你接下懸賞。他有家人、老大護著的話，過一陣子會傳話給你
 func accept_bounty(id: String) -> void:
@@ -1045,11 +1133,12 @@ func pass_on(heir_id: String) -> void:
 			continue
 		if p.grudges.has(old.id):
 			p.grudges.erase(old.id)
-			if not p.grudges.has(heir.id):
-				p.grudges.append(heir.id)
+			p.grudge_why.erase(old.id)
+			add_grudge(p, heir.id, "heir", old.id)
 			_mail.append(NewsData.GRUDGE_PASSED.replace("{p:who}", "{p:%s}" % p.id).replace("{p:old}", "{p:%s}" % old.id).replace("{p:heir}", "{p:%s}" % heir.id))
 		if p.target == old.id:
 			p.target = ""
+	bounties.erase(old.id)
 	for b in bounties:
 		bounties[b]["takers"].erase(old.id)
 	hero_id = heir_id
@@ -1081,7 +1170,7 @@ func _tell(text: String, kind := "news") -> void:
 	while i >= 0:
 		var j := text.find("}", i)
 		var p: Person = people.get(text.substr(i + 3, j - i - 3))
-		if p != null and said.contains(MapData.place_name(p.travel_to if p.travel_left > 0 else p.location)):
+		if p != null and p.id != hero_id and said.contains(MapData.place_name(p.travel_to if p.travel_left > 0 else p.location)):
 			hear(p.id)
 		i = text.find("{p:", j)
 

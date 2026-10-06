@@ -17,7 +17,7 @@ var encounter: EncounterDialog
 ## 找上門、正在跟你說話的人
 var _comer: Person
 var battle: Battle
-## 現在打的是 monster 委託的怪物（和劍庭要你去打的人）/ person 世界上的人 / spar 劍庭的選拔 / trial 劍庭的公開比試
+## 現在打的是 monster 委託的怪物（和劍庭要你去打的人）/ person 世界上的人 / spar 劍庭的選拔 / trial 劍庭的公開比試 / duel 路上的比劍
 var fight_kind := ""
 var _settled := []
 ## 死去那一句停多久，才換到「這一生」
@@ -188,7 +188,7 @@ func _arrived() -> void:
 func _road_dialog() -> void:
 	_show(town_view)
 	var ev := town.road_event()
-	encounter.show_choice(ev["title"], Color.WHITE, ev["text"], ev["options"], _answer_road)
+	encounter.show_choice(ev["title"], ev["color"], ev["text"], ev["options"], _answer_road)
 
 
 func _answer_road(choice: String) -> void:
@@ -204,6 +204,8 @@ func _answer_road(choice: String) -> void:
 		_start_monster(fight.substr(6))
 	elif fight.begins_with("person:"):
 		_start_person(fight.substr(7), "路上")
+	elif fight.begins_with("duel:"):
+		_start_duel(fight.substr(5))
 	elif town.road["step"] != "":
 		_road_dialog()
 	else:
@@ -250,6 +252,14 @@ func _start_person(id: String, why: String) -> void:
 	_show_battle()
 
 
+## 路上有人等你比劍（點到為止）
+func _start_duel(id: String) -> void:
+	fight_kind = "duel"
+	battle = town.start_duel(id)
+	play_log.battle_start("比劍：%s" % town.world.who(id), battle)
+	_show_battle()
+
+
 func _start_spar() -> void:
 	fight_kind = "spar"
 	battle = town.start_spar()
@@ -278,6 +288,8 @@ func _on_battle_ended() -> void:
 			_settled = town.finish_person(battle)
 		"trial":
 			_settled = town.finish_trial(battle)
+		"duel":
+			_settled = town.finish_duel(battle)
 		_:
 			_settled = town.finish_spar(battle)
 	battle_view.show_settlement(_settled)
