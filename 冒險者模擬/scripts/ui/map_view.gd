@@ -1,7 +1,7 @@
 class_name MapView
 extends HBoxContainer
 
-## 地圖分頁：左邊是地圖（用程式畫：地名、路、路上要走幾個月、你在哪、你這裡有幾個人、你接下的事在哪），
+## 地圖分頁：左邊是地圖（用程式畫：地名、路（不寫要走多久，看距離）、你在哪、你這裡有幾個人、你接下的事在哪），
 ## 右邊是點選的地方：你在這裡就看得到有誰；不在就只有聽說的（幾個月前聽說的）。接下的委託、要找的人標在地圖上。
 ## 遠不遠、要不要去，玩家看地圖自己判斷。只負責顯示和按鈕，規則都在 Town。
 
@@ -183,8 +183,6 @@ class MapCanvas extends Control:
 			var a := _pos(r[0])
 			var b := _pos(r[1])
 			draw_line(a, b, ROAD, 2.0, true)
-			var mid := (a + b) / 2
-			draw_string(font, mid + Vector2(-4, -4), str(r[2]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#8a919c"))
 		var h := town.hero
 		for id in MapData.PLACES:
 			var p := _pos(id)
