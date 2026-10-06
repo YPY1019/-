@@ -6,11 +6,11 @@ extends SceneTree
 
 const N := 150
 
-const T1 := ["parry", "sweep_kick", "heavy"]
-const T2 := ["redirect", "disarm", "break_free", "vital", "combo"]
-const ULT := ["sunder"]
-const ULT2 := ["sunder", "falcon"]
-const ULT3 := ["sunder", "falcon", "bastion"]
+const T1 := ["knee", "fallstone", "shed", "lh_cross"]
+const T2 := ["lh_pommel", "lh_half", "lh_advance", "lh_bind", "deflect", "triple", "needle"]
+const ULT := ["lh_verdict"]
+const ULT2 := ["lh_verdict", "leg_rain"]
+const ULT3 := ["lh_verdict", "leg_rain", "leg_siege"]
 
 var _world: World
 

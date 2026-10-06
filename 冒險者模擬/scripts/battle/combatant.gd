@@ -82,6 +82,11 @@ var recent_actions: Array[String] = []
 var last_player_move := ""
 
 
+## 學來的招被挑中的權重（打法裡的一般出手大多是 15～40）
+const MOVE_W := 18
+const MOVE_W_ULT := 25
+
+
 static func from_enemy(id: String) -> Combatant:
 	var d: Dictionary = EnemyData.ENEMIES[id]
 	var c := Combatant.new()
@@ -127,7 +132,24 @@ static func from_person(p: Person, place: String, lethal := true) -> Combatant:
 	c.weapon = w.get("noun", w["name"])
 	c.weapon_id = p.weapon
 	c.weapon_fx = WeaponData.fx(p.weapon)
+	add_moves(d, p.learned, p.weapon)
 	return c
+
+
+## 世界上的人跟你用同一套招：他會的招（有 act 的、拿著的武器用得出來的）加進他的出手裡
+static func add_moves(d: Dictionary, learned: Array, weapon_id: String) -> void:
+	var actions: Dictionary = d["actions"].duplicate()
+	for id in learned:
+		var m: Dictionary = MoveData.MOVES[id]
+		if not m.has("act") or not MoveData.usable(id, weapon_id):
+			continue
+		var a: Dictionary = m["act"].duplicate(true)
+		a["move"] = id
+		a["w"] = MOVE_W_ULT if m.get("ult", false) else MOVE_W
+		if not a.has("stat"):
+			a["stat"] = m["stat"]
+		actions["m_" + id] = a
+	d["actions"] = actions
 
 
 func is_alive() -> bool:

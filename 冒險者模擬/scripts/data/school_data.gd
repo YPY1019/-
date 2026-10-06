@@ -7,7 +7,7 @@ extends RefCounted
 ## 貢獻：替劍庭辦事（JOBS：清剿、討伐紅鬃、拿回庭主師弟的劍譜）。用貢獻換招（MOVES）。
 ##   不加入也能辦事、換第 1 階（藍）的招；更高的要加入、要階位。
 ## 階位：學徒 → 熟手 → 大師，靠公開比試（TRIALS）。累積的貢獻夠了才能比。
-## 絕學「王權裁定」在庭主師弟的劍譜裡（BookData sunder_book）：拿回來交給庭主，他讓你留著讀。
+## 絕學「王權裁定」在庭主師弟的劍譜裡（BookData verdict_book）：拿回來交給庭主，他讓你留著讀。
 ## 架勢（STANCE）：會三招以上劍庭的招，「磐石劍位」自己生效。
 ## 庭主不能帶你過瓶頸（實力和認可是兩回事）。
 
@@ -20,22 +20,25 @@ const HEAD := "master"
 
 ## 換招：招 id -> 要什麼階位、多少貢獻、學多久。數值門檻在 REQ
 const MOVES := {
-	"parry": {"rank": 1, "merit": 15, "months": 4},
-	"redirect": {"rank": 1, "merit": 15, "months": 4},
-	"disarm": {"rank": 2, "merit": 35, "months": 6},
-	"vital": {"rank": 2, "merit": 35, "months": 6},
-	"combo": {"rank": 3, "merit": 60, "months": 8},
+	"lh_cross": {"rank": 1, "merit": 15, "months": 4},
+	"lh_pommel": {"rank": 1, "merit": 15, "months": 4},
+	"lh_half": {"rank": 2, "merit": 35, "months": 6},
+	"lh_advance": {"rank": 2, "merit": 35, "months": 6},
+	"lh_bind": {"rank": 3, "merit": 60, "months": 8},
 }
 ## 絕學（讀劍譜）
-const ULT := "sunder"
+const ULT := "lh_verdict"
 
 ## 招式的數值門檻（沒寫的 = 沒有門檻）。練武場的招也寫在這裡
 const REQ := {
-	"redirect": {"str": 13},
-	"disarm": {"agi": 13},
-	"break_free": {"str": 13},
-	"vital": {"agi": 14},
-	"combo": {"str": 15},
+	"shed": {"str": 12},
+	"deflect": {"agi": 13},
+	"triple": {"str": 14},
+	"needle": {"agi": 14},
+	"lh_cross": {"str": 13},
+	"lh_half": {"agi": 14},
+	"lh_advance": {"str": 14},
+	"lh_bind": {"agi": 15},
 }
 
 ## 入門考驗：接住庭主三招。身體（比較高的那項）要到 JOIN_BODY 才收
@@ -67,6 +70,41 @@ const STANCE := {
 	],
 }
 
+## 世界上的七個流派（原型只有劍庭能加入；霜熊戰團的人在世界上走動）。
+## ranks：階位的叫法。stance：架勢（會 need 招以上這派的招就生效）
+##   lionheart 磐石劍位：擋下一招之後，下一劍重 bonus 倍（STANCE）
+##   frostbear 狂戰士之血：血掉到 hp_below 以下，打出去重 bonus 倍
+const SCHOOLS := {
+	"lionheart": {"name": "獅心劍庭", "ranks": ["", "學徒", "熟手", "大師"], "head": "庭主", "stance": STANCE},
+	"frostbear": {"name": "霜熊戰團", "ranks": ["", "新血", "戰士", "老熊"], "head": "團長", "stance": {
+		"name": "狂戰士之血", "need": 3, "bonus": 1.3, "hp_below": 0.5,
+		"desc": "霜熊戰團的架勢。血流得越多，斧頭越重。",
+		"lines": [
+			"你身上的傷口在燒，手上的力氣反而多了。",
+			"血流進你的眼睛，你連眨都沒眨，一斧劈下去。",
+		]}},
+	"dawn": {"name": "破曉聖槌", "ranks": ["", "見習", "執槌", "聖槌"], "head": "主教"},
+	"thorn": {"name": "鐵棘銳陣", "ranks": ["", "新兵", "陣士", "陣長"], "head": "陣主"},
+	"hawk": {"name": "蒼鷹林衛", "ranks": ["", "學徒", "林衛", "鷹眼"], "head": "林主"},
+	"blackwater": {"name": "黑水拳環", "ranks": ["", "新人", "拳手", "環主"], "head": "環主"},
+	"raven": {"name": "夜鴉隱修會", "ranks": ["", "見習", "隱修", "長老"], "head": "院長"},
+}
+
+
+static func school_name(id: String) -> String:
+	return SCHOOLS[id]["name"] if SCHOOLS.has(id) else ""
+
+
+## 這個人在他流派裡的叫法（學徒、熟手…；掌門用 head）
+static func rank_name(p: Person) -> String:
+	if not SCHOOLS.has(p.school) or p.rank <= 0:
+		return ""
+	var s: Dictionary = SCHOOLS[p.school]
+	if p.id == HEAD and p.school == ID:
+		return s["head"]
+	return s["ranks"][mini(p.rank, s["ranks"].size() - 1)]
+
+
 ## 劍庭的委託。kind：monster 打委託板上的怪物、kill 討伐某人、book 拿回劍譜（入門後庭主交代才有）
 const JOBS := {
 	"wolves": {"kind": "monster", "enemy": "wolf", "merit": 6,
@@ -83,7 +121,7 @@ const JOBS := {
 		"text": "紅鬃的副隊長馬格努斯。十年前那一夜，他也在。"},
 	"roderick": {"kind": "kill", "target": "roderick", "merit": 50,
 		"text": "紅鬃的隊長羅德里克。十年前紅鬃燒了山下的村子，庭主的師弟死在那裡。"},
-	"book": {"kind": "book", "book": "sunder_book", "merit": 60,
+	"book": {"kind": "book", "book": "verdict_book", "merit": 60,
 		"text": "把庭主師弟的劍譜拿回來。"},
 }
 
@@ -91,7 +129,7 @@ const JOBS := {
 ## 最後一句 keep 還沒讀、keep_read 已經讀過
 const ERRAND := {
 	"holder": "roderick",
-	"book": "sunder_book",
+	"book": "verdict_book",
 	"ask": "庭主把你留了下來。「十年前，紅鬃的人燒了山下的村子。我師弟在那裡，沒能出來。他身上那本劍譜，後來到了紅鬃那個獨眼隊長手上。」\n他停了一下。「把它拿回來。」",
 	"ask_lost": "庭主把你留了下來。「十年前，紅鬃的人燒了山下的村子。我師弟在那裡，沒能出來。他身上那本劍譜，後來到了紅鬃那個獨眼隊長手上。」\n他停了一下。「羅德里克死了，書不知道到了誰手上。找到它，拿回來。」",
 	"returned": "庭主接過劍譜，翻了幾頁，手停在一頁的邊上。那裡有幾行小字，是他師弟的筆跡。",
@@ -105,24 +143,37 @@ static func is_member(p: Person) -> bool:
 	return p.school == ID and p.rank > 0
 
 
-## 會幾招劍庭的招
-static func moves_known(p: Person) -> int:
+## 會幾招這派的招
+static func moves_known(p: Person, school := ID) -> int:
 	var n := 0
 	for id in MoveData.MOVES:
-		if MoveData.school(id) == ID and p.knows(id):
+		if MoveData.school(id) == school and p.knows(id):
 			n += 1
 	return n
 
 
+## 這個人身上生效的架勢是哪一派的（空的是沒有）。會最多招的那派先算
+static func stance_of(p: Person) -> String:
+	for id in SCHOOLS:
+		var st: Dictionary = SCHOOLS[id].get("stance", {})
+		if not st.is_empty() and moves_known(p, id) >= st["need"]:
+			return id
+	return ""
+
+
+static func stance_def(school: String) -> Dictionary:
+	return SCHOOLS[school]["stance"]
+
+
 static func stance_active(p: Person) -> bool:
-	return moves_known(p) >= STANCE["need"]
+	return stance_of(p) != ""
 
 
-## 劍庭的招照等級排（給人物面板串成一條線）
-static func chain() -> Array:
+## 一派的招照等級排（給人物面板串成一條線）
+static func chain(school := ID) -> Array:
 	var list := []
 	for id in MoveData.MOVES:
-		if MoveData.school(id) == ID:
+		if MoveData.school(id) == school:
 			list.append(id)
 	list.sort_custom(func(a, b): return MoveData.grade(a) < MoveData.grade(b))
 	return list

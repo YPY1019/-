@@ -217,6 +217,9 @@ func _append(events: Array) -> void:
 	var last := ""
 	for e in events:
 		var text: String = e["text"]
+		if e.has("move"):
+			# 學來的招：前面標出招名（招的等級顏色）
+			text = "[b][color=%s]%s[/color][/b]" % [MoveData.color(e["move"]), MoveData.call_name(e["move"])] + text
 		last = e["kind"]
 		match e["kind"]:
 			"round", "intent", "stat":

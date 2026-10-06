@@ -327,8 +327,9 @@ func _build_me() -> void:
 	elif h.merit > 0:
 		me_box.add_child(UiKit.label("劍庭的貢獻 %d" % h.merit, 17, 0.85))
 	if SchoolData.stance_active(h):
-		var st := _tip(UiKit.label("架勢：%s" % SchoolData.STANCE["name"], 17), SchoolData.STANCE["desc"])
-		st.add_theme_color_override("font_color", Color(MoveData.color("parry")))
+		var sd := SchoolData.stance_def(SchoolData.stance_of(h))
+		var st := _tip(UiKit.label("架勢：%s" % sd["name"], 17), sd["desc"])
+		st.add_theme_color_override("font_color", Color(GrowthData.GRADE_COLORS[2]))
 		me_box.add_child(st)
 
 	if not h.books.is_empty():
@@ -449,7 +450,7 @@ func _build_deathbed() -> void:
 		title_row.add_child(realm)
 		title_row.add_child(UiKit.label("%d 歲" % p.age(), 18, 0.7))
 		info.add_child(title_row)
-		var school := "%s %s" % [SchoolData.NAME, SchoolData.RANKS[p.rank]] if p.school == SchoolData.ID and p.rank > 0 else "沒有流派"
+		var school := "%s %s" % [SchoolData.school_name(p.school), SchoolData.rank_name(p)] if p.rank > 0 else "沒有流派"
 		info.add_child(UiKit.label("%s・在%s" % [school, MapData.place_name(p.location)], 16, 0.7))
 		row.add_child(info)
 		var b := UiKit.button("交給%s" % p.pron, 130, 52)

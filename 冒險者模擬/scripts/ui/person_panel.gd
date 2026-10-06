@@ -14,10 +14,11 @@ signal fight_requested(person_id: String)
 const ROLE_NAMES := {"villain": "亡命之徒", "hunter": "冒險者", "duelist": "決鬥家", "settled": "隱居",
 	"youth": "平民", "follower": "手下", "master": "庭主"}
 ## 身體的印象（別人的面板）：數值到這裡（含）以上就用這個說法
-const STR_WORDS := [[26, "像頭熊一樣"], [22, "力大無窮"], [18, "力大過人"], [15, "力氣很大"], [12, "結實"], [0, "普通"]]
-const AGI_WORDS := [[26, "像影子一樣"], [22, "快得看不清"], [18, "快得驚人"], [15, "手腳很快"], [12, "靈活"], [0, "普通"]]
-## 武學分頁照武器分
-const KIND_TABS := [["", "通用"], ["sword", "劍"]]
+## 看得出來的身體（寫看到的樣子，不寫評語）
+const STR_WORDS := [[26, "肩背厚得像門板"], [22, "手臂比常人粗一圈"], [18, "腕骨粗，兵器握得很穩"], [15, "肩膀結實"], [12, "身板紮實"], [0, "身板單薄"]]
+const AGI_WORDS := [[26, "走路沒有聲音"], [22, "腳步很輕，重心從來不亂"], [18, "轉身很快，腳下不拖"], [15, "腳步俐落"], [12, "動作靈便"], [0, "腳步有點拖"]]
+## 武學分頁照武器分：[分頁名, 這一頁的武器類別]。通用頁放不挑武器的招
+const KIND_TABS := [["通用", []], ["劍", ["sword", "greatsword"]], ["刀斧", ["axe", "blade"]], ["細劍", ["rapier"]], ["錘", ["hammer"]]]
 
 var town: Town
 var person_id := ""
@@ -33,7 +34,7 @@ var items_box: VBoxContainer
 var rel_box: VBoxContainer
 var story_box: VBoxContainer
 ## 武學分頁現在看哪一類武器
-var move_kind := ""
+var move_kind := "通用"
 
 
 func _init(p_town: Town) -> void:
@@ -105,7 +106,7 @@ func _init(p_town: Town) -> void:
 
 func show_person(id: String) -> void:
 	person_id = id
-	move_kind = ""
+	move_kind = "通用"
 	visible = true
 	refresh()
 
@@ -147,7 +148,7 @@ func refresh() -> void:
 
 func _build_info(p: Person) -> void:
 	UiKit.clear(info_grid)
-	var school := SchoolData.NAME if p.school == SchoolData.ID else "無"
+	var school := SchoolData.school_name(p.school) if p.rank > 0 else "無"
 	var where := ""
 	if p.dead:
 		where = "%d 歲死在%s" % [p.age_at(p.died_at), MapData.place_name(p.location)]
@@ -174,8 +175,8 @@ func _info(k1: String, v1: String, k2: String, v2: String, c2 := Color.WHITE) ->
 
 ## 身分：流派的階位；不是流派的人寫他過什麼日子
 func _identity(p: Person) -> String:
-	if p.school == SchoolData.ID and p.rank > 0:
-		return "庭主" if p.id == SchoolData.HEAD else SchoolData.RANKS[mini(p.rank, SchoolData.RANKS.size() - 1)]
+	if SchoolData.rank_name(p) != "":
+		return SchoolData.rank_name(p)
 	if p.id == town.world.hero_id or town.world.lives.has(p.id):
 		return "冒險者"
 	return ROLE_NAMES.get(p.role, "冒險者")
@@ -242,12 +243,13 @@ func _build_stats(p: Person, me: bool) -> void:
 		stats_box.add_child(UiKit.label("血量 %d / %d" % [p.hp, p.max_hp()], 18, 0.8))
 		if p.school == SchoolData.ID:
 			stats_box.add_child(UiKit.label("劍庭的貢獻 %d" % p.merit, 18, 0.8))
-	if SchoolData.stance_active(p):
+	var stance := SchoolData.stance_of(p)
+	if stance != "" and (me or _known_moves(p, me).size() >= SchoolData.stance_def(stance)["need"]):
 		stats_box.add_child(HSeparator.new())
 		stats_box.add_child(UiKit.heading("架勢"))
-		var st := UiKit.label(SchoolData.STANCE["name"], 19)
-		st.add_theme_color_override("font_color", Color(MoveData.color("parry")))
-		st.tooltip_text = SchoolData.STANCE["desc"]
+		var st := UiKit.label(SchoolData.stance_def(stance)["name"], 19)
+		st.add_theme_color_override("font_color", Color(GrowthData.GRADE_COLORS[2]))
+		st.tooltip_text = SchoolData.stance_def(stance)["desc"]
 		st.mouse_filter = Control.MOUSE_FILTER_STOP
 		stats_box.add_child(st)
 
@@ -266,13 +268,14 @@ func _word(words: Array, value: int) -> String:
 func _build_moves(p: Person, me: bool) -> void:
 	UiKit.clear(moves_box)
 	var known := _known_moves(p, me)
-	if not me and not town.hero.fought.has(p.id) and not (p.school != "" and p.school == town.hero.school):
-		moves_box.add_child(UiKit.label("你沒跟%s交過手，不知道%s會什麼。" % [p.pron, p.pron], 18, 0.6))
+	if not me and known.is_empty():
+		var why := "你沒見過%s出手。" % p.pron if not town.hero.fought.has(p.id) else "你沒見過%s用什麼有名堂的招。" % p.pron
+		moves_box.add_child(UiKit.label(why, 18, 0.6))
 		return
 	var bar := UiKit.hbox(6)
 	moves_box.add_child(bar)
 	for k in KIND_TABS:
-		var b := UiKit.button(k[1], 90, 36)
+		var b := UiKit.button(k[0], 80, 36)
 		b.toggle_mode = true
 		b.button_pressed = move_kind == k[0]
 		b.pressed.connect(func():
@@ -280,28 +283,47 @@ func _build_moves(p: Person, me: bool) -> void:
 			_build_moves(p, me))
 		bar.add_child(b)
 	moves_box.add_child(HSeparator.new())
-	if move_kind == "":
-		var general := known.filter(func(id): return MoveData.school(id) == "")
+	var kinds: Array = []
+	for k in KIND_TABS:
+		if k[0] == move_kind:
+			kinds = k[1]
+	if kinds.is_empty():
 		if me:
 			_icon_row("人人都會", MoveData.BASIC.duplicate(), p)
-		elif general.is_empty():
-			moves_box.add_child(UiKit.label("沒看過%s用什麼有名堂的招。" % p.pron, 18, 0.6))
+		var general := known.filter(func(id): return MoveData.MOVES[id].get("weapons", []).is_empty())
 		_icon_row("通用", general, p)
-	else:
-		# 劍：獅心劍庭串成一條線
-		var chain := SchoolData.chain()
-		var shown := chain if me else chain.filter(func(id): return p.knows(id))
+		return
+	var any := false
+	# 流派的招串成一條線：你自己那一派全部列出來（還沒學的灰掉），其他的只列會的
+	for school in SchoolData.SCHOOLS:
+		var chain := SchoolData.chain(school).filter(func(id): return _in_kinds(id, kinds))
+		var shown := chain if me and p.school == school else chain.filter(func(id): return known.has(id))
 		if not shown.is_empty():
-			_icon_row(SchoolData.NAME, shown, p, true)
-		else:
-			moves_box.add_child(UiKit.label("沒有。", 18, 0.6))
+			_icon_row(SchoolData.school_name(school), shown, p, true)
+			any = true
+	var other := known.filter(func(id): return MoveData.school(id) == "" and _in_kinds(id, kinds))
+	if not other.is_empty():
+		_icon_row("不屬於流派", other, p)
+		any = true
+	if not any:
+		moves_box.add_child(UiKit.label("沒有。", 18, 0.6))
 
 
-## 這個人會的招（人人都會的不算）
+func _in_kinds(id: String, kinds: Array) -> bool:
+	for k in MoveData.MOVES[id].get("weapons", []):
+		if kinds.has(k):
+			return true
+	return false
+
+
+## 這個人會的招（人人都會的不算）。別人：只算你看過他用的；同一派的人互相知道
 func _known_moves(p: Person, me: bool) -> Array:
 	var list := []
+	var seen: Array = town.hero.seen.get(p.id, [])
 	for id in MoveData.LEARNABLE:
-		if p.knows(id):
+		if not p.knows(id):
+			continue
+		if me or seen.has(id) or (p.school != "" and p.school == town.hero.school and MoveData.school(id) == p.school):
 			list.append(id)
 	return list
 
@@ -347,7 +369,7 @@ func _move_icon(id: String, learned: bool) -> Control:
 
 func _move_tip(id: String) -> String:
 	var m: Dictionary = MoveData.MOVES[id]
-	var school: String = SchoolData.NAME if MoveData.school(id) == SchoolData.ID else "通用"
+	var school: String = SchoolData.school_name(MoveData.school(id)) if MoveData.school(id) != "" else ("通用" if MoveData.MOVES[id].get("weapons", []).is_empty() else "失傳的招")
 	var lines := ["%s（%s・%s）" % [m["name"], GrowthData.GRADE_NAMES[MoveData.grade(id)], school], m.get("desc", "")]
 	var req: Dictionary = SchoolData.REQ.get(id, {})
 	for s in req:
@@ -413,7 +435,7 @@ func _build_relations(p: Person) -> void:
 			continue
 		rel_box.add_child(UiKit.label("%s：%s%s" % [World.RELATION_NAMES[p.relations[r]], w.who(r), "（死了）" if o.dead else ""], 18))
 		any = true
-	if p.school == SchoolData.ID and p.rank > 0:
+	if p.school != "" and p.rank > 0:
 		for o in w.others():
 			if o != p and o.school == p.school and o.rank > 0 and not p.relations.has(o.id):
 				rel_box.add_child(UiKit.label("同門：%s" % w.who(o.id), 18, 0.85))

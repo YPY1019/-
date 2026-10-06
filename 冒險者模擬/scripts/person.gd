@@ -57,6 +57,8 @@ var errand_given := false
 var errand_reported := false
 ## 跟誰打過（看過他出手，人物面板才列得出他會的招）
 var fought: Array[String] = []
+## 看過誰用過哪些招：人 id -> [招 id]（人物面板只寫看過的）
+var seen := {}
 ## 接下的一般委託（怪物 id）。打贏才拿得到報酬
 var jobs: Array[String] = []
 ## 打贏過的對手（委託的怪物 id、人的 id）
@@ -206,6 +208,13 @@ func realm_color() -> String:
 	return GrowthData.REALM_COLORS[realm]
 
 
+func saw_move(who: String, move_id: String) -> void:
+	var list: Array = seen.get(who, [])
+	if not list.has(move_id):
+		list.append(move_id)
+	seen[who] = list
+
+
 func knows(move_id: String) -> bool:
 	return MoveData.is_basic(move_id) or learned.has(move_id)
 
@@ -308,8 +317,7 @@ func to_combatant(full := false) -> Combatant:
 			c.aged[s] = decline(s)
 	c.omen = omen()
 	c.realm = realm
-	if SchoolData.stance_active(self):
-		c.stance = SchoolData.ID
+	c.stance = SchoolData.stance_of(self)
 	c.attack_mult = WeaponData.get_def(weapon)["power"]
 	c.weapon = WeaponData.get_def(weapon)["name"]
 	c.weapon_id = weapon

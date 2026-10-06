@@ -36,7 +36,7 @@ func _init() -> void:
 	tv.tabs.current_tab = tv.training_view.get_index()
 	await _frames(3)
 	_save("04a_training")
-	tv._act(town.learn_training("heavy"))
+	tv._act(town.learn_training("fallstone"))
 	await _idle()
 	h.stats = {"str": 12, "agi": 12}
 	main._start_spar()
@@ -86,7 +86,7 @@ func _init() -> void:
 	# 變強，去找布蘭
 	h.stats = {"str": 19, "agi": 18}
 	h.realm = 1
-	for m in ["parry", "sweep_kick", "heavy", "redirect", "disarm", "break_free", "vital", "combo"]:
+	for m in ["knee", "fallstone", "shed", "lh_cross", "lh_pommel", "lh_half", "deflect", "needle"]:
 		h.learn(m)
 	h.hp = h.max_hp()
 	var bran := w.person("bran")

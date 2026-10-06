@@ -12,11 +12,13 @@ func _init() -> void:
 	if args.size() > 6:
 		hero.clock.month = int(args[6])
 	# 數值不到門檻的招學不到（跟道場一樣）
-	for m in ["parry", "sweep_kick", "heavy", "redirect", "disarm", "break_free", "vital", "combo"]:
+	for m in MoveData.LEARNABLE:
+		if MoveData.MOVES[m].get("ult", false) or not MoveData.usable(m, hero.weapon):
+			continue
 		var req: Dictionary = SchoolData.REQ.get(m, {})
 		if req.keys().all(func(s): return hero.stats[s] >= req[s]):
 			hero.learn(m)
-	for u in ["sunder", "falcon", "bastion"]:
+	for u in ["lh_verdict", "leg_rain", "leg_siege", "fb_fury"]:
 		hero.learn(u)
 	var b := Battle.new([hero.to_combatant(true)], [Combatant.from_enemy(args[0])], int(args[5]))
 	AutoPilot.new().play(b)

@@ -31,9 +31,10 @@ const COMMISSIONS := {
 
 ## 練武場：退休的老兵收錢教通用招（綠）。招 id -> 學費、學多久。數值門檻在 SchoolData.REQ
 const TRAINING := {
-	"sweep_kick": {"cost": 40, "months": 3},
-	"heavy": {"cost": 40, "months": 3},
-	"break_free": {"cost": 50, "months": 4},
+	"knee": {"cost": 40, "months": 3},
+	"fallstone": {"cost": 40, "months": 3},
+	"shed": {"cost": 50, "months": 4},
+	"dust": {"cost": 30, "months": 2},
 }
 const TRAINER := "老兵哈洛德"
 const TRAINER_TEXT := "練武場在城牆根下，地上的沙被踩得很實。老兵哈洛德少了一隻耳朵，教的都是戰場上活下來的招。"

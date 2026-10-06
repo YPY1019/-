@@ -188,7 +188,7 @@ const ENEMIES := {
 		},
 		"habits": [
 			# 你砍在盾上，他從盾後反刺
-			{"last": "shield_wall", "player": ["attack", "vital", "combo", "sweep_kick"], "then": "thrust", "tell": "你的劍還卡在盾牌上，{name}已經從盾後壓低身子，劍尖對準你的胸口。"},
+			{"last": "shield_wall", "player": ["attack", "needle", "lh_half", "triple", "knee", "fb_whirl", "lh_pommel"], "then": "thrust", "tell": "你的劍還卡在盾牌上，{name}已經從盾後壓低身子，劍尖對準你的胸口。"},
 		],
 		"pain": {
 			"light": ["劍刃在鐵甲上刮出一道白痕。", "{name}悶哼一聲，腳步沒停。"],
@@ -285,7 +285,7 @@ const ENEMIES := {
 		"name": "羅德里克", "title": "傭兵隊長",
 		"blurb": "傭兵團「紅鬃」的隊長。獨眼。",
 		"hp": 260, "str": 18, "agi": 18, "armor": "light", "traits": [], "kinds": ["sword"], "pron": "他",
-		"weapon": "鋸齒劍", "guard": "架勢", "loot": "red_fang", "books": ["sunder_book"], "no_flee": true,
+		"weapon": "鋸齒劍", "guard": "架勢", "loot": "red_fang", "books": ["verdict_book"], "no_flee": true,
 		"parry": ["{name}腳下還沒站穩，劍卻已經橫在身前。你砍上去，{pron}的劍卡住了你的劍刃。", "你搶上一步出劍，{name}的劍往上一挑，把你的劍架開了。"],
 		"scene": ["傭兵營地外的空地，篝火還在冒煙。十幾個傭兵圍成一圈等著看。"],
 		"start": ["一個獨眼的高個子從人群裡走出來，拔出一把暗紅色的劍：「就是你要拿我的人頭？」"],
@@ -343,7 +343,7 @@ const ENEMIES := {
 		},
 		"habits": [
 			# 你砍在劍身上，他順勢刺回來
-			{"last": "wall", "player": ["attack", "vital", "combo", "sweep_kick"], "then": "pierce", "tell": "{name}把擋住你的劍身一翻，劍尖對準了你的胸口。"},
+			{"last": "wall", "player": ["attack", "needle", "lh_half", "triple", "knee", "fb_whirl", "lh_pommel"], "then": "pierce", "tell": "{name}把擋住你的劍身一翻，劍尖對準了你的胸口。"},
 		],
 		"pain": {
 			"light": ["劍刃在黑甲上刮出一串火星。", "{name}沒有出聲。"],
@@ -398,7 +398,7 @@ const ENEMIES := {
 		"name": "伊薇特", "title": "決鬥家",
 		"blurb": "南方來的決鬥家，右手細劍，左手短劍。據說沒輸過。",
 		"hp": 240, "str": 15, "agi": 21, "armor": "none", "traits": ["disarmable"], "kinds": ["rapier"], "pron": "她",
-		"weapon": "細劍", "guard": "短劍", "books": ["falcon_book"], "no_flee": true,
+		"weapon": "細劍", "guard": "短劍", "books": ["rain_book"], "no_flee": true,
 		"parry": ["{name}還沒站穩，左手的短劍已經架了過來，把你的劍撥開。", "你搶上去出劍，{name}用短劍一擋，細劍跟著點向你的手腕，你只好收劍。"],
 		"scene": ["城外的墓園，墓碑之間的草剛割過。", "清晨的廣場，噴水池邊一個人都沒有。"],
 		"start": ["一個穿深色外套的女人等在那裡，右手細劍，左手短劍。她把劍尖往地上點了點：「你是來決鬥的？」"],
@@ -418,7 +418,7 @@ const ENEMIES := {
 		"habits": [
 			{"last": "feint", "chance": 0.6, "then": "lunge", "tell": "你還沒站穩，{name}的劍尖已經對準了你。"},
 			# 你用了收不回來的大招，她就刺過來
-			{"player": ["heavy", "combo"], "chance": 0.5, "then": "lunge", "tell": "你這一下用老了，{name}腳下一錯，劍尖跟著遞了過來。"},
+			{"player": ["fallstone", "fb_cleave", "triple", "fb_whirl"], "chance": 0.5, "then": "lunge", "tell": "你這一下用老了，{name}腳下一錯，劍尖跟著遞了過來。"},
 		],
 		"pain": {
 			"light": ["{name}皺了一下眉。", "{name}往後跳開一步，看了看袖子上的血。"],
@@ -451,7 +451,7 @@ const ENEMIES := {
 		},
 		"habits": [
 			# 你砍在他的劍上，他順著你的劍刃刺回來
-			{"last": "guard", "player": ["attack", "heavy", "combo", "vital"], "then": "thrust", "tell": "{name}架開你的劍，順著你的劍刃滑進來，劍尖對準你的胸口。"},
+			{"last": "guard", "player": ["attack", "fallstone", "fb_cleave", "triple", "fb_whirl", "needle", "lh_half"], "then": "thrust", "tell": "{name}架開你的劍，順著你的劍刃滑進來，劍尖對準你的胸口。"},
 		],
 		"pain": {
 			"light": ["{name}沒有出聲，換了一口氣。", "{name}退了一步。"],
@@ -464,7 +464,7 @@ const ENEMIES := {
 		"name": "瓦倫", "title": "叛將",
 		"blurb": "背叛了領主、佔了山口要塞的將軍。左手一面塔盾，右手一把戰錘。",
 		"hp": 960, "str": 31, "agi": 24, "armor": "heavy", "traits": [], "kinds": ["hammer"], "pron": "他",
-		"weapon": "戰錘", "guard": "塔盾", "books": ["bastion_book"], "no_flee": true,
+		"weapon": "戰錘", "guard": "塔盾", "books": ["siege_book"], "no_flee": true,
 		"parry": ["{name}還沒站穩，塔盾已經擋在身前。你的劍砍在盾面上，震得手腕發麻。", "你搶上去出劍，{name}把盾一推，連你帶劍一起推開。"],
 		"scene": ["山口的舊要塞，城牆上的旗子早就燒掉了。", "要塞的中庭，地上的石板裂了好幾道縫。"],
 		"start": ["一個穿全身鎧甲的男人從城門走出來，左手的塔盾比你還寬。他把戰錘往地上一頓：「一個人來？」"],
@@ -484,7 +484,7 @@ const ENEMIES := {
 		},
 		"habits": [
 			# 你砍在盾上，他舉盾撞過來
-			{"last": "wall", "player": ["attack", "heavy", "combo", "vital"], "then": "bash", "tell": "你的劍還卡在盾面上，{name}已經舉著盾撞了過來。"},
+			{"last": "wall", "player": ["attack", "fallstone", "fb_cleave", "triple", "fb_whirl", "needle", "lh_half"], "then": "bash", "tell": "你的劍還卡在盾面上，{name}已經舉著盾撞了過來。"},
 		],
 		"rage": {
 			"hp_below": 0.3,

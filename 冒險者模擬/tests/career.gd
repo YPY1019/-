@@ -8,7 +8,7 @@ extends SceneTree
 ## 真人大約比電腦玩家快一倍（2026-10-06 試玩），電腦拿到的只當下限參考。
 ## 執行：Godot --headless --path . --script res://tests/career.gd -- [幾輪] [印第一輪的過程 1/0]
 
-const PRIZES := ["red_fang", "knell", "gatebreaker", "nightwatch", "sunder_book", "falcon_book", "bastion_book"]
+const PRIZES := ["red_fang", "knell", "gatebreaker", "nightwatch", "verdict_book", "rain_book", "siege_book"]
 ## 怪物由弱到強
 const LADDER := ["wolf", "bandit_leader", "deserter", "bear", "ogre"]
 
