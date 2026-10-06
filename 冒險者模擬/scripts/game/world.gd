@@ -34,6 +34,30 @@ const DUEL_RANGE := [-3.0, 0.5]
 ## 打完、被打跑之後歇幾個月；冒險者撕下一張懸賞之後歇比較久（領賞、花錢、養傷）
 const REST_AFTER := [3, 6]
 const HUNT_REST := [8, 16]
+## 拼命的架，輸的人死的機率（見 _death_chance）
+const DEATH_WANTED := 0.85
+const DEATH_GRUDGE := 0.6
+const DEATH_OTHER := 0.3
+## 名聲：打贏一個人加多少（基本 + 對手名聲的幾成）、輸的人掉幾成、每個月淡掉多少
+const FAME_WIN := 3.0
+const FAME_TAKE := 0.25
+const FAME_LOSS := 0.2
+const FAME_FADE := 0.998
+## 世界上的人自己的人生：每個月的機率
+const RETIRE_AGE := 46
+const RETIRE_CHANCE := 0.02
+const MARRY_CHANCE := 0.006
+const CHILD_CHANCE := 0.012
+const CHILDREN_MAX := 3
+const DISCIPLE_CHANCE := 0.03
+const PROMOTE_CHANCE := 0.012
+## 孩子幾歲進城（之前不出現在世界上）
+const CHILD_ARRIVE_AGE := 14
+## 世界上的人少於這個數，外地的人會慢慢來
+const POP_MIN := 18
+const NEWCOMER_CHANCE := 0.15
+## 強者榜列幾個人
+const RANKING_SIZE := 12
 
 var clock := Clock.new()
 ## id -> Person（死了的也留著，世界記得）
@@ -47,6 +71,8 @@ var monsters := {}
 var shop_stock: Array = []
 ## 每個人的壞事上次傳到你耳裡是第幾個月
 var _crime_told := {}
+## 還沒長大的孩子：[{"due": 進城的月, "parents": [id, id], "name", "pron", "born": 生在哪一年}]
+var _children: Array = []
 ## 這次推的時候傳到你耳裡的事
 var news: Array = []
 ## 已經傳過話給你的人（target id）
@@ -114,13 +140,13 @@ func fmt(text: String) -> String:
 
 
 ## 這個人身上的東西都是誰的（看得到的那面）：關係的說法
-const RELATION_NAMES := {"parent": "父親", "child": "孩子", "master": "師傅", "disciple": "徒弟",
-	"sibling": "兄弟", "boss": "老大", "follower": "手下"}
+const RELATION_NAMES := {"parent": "父母", "child": "孩子", "master": "師傅", "disciple": "徒弟",
+	"sibling": "兄弟", "boss": "老大", "follower": "手下", "spouse": "伴侶"}
 const RELATION_BACK := {"parent": "child", "child": "parent", "master": "disciple", "disciple": "master",
-	"sibling": "sibling", "boss": "follower", "follower": "boss"}
+	"sibling": "sibling", "boss": "follower", "follower": "boss", "spouse": "spouse"}
 ## 死了會有人替他報仇、動他之前會先傳話的關係
-const AVENGER_RELATIONS := ["parent", "child", "master", "disciple", "sibling", "boss", "follower"]
-const PROTECTOR_RELATIONS := ["parent", "sibling", "boss", "master"]
+const AVENGER_RELATIONS := ["parent", "child", "master", "disciple", "sibling", "boss", "follower", "spouse"]
+const PROTECTOR_RELATIONS := ["parent", "sibling", "boss", "master", "spouse"]
 
 
 ## 有懸賞
@@ -236,6 +262,7 @@ func _spawn(id: String) -> Person:
 	p.grudges = d.get("grudges", []).duplicate()
 	p.stay_left = rng.randi_range(2, 8)
 	p.rest_left = rng.randi_range(4, 14)
+	p.fame = d.get("fame", p.power() * (0.5 if p.role == "youth" else 1.0))
 	p.hp = p.max_hp()
 	people[id] = p
 	# 關係寫一邊就好，另一邊補上
@@ -312,6 +339,11 @@ func tick() -> void:
 		if not p.dead and p.travel_left == 0:
 			_act(p)
 			_sell_off(p)
+			_life(p)
+		# 名聲慢慢淡掉（很久沒消息的人，名字就沒人提了）
+		p.fame *= FAME_FADE
+	_births()
+	_replenish()
 	if LifeData.month_of_year(month()) == SchoolData.SELECTION_MONTHS[-1]:
 		_spring()
 	look_around()
@@ -528,12 +560,183 @@ func _go(p: Person, place: String) -> void:
 	p.travel_left = MapData.distance(p.location, place)
 
 
+# ---------- 不是打架的人生 ----------
+
+## 一個月裡，世界上的人自己的事：退隱、成親、收徒、在流派升階
+func _life(p: Person) -> void:
+	var age := p.age()
+	if p.role in ["hunter", "duelist", "settled"] and age >= RETIRE_AGE and p.target == "" and rng.randf() < RETIRE_CHANCE:
+		p.role = "retired"
+		_go(p, MapData.HOME)
+		p.note("退隱")
+		_tell(NewsData.RETIRED.replace("{p:who}", "{p:%s}" % p.id))
+		return
+	if p.role != "villain" and p.role != "follower" and age >= 20 and age <= 40 and _spouse(p) == null and rng.randf() < MARRY_CHANCE:
+		for o in at(p.location):
+			if o != p and o.pron != p.pron and o.age() >= 20 and o.age() <= 42 and _spouse(o) == null \
+					and not p.relations.has(o.id) and not o.role in ["villain", "follower"] and not p.grudges.has(o.id):
+				p.relations[o.id] = "spouse"
+				o.relations[p.id] = "spouse"
+				p.note("跟{p:%s}成親" % o.id)
+				o.note("跟{p:%s}成親" % p.id)
+				_tell(NewsData.MARRIED.replace("{p:a}", "{p:%s}" % p.id).replace("{p:b}", "{p:%s}" % o.id))
+				break
+	var s := _spouse(p)
+	if s != null and p.pron == "她" and age <= 40 and _kids(p) < CHILDREN_MAX and rng.randf() < CHILD_CHANCE:
+		_have_child(p, s)
+	if p.realm >= 2 and age >= 28 and not p.role in ["villain", "follower", "youth"] and _disciple(p) == null and rng.randf() < DISCIPLE_CHANCE:
+		for o in at(p.location):
+			if o.role == "youth" and not o.relations.values().has("master") and not p.relations.has(o.id):
+				p.relations[o.id] = "disciple"
+				o.relations[p.id] = "master"
+				o.growth += 0.3
+				var teach := p.learned.filter(func(m): return not o.knows(m))
+				if not teach.is_empty():
+					o.learn(teach[rng.randi_range(0, teach.size() - 1)])
+				o.note("拜{p:%s}為師" % p.id)
+				_tell(NewsData.DISCIPLE.replace("{p:master}", "{p:%s}" % p.id).replace("{p:disciple}", "{p:%s}" % o.id))
+				break
+	# 劍庭的人照實力慢慢升階
+	if p.school == SchoolData.ID and p.rank > 0 and p.rank < 3 and p.realm >= p.rank + 1 and rng.randf() < PROMOTE_CHANCE:
+		p.rank += 1
+		p.note("升為%s" % SchoolData.RANKS[p.rank])
+		_tell(NewsData.PROMOTED.replace("{p:who}", "{p:%s}" % p.id).replace("{rank}", SchoolData.RANKS[p.rank]))
+
+
+func _spouse(p: Person) -> Person:
+	for id in p.relations:
+		if p.relations[id] == "spouse":
+			var o: Person = people.get(id)
+			if o != null and not o.dead:
+				return o
+	return null
+
+
+func _disciple(p: Person) -> Person:
+	for id in p.relations:
+		if p.relations[id] == "disciple":
+			var o: Person = people.get(id)
+			if o != null and not o.dead:
+				return o
+	return null
+
+
+func _kids(p: Person) -> int:
+	var n := p.relations.values().count("child")
+	for c in _children:
+		if c["parents"].has(p.id):
+			n += 1
+	return n
+
+
+## 生了孩子：孩子長到 CHILD_ARRIVE_AGE 歲才進城（世界上才有這個人）
+func _have_child(mother: Person, father: Person) -> void:
+	var pick := _fresh_name(PeopleData.CHILD_NAMES)
+	_children.append({"due": month() + CHILD_ARRIVE_AGE * 12, "parents": [mother.id, father.id], "name": pick[0], "pron": pick[1],
+		"born": LifeData.year_of(month())})
+	mother.note("生了孩子")
+	father.note("生了孩子")
+	_tell(NewsData.BORN.replace("{p:who}", "{p:%s}" % father.id))
+
+
+## 孩子長大了，進城
+func _births() -> void:
+	for c in _children.duplicate():
+		if c["due"] > month():
+			continue
+		_children.erase(c)
+		var p := _new_person(c["name"], c["pron"], "master", "youth", c["born"])
+		p.stats = {"str": 9, "agi": 9}
+		p.potential = {"str": rng.randi_range(16, 23), "agi": rng.randi_range(16, 23)}
+		p.growth = 1.3
+		var parent: Person = null
+		for pid in c["parents"]:
+			var par: Person = people.get(pid)
+			if par == null:
+				continue
+			p.relations[pid] = "parent"
+			par.relations[p.id] = "child"
+			if parent == null or par.dead == false:
+				parent = par
+		p.hp = p.max_hp()
+		if parent != null:
+			_tell(NewsData.GROWN_UP.replace("{p:parent}", "{p:%s}" % parent.id).replace("{p:who}", "{p:%s}" % p.id))
+
+
+## 人少了，外地的人慢慢來（接懸賞的冒險者、找地方落腳的劍士）
+func _replenish() -> void:
+	if others().size() >= POP_MIN or rng.randf() >= NEWCOMER_CHANCE:
+		return
+	var kinds := [["master", "steel_sword", "劍士"], ["raider", "hand_axe", "斧手"], ["duelist", "rapier", "劍客"]]
+	var k: Array = kinds[rng.randi_range(0, kinds.size() - 1)]
+	var pick := _fresh_name(PeopleData.NEWCOMER_NAMES)
+	var age := rng.randi_range(19, 30)
+	var p := _new_person(pick[0], pick[1], k[0], "hunter" if rng.randf() < 0.6 else "settled", LifeData.year_of(month()) - age)
+	var base := rng.randi_range(12, 17)
+	p.stats = {"str": base + rng.randi_range(-1, 1), "agi": base + rng.randi_range(-1, 1)}
+	p.potential = {"str": p.stats["str"] + rng.randi_range(1, 4), "agi": p.stats["agi"] + rng.randi_range(1, 4)}
+	p.growth = 0.5
+	p.realm = GrowthData.realm_of_stats(p.stats)
+	p.owned_weapons.clear()
+	p.owned_weapons.append(k[1])
+	p.weapon = k[1]
+	var generic := ["knee", "fallstone", "shed", "dust", "deflect", "triple", "needle"].filter(func(m): return MoveData.usable(m, k[1]))
+	generic.shuffle()
+	for m in generic.slice(0, rng.randi_range(1, 3)):
+		p.learn(m)
+	p.boldness = rng.randf_range(0.0, 0.8)
+	p.hp = p.max_hp()
+	p.fame = p.power() * 0.6
+	_tell(NewsData.NEWCOMER[rng.randi_range(0, NewsData.NEWCOMER.size() - 1)].replace("%s", k[2]).replace("{p:who}", "{p:%s}" % p.id))
+
+
+## 挑一個還沒有人用過的名字（用完了就加上「小」）
+func _fresh_name(names: Array) -> Array:
+	var used := {}
+	for p in people.values():
+		used[p.display_name] = true
+	for c in _children:
+		used[c["name"]] = true
+	var free := names.filter(func(n): return not used.has(n[0]))
+	if free.is_empty():
+		var n: Array = names[rng.randi_range(0, names.size() - 1)]
+		return ["小" + n[0], n[1]]
+	return free[rng.randi_range(0, free.size() - 1)]
+
+
+## 一個不在 PeopleData 裡的新人（孩子、外地來的）
+func _new_person(name: String, pron: String, style: String, role: String, born_year: int) -> Person:
+	var p := Person.new()
+	p.id = "p_%d_%d" % [month(), rng.randi_range(0, 999999)]
+	p.clock = clock
+	p.display_name = name
+	p.pron = pron
+	p.style = style
+	p.role = role
+	p.born_year = born_year
+	p.dies_at = LifeData.roll_dies_at(rng, born_year, LifeData.LIFESPAN_MIN + 6, LifeData.LIFESPAN_MAX + 14, month())
+	p.location = MapData.HOME
+	people[p.id] = p
+	return p
+
+
+## 強者榜：最有名的幾個人（活著的，含你）
+func ranking() -> Array:
+	var list: Array = people.values().filter(func(p): return not p.dead and p.fame > 0.0)
+	list.sort_custom(func(a, b): return a.fame > b.fame)
+	return list.slice(0, RANKING_SIZE)
+
+
 # ---------- 打 ----------
 
-## 這一架輸的人會不會死：有懸賞的、有仇的、決鬥。其他（搶東西）只是被打傷
+## 這一架輸的人會不會死：有懸賞的、有仇的才拼命。其他（搶東西、比劍）只是被打傷、認輸
 func lethal(a: Person, b: Person) -> bool:
-	return bounties.has(b.id) or bounties.has(a.id) and b.target == a.id or a.grudges.has(b.id) or b.grudges.has(a.id) \
-		or a.role == "duelist" and a.target == b.id or b.role == "duelist" and b.target == a.id
+	return bounties.has(b.id) or bounties.has(a.id) and b.target == a.id or a.grudges.has(b.id) or b.grudges.has(a.id)
+
+
+## 這一架是比劍（決鬥家找上門、沒有仇）：打到一方認輸，不拿東西
+func is_duel(a: Person, b: Person) -> bool:
+	return not lethal(a, b) and (a.role == "duelist" and a.target == b.id or b.role == "duelist" and b.target == a.id)
 
 
 ## 世界上的兩個人打一架（a 找上 b）。不含玩家角色（玩家角色的架由 Town 開戰鬥，打完呼叫 settle）
@@ -541,7 +744,40 @@ func fight(a: Person, b: Person) -> void:
 	var a_wins := rng.randf() < GrowthData.win_chance(a.power(), b.power())
 	var w := a if a_wins else b
 	var l := b if a_wins else a
-	settle(w, l, lethal(a, b), rng.randf() < NAMED_CHANCE)
+	if is_duel(a, b):
+		_duel_done(w, l)
+		return
+	settle(w, l, lethal(a, b) and rng.randf() < _death_chance(w, l), rng.randf() < NAMED_CHANCE)
+
+
+## 拼命的架，輸的人死的機率：懸賞的人被抓到多半沒命；去抓人反被打倒的，常常只是被打傷、搶光
+func _death_chance(w: Person, l: Person) -> float:
+	if bounties.has(l.id):
+		return DEATH_WANTED
+	if w.grudges.has(l.id):
+		return DEATH_GRUDGE
+	return DEATH_OTHER
+
+
+## 比劍分出勝負：輸的人認輸，名聲換一點過去
+func _duel_done(w: Person, l: Person) -> void:
+	_gain_fame(w, l, 0.6)
+	if w.target == l.id:
+		w.target = ""
+	if l.target == w.id:
+		l.target = ""
+	w.rest_left = rng.randi_range(DUEL_EVERY[0], DUEL_EVERY[1]) if w.role == "duelist" else rng.randi_range(REST_AFTER[0], REST_AFTER[1])
+	l.rest_left = rng.randi_range(REST_AFTER[0], REST_AFTER[1])
+	l.hp = maxi(1, roundi(l.max_hp() * 0.5))
+	w.note("在%s跟{p:%s}比劍，贏了" % [MapData.place_name(w.location), l.id])
+	l.note("在%s跟{p:%s}比劍，認輸了" % [MapData.place_name(w.location), w.id])
+	_tell(NewsData.DUEL_WON.replace("{p:winner}", "{p:%s}" % w.id).replace("{p:loser}", "{p:%s}" % l.id).replace("{place}", MapData.place_name(w.location)))
+
+
+## 打贏一個人：名聲照對手有多有名加（殺了他加多一點），輸的人掉一點
+func _gain_fame(w: Person, l: Person, scale := 1.0) -> void:
+	w.fame += (FAME_WIN + l.fame * FAME_TAKE) * scale
+	l.fame *= 1.0 - FAME_LOSS * scale
 
 
 ## 打完：輸的人死掉或被打傷，贏的人拿走他身上的東西。told = 傳聞說得出是誰
@@ -554,6 +790,7 @@ func settle(w: Person, l: Person, kill: bool, told := true) -> Array:
 		taken = _take(w, l, kill) if w.id != hero_id else []
 	elif w.id != hero_id:
 		taken = _take_from_hero(w, l)
+	_gain_fame(w, l, 1.2 if kill else 1.0)
 	w.grudges.erase(l.id)
 	if w.target == l.id:
 		w.target = ""

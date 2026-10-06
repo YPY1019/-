@@ -30,6 +30,16 @@ const JOINED := "開春，{p:who}通過了獅心劍庭的選拔，換上了學�
 const PAGE_PASSED := "{p:who}的遺物裡有幾張燒焦的紙，後來落到了{p:to}手上。"
 ## 有人把用不上的好東西賣給了武器店
 const SOLD := "{p:who}把{item}賣給了霜溪城的武器店。"
+## 比劍認輸（決鬥大多點到為止）
+const DUEL_WON := "{p:winner}在{place}跟{p:loser}比劍，{p:loser}認輸了。"
+## 世界上的人自己的人生（不是打架的事）
+const RETIRED := "{p:who}把兵器掛在牆上，說不出城了。"
+const MARRIED := "{p:a}跟{p:b}成親了。"
+const BORN := "{p:who}家裡多了一個孩子。"
+const GROWN_UP := "{p:parent}的孩子{p:who}長大了，背著劍進了霜溪城。"
+const DISCIPLE := "{p:master}收了{p:disciple}當徒弟。"
+const PROMOTED := "{p:who}在劍庭的比試裡贏了，升為{rank}。"
+const NEWCOMER := ["城裡來了一個從南邊來的%s，叫{p:who}。", "霜溪城的旅店住進一個外地來的%s，叫{p:who}，說是來接懸賞的。"]
 ## 決鬥
 const DUEL := [
 	"{p:a}向{p:b}下了戰書。",

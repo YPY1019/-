@@ -67,6 +67,8 @@ var fought: Array[String] = []
 var claims: Array = []
 ## 劍庭的事：辦完之後第幾個月才會再有（世界的月）
 var job_back := {}
+## 名聲：打贏有名的人就變有名（強者榜照這個排，不寫出數字）
+var fame := 0.0
 ## 在公會打聽的人：人 id -> 消息斷掉的那個月（世界的月）
 var inquired := {}
 ## 被逐出流派了（不能再回去）

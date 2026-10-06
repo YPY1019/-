@@ -220,6 +220,9 @@ func _build_buttons(p: Person, me: bool) -> void:
 			inquiry_done.emit(town.inquire(p.id))
 			refresh())
 		button_box.add_child(ib)
+	var rank := town.world.ranking().find(p)
+	if rank >= 0:
+		button_box.add_child(UiKit.label("強者榜上第 %d 個名字。" % (rank + 1), 16, 0.8))
 	if town.world.wanted(p.id):
 		var w := UiKit.label("公會懸賞%s。" % p.pron, 16)
 		w.add_theme_color_override("font_color", Color(TownView.GOLD))
@@ -447,6 +450,16 @@ func _build_items(p: Person, me: bool) -> void:
 
 # ---------- 關係 ----------
 
+## 關係的叫法：父母、伴侶照對方是男是女寫
+func _relation_name(kind: String, o: Person) -> String:
+	match kind:
+		"parent":
+			return "母親" if o.pron == "她" else "父親"
+		"spouse":
+			return "妻子" if o.pron == "她" else "丈夫"
+	return World.RELATION_NAMES[kind]
+
+
 func _build_relations(p: Person) -> void:
 	UiKit.clear(rel_box)
 	var w := town.world
@@ -455,7 +468,7 @@ func _build_relations(p: Person) -> void:
 		var o := w.person(r)
 		if o == null:
 			continue
-		rel_box.add_child(UiKit.label("%s：%s%s" % [World.RELATION_NAMES[p.relations[r]], w.who(r), "（死了）" if o.dead else ""], 18))
+		rel_box.add_child(UiKit.label("%s：%s%s" % [_relation_name(p.relations[r], o), w.who(r), "（死了）" if o.dead else ""], 18))
 		any = true
 	if p.school != "" and p.rank > 0:
 		for o in w.others():

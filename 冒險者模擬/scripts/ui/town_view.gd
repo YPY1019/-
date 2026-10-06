@@ -400,6 +400,7 @@ func _build_board() -> void:
 		row.add_child(b)
 		board_box.add_child(row)
 		board_box.add_child(HSeparator.new())
+	_build_ranking()
 	board_box.add_child(UiKit.heading("一般委託"))
 	var list := town.board()
 	if list.is_empty():
@@ -453,9 +454,52 @@ func _build_board() -> void:
 			line += "・接下的人：" + "、".join(takers.map(func(t): return town.world.who(t)))
 		info.add_child(UiKit.label(line, 15, 0.6))
 		row.add_child(info)
-		row.add_child(_take_button(town.took_bounty(id), func(): add_messages(town.accept_bounty(id))))
+		var buttons := UiKit.vbox(4)
+		buttons.add_child(_take_button(town.took_bounty(id), func(): add_messages(town.accept_bounty(id))))
+		buttons.add_child(_inquire_button(id))
+		row.add_child(buttons)
 		board_box.add_child(row)
 		board_box.add_child(HSeparator.new())
+
+
+## 強者榜：公會牆上的名單，照名聲排（不寫數字）。點名字看人物面板，旁邊可以直接打聽
+func _build_ranking() -> void:
+	var head := UiKit.heading("強者榜")
+	board_box.add_child(head)
+	board_box.add_child(UiKit.label("公會牆上釘著一張羊皮紙，寫著這幾年北境最有名的人。", 16, 0.7, true))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 4)
+	board_box.add_child(grid)
+	var i := 0
+	for p in town.world.ranking():
+		i += 1
+		grid.add_child(UiKit.label("%d" % i, 17, 0.6))
+		var me: bool = p.id == town.world.hero_id
+		var name_button := LinkButton.new()
+		name_button.text = "你" if me else ("%s %s" % [p.title, p.display_name]).strip_edges()
+		name_button.add_theme_font_size_override("font_size", 18)
+		name_button.add_theme_color_override("font_color", Color(p.realm_color()))
+		name_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_button.pressed.connect(show_person.bind(p.id))
+		grid.add_child(name_button)
+		grid.add_child(_inquire_button(p.id) if not me else Control.new())
+	board_box.add_child(HSeparator.new())
+
+
+## 「花 X 銀打聽」：已經有消息了就寫「有消息」
+func _inquire_button(id: String) -> Control:
+	var st := town.inquire_state(id)
+	if st["tracking"]:
+		var l := UiKit.label("有消息", 15, 0.6)
+		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		return l
+	var b := UiKit.button("花 %d 銀打聽" % st["cost"], 150, 34)
+	b.disabled = not st["ok"]
+	b.tooltip_text = st["why"]
+	b.pressed.connect(func(): add_messages(town.inquire(id)))
+	return b
 
 
 ## 「接下」按鈕；接過了就寫「你接下了」

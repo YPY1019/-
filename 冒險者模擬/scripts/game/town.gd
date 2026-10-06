@@ -31,6 +31,8 @@ var _fight_kin := false
 var road := {}
 ## 每走一個月碰上事的機率（測試可以改成 0）
 var road_chance := RoadData.CHANCE_PER_MONTH
+## 打倒委託的怪物，名聲加多少（乘危險度的境界 +1）
+const MONSTER_FAME := 0.8
 ## 打的怪物有沒有接委託
 var _fight_has_job := false
 ## 剛打贏、還沒決定殺不殺的人
@@ -351,6 +353,8 @@ func finish_monster(battle: Battle) -> Array:
 ## 打贏怪物：牠身上的東西、卡在瓶頸時打贏強敵就衝破瓶頸
 func _after_monster(id: String) -> Array:
 	var msgs := []
+	# 打倒危險的東西，名字也會傳出去一點
+	hero.fame += (EnemyData.danger(id)["realm"] + 1) * MONSTER_FAME
 	if not hero.beaten.has(id):
 		hero.beaten.append(id)
 		hero.note("打倒了%s" % EnemyData.ENEMIES[id]["name"])
