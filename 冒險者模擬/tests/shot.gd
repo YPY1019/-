@@ -90,10 +90,14 @@ func _init() -> void:
 	await _idle()
 	_save("05b_wolf_event")
 	main.encounter.visible = false
-	town.road = {"id": "caravan", "place": "pasture"}
+	town.road = {"id": "caravan", "place": "pasture", "step": "start"}
 	main._road_dialog()
 	await _frames(3)
 	_save("05a_road_event")
+	town.answer_road("0")
+	main._road_dialog()
+	await _frames(3)
+	_save("05a2_road_event_step2")
 	main.encounter.visible = false
 	town.road = {}
 	main._meet_monster("wolf")

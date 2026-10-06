@@ -198,8 +198,10 @@ func _answer_road(choice: String) -> void:
 		_start_monster(fight.substr(6))
 	elif fight.begins_with("person:"):
 		_start_person(fight.substr(7), "路上")
+	elif town.road["step"] != "":
+		_road_dialog()
 	else:
-		_continue_road(r["extra"])
+		_continue_road()
 
 
 ## 路上的事處理完，走完剩下的路
@@ -310,11 +312,14 @@ func _close_battle() -> void:
 	var msgs := _settled + town.after_fight()
 	_settled = []
 	var w := town.take_wait()
-	# 路上打完（沒被打倒）：接著走
+	# 路上打完（沒被打倒）：這件事還有下一步就接下去，不然接著走
 	if w.is_empty() and not town.road.is_empty():
 		town_view.add_messages(msgs)
 		_show(town_view)
-		_continue_road()
+		if town.road["step"] != "":
+			_road_dialog()
+		else:
+			_continue_road()
 		return
 	if w.is_empty():
 		town_view.add_messages(msgs)

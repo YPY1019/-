@@ -225,22 +225,25 @@ func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar
 ## 走路；路上碰上事：攔路的打得過就打、不然給錢；跟在後面的就回頭打；其他選第一個
 func _go(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, got: Dictionary, place: String) -> void:
 	town.travel(place)
-	while not town.road.is_empty() and not town.hero.dying():
-		var id: String = town.road["id"]
-		var choice: String = RoadData.EVENTS[id]["options"][0][0]
-		if id == "robbers" and (town.hero.power() < 12.0 or town.hero.hp < town.hero.max_hp() * 0.5):
-			choice = "pay"
-		if id == "traveler":
-			choice = "greet"
-		if id == "stalked" and town.hero.hp < town.hero.max_hp() * 0.5:
-			choice = "hurry"
+	var guard := 0
+	while not town.road.is_empty() and not town.hero.dying() and guard < 20:
+		guard += 1
+		if town.road["step"] == "":
+			town.continue_travel()
+			break
+		# 選第一個看得到的選項；攔路的、跟在後面的，血少就不打
+		var ev := town.road_event()
+		var choice: String = ev["options"][0][0]
+		if town.hero.hp < town.hero.max_hp() * 0.5 and ev["options"].size() > 1:
+			choice = ev["options"][1][0]
 		var r := town.answer_road(choice)
 		var fight: String = r["fight"]
 		if fight.begins_with("enemy:"):
 			var eid := fight.substr(6)
 			_fight(town, pilot, rng, func(): return town.start_monster(eid), "monster", got, town.hero)
-		if not town.road.is_empty():
-			town.continue_travel(r["extra"])
+		elif fight.begins_with("person:"):
+			var pid := fight.substr(7)
+			_fight(town, pilot, rng, func(): return town.start_person(pid), "person", got, town.hero)
 
 
 ## 打一場、拿光戰利品、結算。回傳勝負
