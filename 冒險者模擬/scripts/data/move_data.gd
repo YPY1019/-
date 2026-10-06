@@ -76,7 +76,7 @@ const MOVES := {
 		"default": {"deal": 1.0, "take": 1.0, "hit": true, "text": [
 			"你不退，迎上去一{my_stroke}砍向{name}。",
 			"你踏前一步，{my}劈向{name}的肩膀，自己的胸口也跟著露了出來。",
-			"你橫過{my}一掃，{my_edge}從{name}身側劃過。",
+			"你把{my}橫著一掃，{my_edge}從{name}身側劃過。",
 		]},
 		"vs": {
 			# 出手快：對方出快攻時搶先砍到，對方的攻擊被打歪一點
