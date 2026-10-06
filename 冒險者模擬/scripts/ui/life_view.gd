@@ -1,13 +1,15 @@
 class_name LifeView
 extends CenterContainer
 
-## 這一輩子：幾歲出道、打倒了誰、學會什麼、拿到什麼、幾歲死。照時間一行一行列。
-## 壽命用完時出現，只能重新開始。
+## 這一生：怎麼開始、打倒了誰、學會什麼、拿到什麼、幾歲死。照時間一行一行列。
+## 死後出現。臨終時選好了接手的人，就能換他接著玩（世界還在，記得上一個人）；也可以重新開始。
 
+signal continue_requested
 signal restart_requested
 
 var title_label: Label
 var text: RichTextLabel
+var continue_button: Button
 
 
 func _init() -> void:
@@ -29,23 +31,36 @@ func _init() -> void:
 	box.add_child(panel)
 	var row := UiKit.hbox(16)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	continue_button = UiKit.button("", 260, 50)
+	continue_button.pressed.connect(func(): continue_requested.emit())
+	row.add_child(continue_button)
 	var again := UiKit.button("重新開始", 190, 50)
 	again.pressed.connect(func(): restart_requested.emit())
 	row.add_child(again)
 	box.add_child(row)
 
 
-func show_life(h: Adventurer) -> void:
-	title_label.text = "這一生"
+## heir：接手的人（沒有就只能重新開始）
+func show_life(world: World, h: Person, heir: Person) -> void:
+	title_label.text = "這一生：%s" % h.display_name
 	title_label.add_theme_color_override("font_color", Color(UiKit.MSG_COLOR["big"]))
 	text.clear()
 	# 兩欄：左邊年紀，右邊發生的事
-	var rows := [[0, "帶著一把舊鐵劍來到北境的小城"]]
+	var rows := []
+	if world.lives.is_empty():
+		rows.append([0, "帶著一把舊鐵劍來到北境的霜溪城"])
 	for e in h.history:
-		rows.append([e["month"], e["text"]])
+		rows.append([e["month"], world.fmt(e["text"])])
 	if h.dead:
-		rows.append([h.month, "死在北境的小城"])
+		rows.append([h.died_at, "死在%s" % MapData.place_name(h.location)])
 	var bb := "[table=2]"
 	for r in rows:
-		bb += "[cell][color=#9aa3ad]%s　[/color][/cell][cell]%s。[/cell]" % [LifeData.date_text(r[0]), r[1]]
+		bb += "[cell][color=#9aa3ad]%s　[/color][/cell][cell]%s。[/cell]" % [LifeData.date_text(h.age_at(r[0]), r[0]), r[1]]
 	text.append_text(bb + "[/table]")
+	# 之前的人
+	if not world.lives.is_empty():
+		var before := world.lives.map(func(id): return world.person(id).display_name)
+		text.append_text("\n[color=#9aa3ad]在%s之前：%s[/color]" % [h.display_name, "、".join(before)])
+	continue_button.visible = heir != null
+	if heir != null:
+		continue_button.text = "接著玩：%s" % heir.display_name

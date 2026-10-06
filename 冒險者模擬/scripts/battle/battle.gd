@@ -4,9 +4,9 @@ extends RefCounted
 ## 一場戰鬥的規則。不碰畫面：收指令，吐出「事件清單」給畫面顯示。
 ## 事件的 kind 是 "stat"、"intent"（對手一般出手的架勢）、或傷害事件的 note（雙方數值）：只寫進試玩紀錄，畫面不顯示。
 ##
-## 進口：Battle.new(我方, 敵方)，我方是從 Adventurer.to_combatant() 來的。
+## 進口：Battle.new(我方, 敵方)，我方是從 Person.to_combatant() 來的。
 ## 出口：result() —— 勝負或撤退、剩多少血、打了幾回合、用了哪些招、被招牌招打中幾次。
-## 戰鬥本身不改 Adventurer，打完由 Town 結算。
+## 戰鬥本身不改 Person，打完由 Town 結算。
 ##
 ## 每回合：
 ##   1. 對手擺出招（描述）
@@ -172,7 +172,7 @@ func _end_text() -> String:
 	if outcome == "win" and enemies[0].fled:
 		return EnemyData.FLED_END
 	var d: Dictionary = enemies[0].enemy_def
-	return d.get(outcome + "_text", END_TEXT[outcome])
+	return enemies[0].fill(d.get(outcome + "_text", END_TEXT[outcome]))
 
 
 # ---- 抽招 ----
@@ -185,12 +185,12 @@ func _deal_hands() -> void:
 		ally.hand.clear()
 		if ally.held:
 			for id in MoveData.HELD:
-				if MoveData.is_basic(id) or ally.adventurer.knows(id):
+				if MoveData.is_basic(id) or ally.person.knows(id):
 					ally.hand.append(id)
 			notes.append("你被抱住了。")
 		else:
 			# 一般招和學來的招放在同一個池子裡抽，沒有永遠都在的招
-			var pool: Array = MoveData.BASIC + ally.adventurer.learned
+			var pool: Array = MoveData.BASIC + ally.person.learned
 			# 收招慢的招（裂盾斬），用完下回合不能再用
 			if not ally.used.is_empty() and MoveData.MOVES[ally.used[-1]].get("no_repeat", false):
 				pool.erase(ally.used[-1])
@@ -275,15 +275,20 @@ func _player_act(ally: Combatant, move_id: String, target: Combatant, ev: Array)
 
 
 ## 老了：偶爾寫一句身體跟不上（不寫數值掉了幾點）。掉越多越常寫，一場最多幾句
+## 快死了：偶爾寫一句喘、咳（徵兆越明顯越常寫，跟老了的句子一起算次數）
 func _show_age(ally: Combatant, ev: Array) -> void:
-	if ally.aged.is_empty() or round_no < 2 or ally.aged_said >= LifeData.AGED_MAX_PER_FIGHT or _all_dead(enemies):
+	if ally.aged.is_empty() and ally.omen <= 0.0 or round_no < 2 or ally.aged_said >= LifeData.AGED_MAX_PER_FIGHT or _all_dead(enemies):
 		return
 	var total := 0
 	var lines := []
 	for s in ally.aged:
 		total += ally.aged[s]
 		lines.append_array(LifeData.AGED_LINES[s])
-	if rng.randf() >= minf(LifeData.AGED_CHANCE_MAX, total * LifeData.AGED_CHANCE_PER_POINT):
+	var chance := minf(LifeData.AGED_CHANCE_MAX, total * LifeData.AGED_CHANCE_PER_POINT)
+	if ally.omen > 0.0:
+		chance = maxf(chance, ally.omen * LifeData.OMEN_BATTLE_CHANCE)
+		lines = LifeData.OMEN_BATTLE_LINES.duplicate() if ally.omen > 0.5 or lines.is_empty() else lines + LifeData.OMEN_BATTLE_LINES
+	if rng.randf() >= chance:
 		return
 	ally.aged_said += 1
 	ev.append(_ev("action", _pick(lines)))
@@ -513,7 +518,7 @@ func _weapon_fx_in(enemy: Combatant, target: Combatant, dmg: int, ev: Array) -> 
 		"twin":
 			var extra := WeaponData.twin_extra(dmg)
 			target.hp = maxi(0, target.hp - extra)
-			var src: String = WeaponData.get_def(enemy.enemy_def["loot"])["name"]
+			var src: String = WeaponData.get_def(enemy.weapon_id)["name"]
 			ev.append({"kind": "damage_in", "text": "你", "amount": extra, "note": src, "src": src})
 		"knell":
 			if not target.next_status.has("off_balance"):
@@ -546,7 +551,7 @@ func _watch_signature(enemy: Combatant, target: Combatant, ev: Array) -> void:
 	var sig: Dictionary = enemy.enemy_def.get("signature", {})
 	if sig.is_empty() or enemy.intent.get("action", "") != sig["action"]:
 		return
-	if target.adventurer == null or target.adventurer.knows(sig["learn"]):
+	if target.person == null or target.person.knows(sig["learn"]):
 		return
 	target.sig_hits[sig["learn"]] = target.sig_hits.get(sig["learn"], 0) + 1
 	ev.append(_ev("info", _pick(sig["seen"])))
@@ -603,7 +608,7 @@ func _damage_enemy(ally: Combatant, enemy: Combatant, move_id: String, deal: flo
 		var rage: Dictionary = enemy.enemy_def["rage"]
 		if enemy.hp < enemy.max_hp * rage["hp_below"]:
 			enemy.raging = true
-			ev.append(_ev("info", rage["text"]))
+			ev.append(_ev("info", enemy.fill(rage["text"])))
 
 
 # ---- 對手選下一招 ----

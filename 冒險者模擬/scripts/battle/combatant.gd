@@ -22,7 +22,8 @@ var stats := {}
 var armor := "none"
 var traits: Array = []
 var weapon := ""
-## 武器特效（WeaponData 的 fx）。有名的強者拿著稀有的劍，打你時也會發動
+## 武器（WeaponData 的 id）和特效（fx）。有名的強者拿著稀有的劍，打你時也會發動
+var weapon_id := ""
 var weapon_fx := ""
 var guard_item := ""
 ## 他／牠
@@ -31,12 +32,14 @@ var pron := "牠"
 ## 敵人資料和 id（敵人才有）
 var enemy_id := ""
 var enemy_def := {}
-## 冒險者本人（玩家方才有）
-var adventurer: Adventurer
+## 人（玩家方是你；敵方是世界上的人，怪物沒有）
+var person: Person
 ## 老了身體掉了幾點：數值 -> 點數（只放有掉的）。戰報偶爾寫一句
 var aged := {}
 ## 這場寫過幾句老了的樣子
 var aged_said := 0
+## 快死的徵兆有多明顯（0～1）：戰報偶爾寫喘、咳
+var omen := 0.0
 
 ## ---- 玩家方 ----
 ## 這回合手上的招（抽到的 + 基本招）
@@ -90,9 +93,37 @@ static func from_enemy(id: String) -> Combatant:
 	c.guard_item = d["guard"]
 	c.pron = d.get("pron", "牠")
 	if d.has("loot"):
+		c.weapon_id = d["loot"]
 		c.weapon_fx = WeaponData.fx(d["loot"])
 	c.enemy_def = d
 	c.enemy_id = id
+	return c
+
+
+## 世界上的人：招和戰報用他的打法（style），數值、血量、武器用他自己的。
+## 對手打你多痛看招（打法），武器只帶來特效。
+## place：在哪裡打（場景）。lethal = false：只是打傷他，倒下的句子換成沒死的
+static func from_person(p: Person, place: String, lethal := true) -> Combatant:
+	var c := from_enemy(p.style)
+	var d: Dictionary = c.enemy_def.duplicate()
+	d["title"] = p.title
+	d["scene"] = MapData.PLACES[place]["scene"]
+	if not p.start_lines.is_empty():
+		d["start"] = p.start_lines
+	if not lethal:
+		d["win_text"] = "{name}倒在地上，撐了幾次都爬不起來。"
+	d.erase("hide_hp")
+	c.enemy_def = d
+	c.person = p
+	c.display_name = p.display_name
+	c.pron = p.pron
+	c.stats = p.body_stats()
+	c.max_hp = p.max_hp()
+	c.hp = p.hp
+	var w := WeaponData.get_def(p.weapon)
+	c.weapon = w.get("noun", w["name"])
+	c.weapon_id = p.weapon
+	c.weapon_fx = WeaponData.fx(p.weapon)
 	return c
 
 

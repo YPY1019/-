@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## 平衡模擬（開發用，不是遊戲的一部分）。
-## 不同的數值、境界、招式和武器組合，每種敵人打很多場（滿血開打，自動戰鬥），看勝率。
+## 不同的數值、境界、招式和武器組合，打委託的怪物和世界上有名字的人（開局時的身體）很多場（滿血開打，自動戰鬥），看勝率。
 ## 執行：Godot.exe --headless --path . --script res://tests/sim.gd
 
 const N := 150
@@ -12,6 +12,8 @@ const ULT := ["sunder"]
 const ULT2 := ["sunder", "falcon"]
 const ULT3 := ["sunder", "falcon", "bastion"]
 const WILD := ["sand", "shout"]
+
+var _world: World
 
 
 func _init() -> void:
@@ -50,7 +52,12 @@ func _init() -> void:
 		["23/21 三境 二絕 守夜", 23, 21, 2, T1 + T2 + ULT2 + WILD, "nightwatch"],
 		["25/23 三境 二絕 守夜", 25, 23, 2, T1 + T2 + ULT2 + WILD, "nightwatch"],
 	]
-	var ids := ["merc_captain", "raider", "duelist", "black_knight", "ogre", "old_captain", "rebel_lord"]
+	# 怪物用 EnemyData 的 id，人用 PeopleData 的 id（開局時的身體；後來才來的人用剛來時的身體）
+	var ids := ["bear", "bran", "roderick", "ulf", "yvette", "black_knight", "ogre", "grayson", "leonard", "varen"]
+	_world = World.new(1)
+	for id in PeopleData.PEOPLE:
+		if _world.person(id) == null:
+			_world._spawn(id)
 	# 加參數只跑名字裡有這段字的組合：-- "/10"
 	var only := OS.get_cmdline_user_args()
 	if not only.is_empty():
@@ -76,8 +83,8 @@ func _init() -> void:
 					hp_sum += r["hp"]
 				elif r["outcome"] == "flee":
 					fled += 1
-			line += " | %s %3d%% 剩%3d 回%4.1f" % [
-				EnemyData.ENEMIES[id]["name"].substr(0, 2), 100 * wins / N, hp_sum / maxi(1, wins), float(rounds) / N]
+			var short: String = EnemyData.ENEMIES[id]["name"] if EnemyData.ENEMIES.has(id) else _world.person(id).display_name
+			line += " | %s %3d%% 剩%3d 回%4.1f" % [short.substr(0, 2), 100 * wins / N, hp_sum / maxi(1, wins), float(rounds) / N]
 			if ults > 0:
 				line += " 斷%.1f" % (float(ults) / N)
 		print(line)
@@ -85,7 +92,7 @@ func _init() -> void:
 
 
 func _battle(str_v: int, agi_v: int, realm: int, moves: Array, weapon: String, enemy_id: String, rng_seed: int) -> Battle:
-	var hero := Adventurer.new()
+	var hero := Person.new()
 	hero.stats = {"str": str_v, "agi": agi_v}
 	hero.realm = realm
 	hero.weapon = weapon
@@ -95,7 +102,14 @@ func _battle(str_v: int, agi_v: int, realm: int, moves: Array, weapon: String, e
 		if req.keys().all(func(s): return hero.stats[s] >= req[s]):
 			hero.learn(m)
 	var me := hero.to_combatant(true)
-	var b := Battle.new([me], [Combatant.from_enemy(enemy_id)], rng_seed)
+	var foe: Combatant
+	if EnemyData.ENEMIES.has(enemy_id):
+		foe = Combatant.from_enemy(enemy_id)
+	else:
+		var p := _world.person(enemy_id)
+		p.hp = p.max_hp()
+		foe = Combatant.from_person(p, p.location)
+	var b := Battle.new([me], [foe], rng_seed)
 	if enemy_id == SchoolData.MASTER_ENEMY:
 		me.yield_hp = roundi(me.max_hp * SchoolData.SPAR_YIELD)
 		b.round_limit = SchoolData.SPAR_ROUNDS

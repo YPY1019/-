@@ -1,11 +1,16 @@
 class_name TownView
 extends VBoxContainer
 
-## 城鎮畫面：你的狀態、委託板（含懸賞）、北境劍術道場、武器（你的武器和武器店）、休養。只負責顯示和按鈕，規則都在 Town。
-## 要開打時發出 commission_requested / spar_requested，由 main 切到戰鬥畫面。
+## 主畫面：你的狀態、委託板（一般委託和懸賞）、地圖、人物、北境劍術道場、武器（你的武器和武器店）、休養。
+## 只負責顯示和按鈕，規則都在 Town。城外只能走路、找人打；休養、學招、讀秘笈、買武器要在城裡。
+## 要開打、要走路時發出 commission_requested / fight_requested / travel_requested / spar_requested，由 main 處理。
 ## 花時間的事（學招、讀秘笈、休養）發出 wait_requested，由 main 擋住按鈕、呼叫 play_wait 演那段時間。
+## 臨終時中間換成安排後事（選誰接手），選好發出 heir_chosen。
 
 signal commission_requested(enemy_id: String)
+signal fight_requested(person_id: String)
+signal travel_requested(place: String)
+signal heir_chosen(person_id: String)
 signal spar_requested
 ## 花了時間：w 是 Town.take_wait() 那一段，msgs 是這件事的結果
 signal wait_requested(w: Dictionary, msgs: Array)
@@ -19,6 +24,8 @@ const AGED := "#c9a46a"
 var town: Town
 
 var date_label: Label
+var place_label: Label
+var home_button: Button
 var money_label: Label
 var hp_bar: ProgressBar
 var hp_label: Label
@@ -28,6 +35,12 @@ var board_box: VBoxContainer
 var dojo_box: VBoxContainer
 var shop_box: VBoxContainer
 var log_label: RichTextLabel
+var tabs: TabContainer
+var map_view: MapView
+var people_view: PeopleView
+## 臨終時換掉中間的分頁
+var deathbed_box: VBoxContainer
+var deathbed_panel: Control
 
 
 func _init(p_town: Town) -> void:
@@ -42,6 +55,13 @@ func _init(p_town: Town) -> void:
 	date_label = UiKit.label("", 24)
 	date_box.add_child(date_label)
 	top.add_child(date_box)
+	var place_box := UiKit.hbox(8)
+	place_label = UiKit.label("", 24)
+	place_box.add_child(place_label)
+	home_button = UiKit.button("", 150)
+	home_button.pressed.connect(func(): travel_requested.emit(MapData.HOME))
+	place_box.add_child(home_button)
+	top.add_child(place_box)
 	money_label = UiKit.label("", 24)
 	top.add_child(money_label)
 	var hp_box := UiKit.vbox(2)
@@ -63,7 +83,7 @@ func _init(p_town: Town) -> void:
 	me_panel.custom_minimum_size.x = 380
 	mid.add_child(me_panel)
 
-	var tabs := TabContainer.new()
+	tabs = TabContainer.new()
 	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	mid.add_child(tabs)
@@ -71,6 +91,18 @@ func _init(p_town: Town) -> void:
 	var board := _scroll(board_box)
 	board.name = "委託板"
 	tabs.add_child(board)
+	map_view = MapView.new(town)
+	map_view.name = "地圖"
+	map_view.travel_requested.connect(func(p): travel_requested.emit(p))
+	map_view.fight_requested.connect(func(id): fight_requested.emit(id))
+	map_view.monster_requested.connect(func(id): commission_requested.emit(id))
+	map_view.person_selected.connect(show_person)
+	tabs.add_child(map_view)
+	people_view = PeopleView.new(town)
+	people_view.name = "人物"
+	people_view.travel_requested.connect(func(p): travel_requested.emit(p))
+	people_view.fight_requested.connect(func(id): fight_requested.emit(id))
+	tabs.add_child(people_view)
 	dojo_box = UiKit.vbox(8)
 	var dojo := _scroll(dojo_box)
 	dojo.name = "北境劍術道場"
@@ -79,6 +111,10 @@ func _init(p_town: Town) -> void:
 	var shop := _scroll(shop_box)
 	shop.name = "武器"
 	tabs.add_child(shop)
+	deathbed_box = UiKit.vbox(10)
+	deathbed_panel = _scroll(deathbed_box)
+	deathbed_panel.visible = false
+	mid.add_child(deathbed_panel)
 
 	# 下：發生了什麼事
 	log_label = RichTextLabel.new()
@@ -114,11 +150,12 @@ const LINE_COLOR := "#9aa3ad"
 var _rng := RandomNumberGenerator.new()
 
 
-## w：Town.take_wait() 那一段。跳完呼叫 after
+## w：Town.take_wait() 那一段。跳完呼叫 after。世界上發生的事跳到那個月才寫
 func play_wait(w: Dictionary, after: Callable) -> void:
 	var from: int = w["from"]
 	var months: int = w["months"]
 	var schedule := _wait_schedule(w["kind"], from, months)
+	var news: Array = w.get("news", [])
 	log_label.append_text("[color=%s]%s……[/color]\n" % [LINE_COLOR, w["title"]])
 	_show_month(from)
 	if months > 0:
@@ -128,13 +165,17 @@ func play_wait(w: Dictionary, after: Callable) -> void:
 			_show_month(from + tick)
 			if schedule.has(tick):
 				log_label.append_text("[i][color=%s]%s[/color][/i]\n" % [LINE_COLOR, schedule[tick]])
+			var told := news.filter(func(e): return e["month"] == from + tick)
+			if not told.is_empty():
+				log_label.append_text(UiKit.messages_bbcode(told) + "\n")
+				messages_added.emit(told)
 	await get_tree().create_timer(0.3).timeout
 	after.call()
 
 
 ## 跳的時候只動年月，其他的（血量、錢）跳完才更新
 func _show_month(month: int) -> void:
-	date_label.text = LifeData.date_text(month)
+	date_label.text = LifeData.date_text(town.hero.age_at(month), month)
 
 
 ## 第幾格寫哪一句：第一格寫剛開始的，中間換季寫季節，最後一格寫快結束的
@@ -159,6 +200,12 @@ func _pick_line(list: Array) -> String:
 func refresh() -> void:
 	var h := town.hero
 	date_label.text = h.date_text()
+	place_label.text = MapData.place_name(h.location)
+	var home := MapData.distance(h.location, MapData.HOME)
+	home_button.visible = home > 0 and not h.dying()
+	home_button.text = "回城（%s）" % LifeData.span_text(home)
+	tabs.visible = not h.dying()
+	deathbed_panel.visible = h.dying()
 	money_label.text = "%d 銀" % h.money
 	money_label.add_theme_color_override("font_color", Color(BAD) if h.money < 0 else Color(GOLD))
 	hp_label.text = "血量 %d / %d" % [h.hp, h.max_hp()]
@@ -169,6 +216,22 @@ func refresh() -> void:
 	_build_board()
 	_build_dojo()
 	_build_shop()
+	map_view.refresh()
+	people_view.refresh()
+	if h.dying():
+		_build_deathbed()
+
+
+## 在人物分頁打開這個人
+func show_person(id: String) -> void:
+	tabs.current_tab = people_view.get_index()
+	people_view.select(id)
+
+
+## 走到一個地方之後：打開地圖，看這裡有誰
+func show_map() -> void:
+	tabs.current_tab = map_view.get_index()
+	map_view.select(town.hero.location)
 
 
 ## 花了時間的就先演等的畫面，演完才寫進紀錄
@@ -185,12 +248,16 @@ func _act(msgs: Array) -> void:
 func _build_rest() -> void:
 	UiKit.clear(rest_row)
 	var full := town.months_to_full()
+	var away := not town.in_city() or town.hero.dying()
 	var one := UiKit.button("休養 1 個月", 150)
-	one.disabled = full == 0
+	one.disabled = full == 0 or away
 	one.pressed.connect(func(): _act(town.rest(1)))
 	rest_row.add_child(one)
 	var all := UiKit.button("休養到痊癒（%s）" % LifeData.span_text(full) if full > 0 else "不用休養", 230)
-	all.disabled = full == 0
+	all.disabled = full == 0 or away
+	if away and not town.hero.dying():
+		one.tooltip_text = "要在城裡"
+		all.tooltip_text = "要在城裡"
 	all.pressed.connect(func(): _act(town.rest(town.months_to_full())))
 	rest_row.add_child(all)
 
@@ -201,6 +268,7 @@ func _build_rest() -> void:
 func _build_me() -> void:
 	UiKit.clear(me_box)
 	var h := town.hero
+	me_box.add_child(UiKit.label(h.display_name, 20, 0.8))
 	var realm := _tip(UiKit.label(h.realm_text(), 22), "境界。衝破瓶頸就升一境，血量也跟著變多。")
 	realm.add_theme_color_override("font_color", Color(h.realm_color()))
 	me_box.add_child(realm)
@@ -258,6 +326,7 @@ func _build_me() -> void:
 			else:
 				var b := UiKit.button("讀（%s）" % LifeData.span_text(st["months"]), 130)
 				b.disabled = not st["ok"]
+				b.tooltip_text = st["why"]
 				b.pressed.connect(func(): _act(town.read_book(id)))
 				row.add_child(b)
 			me_box.add_child(row)
@@ -276,50 +345,115 @@ func _move_flow(ids: Array) -> void:
 
 
 # ---------- 委託板 ----------
+# 一般委託：怪物在哪、報酬多少。懸賞只寫懸賞本身（誰、做了什麼、賞多少、有誰接了）。
+# 人在哪、多強、帶著什麼，看人物面板（點名字）。
 
 func _build_board() -> void:
 	UiKit.clear(board_box)
 	var h := town.hero
-	var header_done := false
-	for id in town.board():
+	board_box.add_child(UiKit.heading("一般委託"))
+	var list := town.board()
+	if list.is_empty():
+		board_box.add_child(UiKit.label("板子上空空的。", 17, 0.6))
+	for id in list:
 		var c: Dictionary = TownData.COMMISSIONS[id]
 		var e: Dictionary = EnemyData.ENEMIES[id]
-		var named: bool = EnemyData.NAMED.has(id)
-		if named and not header_done:
-			header_done = true
-			var head := UiKit.heading("懸賞")
-			head.add_theme_color_override("font_color", Color(GOLD))
-			board_box.add_child(head)
 		var row := UiKit.hbox(16)
 		var info := UiKit.vbox(2)
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var dg := EnemyData.danger(id)
 		var title_row := UiKit.hbox(12)
-		title_row.add_child(UiKit.label(("%s %s" % [e.get("title", ""), e["name"]]).strip_edges(), 20))
-		# 人標境界，怪物標危險度
-		var stars := _tip(UiKit.label(dg["text"] if named else "%s %s" % [dg["stars"], dg["stage"]], 20),
-			"境界" if named else "危險度：大約是%s的人打得贏的" % dg["text"])
+		title_row.add_child(UiKit.label(e["name"], 20))
+		# 怪物標危險度
+		var stars := _tip(UiKit.label("%s %s" % [dg["stars"], dg["stage"]], 20), "危險度：大約是%s的人打得贏的" % dg["text"])
 		stars.add_theme_color_override("font_color", Color(dg["color"]))
 		title_row.add_child(stars)
 		if h.beaten.has(id):
 			title_row.add_child(UiKit.label("打贏過", 16, 0.5))
 		info.add_child(title_row)
-		info.add_child(UiKit.label(e["blurb"], 16, 0.75, true))
-		if e.has("loot") and named:
-			info.add_child(UiKit.label("帶著一把" + WeaponData.get_def(e["loot"])["look"], 16, 0.75, true))
-		for book in e.get("books", []):
-			if not h.books.has(book):
-				info.add_child(UiKit.label("身上還有%s。" % BookData.get_def(book)["look"], 16, 0.75, true))
-		info.add_child(UiKit.label("%d 銀・%s" % [c["reward"], LifeData.span_text(c["months"])], 15, 0.6))
-		info.tooltip_text = c["text"]
-		info.mouse_filter = Control.MOUSE_FILTER_PASS
+		info.add_child(UiKit.label(c["text"], 16, 0.75, true))
+		info.add_child(UiKit.label("%s・%d 銀" % [MapData.place_name(c["place"]), c["reward"]], 15, 0.6))
 		row.add_child(info)
-		var b := UiKit.button("接下", 110, 52)
+		var months := MapData.distance(h.location, c["place"])
+		var b := UiKit.button("接下" if months == 0 else "前往（%s）" % LifeData.span_text(months), 150, 52)
 		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		b.pressed.connect(func(): commission_requested.emit(id))
 		row.add_child(b)
 		board_box.add_child(row)
 		board_box.add_child(HSeparator.new())
+
+	var head := UiKit.heading("懸賞")
+	head.add_theme_color_override("font_color", Color(GOLD))
+	board_box.add_child(head)
+	for id in town.world.bounties:
+		var bounty: Dictionary = town.world.bounties[id]
+		var p := town.world.person(id)
+		var row := UiKit.hbox(16)
+		var info := UiKit.vbox(2)
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var name_button := LinkButton.new()
+		name_button.text = ("%s %s" % [p.title, p.display_name]).strip_edges()
+		name_button.add_theme_font_size_override("font_size", 20)
+		name_button.add_theme_color_override("font_color", Color(p.realm_color()))
+		name_button.tooltip_text = "看人物面板"
+		name_button.pressed.connect(show_person.bind(id))
+		var name_row := UiKit.hbox(0)
+		name_row.add_child(name_button)
+		info.add_child(name_row)
+		info.add_child(UiKit.label(bounty["text"], 16, 0.75, true))
+		var line := "%d 銀" % bounty["reward"]
+		var takers: Array = bounty["takers"].filter(func(t): return t != town.world.hero_id and not town.world.person(t).dead)
+		if not takers.is_empty():
+			line += "・接下的人：" + "、".join(takers.map(func(t): return town.world.who(t)))
+		info.add_child(UiKit.label(line, 15, 0.6))
+		row.add_child(info)
+		if town.took_bounty(id):
+			var took := UiKit.label("你接下了", 17)
+			took.add_theme_color_override("font_color", Color("#9be39b"))
+			took.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(took)
+		else:
+			var b := UiKit.button("接下", 110, 52)
+			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			b.disabled = not town.in_city()
+			if b.disabled:
+				b.tooltip_text = "要在城裡的公會登記"
+			b.pressed.connect(func(): add_messages(town.accept_bounty(id)))
+			row.add_child(b)
+		board_box.add_child(row)
+		board_box.add_child(HSeparator.new())
+
+
+# ---------- 臨終 ----------
+# 病倒了，不能出遠門。選一個人把東西交給他，換他接著玩。
+
+func _build_deathbed() -> void:
+	UiKit.clear(deathbed_box)
+	var h := town.hero
+	deathbed_box.add_child(UiKit.heading("後事"))
+	deathbed_box.add_child(UiKit.label("你知道自己起不來了。身上的東西、還沒做完的事，要交給誰？", 18, 0.85, true))
+	var things := h.items().map(func(it): return town._item_name(it))
+	deathbed_box.add_child(UiKit.label("身上的東西：%s。還有 %d 銀。" % ["、".join(things), maxi(0, h.money)], 16, 0.7, true))
+	deathbed_box.add_child(HSeparator.new())
+	for p in town.heir_candidates():
+		var row := UiKit.hbox(16)
+		var info := UiKit.vbox(2)
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var title_row := UiKit.hbox(12)
+		title_row.add_child(UiKit.label(("%s %s" % [p.title, p.display_name]).strip_edges(), 20))
+		var realm := UiKit.label(p.realm_text(), 18)
+		realm.add_theme_color_override("font_color", Color(p.realm_color()))
+		title_row.add_child(realm)
+		title_row.add_child(UiKit.label("%d 歲" % p.age(), 18, 0.7))
+		info.add_child(title_row)
+		info.add_child(UiKit.label(p.blurb, 16, 0.75, true))
+		row.add_child(info)
+		var b := UiKit.button("交給%s" % p.pron, 130, 52)
+		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		b.pressed.connect(func(): heir_chosen.emit(p.id))
+		row.add_child(b)
+		deathbed_box.add_child(row)
+		deathbed_box.add_child(HSeparator.new())
 
 
 # ---------- 道場 ----------
@@ -327,6 +461,9 @@ func _build_board() -> void:
 func _build_dojo() -> void:
 	UiKit.clear(dojo_box)
 	var h := town.hero
+	if not town.in_city():
+		dojo_box.add_child(UiKit.label("道場在霜溪城。", 18, 0.6))
+		return
 	for t in SchoolData.TIERS:
 		match t["exam"]:
 			"spar":
@@ -410,6 +547,9 @@ func _build_shop() -> void:
 
 	shop_box.add_child(HSeparator.new())
 	shop_box.add_child(UiKit.heading("武器店"))
+	if not town.in_city():
+		shop_box.add_child(UiKit.label("武器店在霜溪城。", 18, 0.6))
+		return
 	for id in WeaponData.SHOP:
 		var w := WeaponData.get_def(id)
 		var st := town.weapon_state(id)

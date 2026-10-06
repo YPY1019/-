@@ -33,6 +33,15 @@ const REALM_COLORS := ["#c9ccd1", "#6fcf7a", "#6fa8ff"]
 const STAGES := ["前段", "中段", "後段"]
 ## 第 i 境的血量
 const REALM_HP := [100, 150, 220]
+## 世界上有打法的人：數值每長 1 點，血量多幾點（掉 1 點就少幾點）
+const HP_PER_POINT := 12
+
+# ---- 世界上的人互相打（World） ----
+## 粗略的強弱：0.6 × 比較高的那項 ＋ 0.4 × 比較低的那項 ＋ 武器 ＋ 絕學
+const POWER_PER_WEAPON := 3.0
+const POWER_PER_ULT := 1.0
+## 強弱差這麼多，勝率大約 73%（差兩倍約 88%）
+const POWER_SPREAD := 1.0
 
 # ---- 戰鬥時的比較 ----
 ## 招式打出去、對手打過來的基本傷害（再乘招式倍率、差距倍率）
@@ -82,6 +91,16 @@ static func realm_of_value(value: int) -> int:
 		if value <= CAPS[i]:
 			return i
 	return CAPS.size() - 1
+
+
+## 世界上的人：底子落在第幾境（他們不用衝瓶頸，長到哪就是哪）
+static func realm_of_stats(stats: Dictionary) -> int:
+	return realm_of_value(maxi(stats["str"], stats["agi"]))
+
+
+## a 打贏 b 的機率（世界上的人互相打）
+static func win_chance(power_a: float, power_b: float) -> float:
+	return 1.0 / (1.0 + exp(-(power_a - power_b) / POWER_SPREAD))
 
 
 ## 在這一境的前段 0、中段 1、後段 2

@@ -5,12 +5,12 @@ extends SceneTree
 
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
-	var hero := Adventurer.new()
+	var hero := Person.new()
 	hero.stats = {"str": int(args[1]), "agi": int(args[2])}
 	hero.realm = int(args[3])
 	hero.weapon = args[4]
 	if args.size() > 6:
-		hero.month = int(args[6])
+		hero.clock.month = int(args[6])
 	# 數值不到門檻的招學不到（跟道場一樣）
 	for m in ["parry", "sweep_kick", "heavy", "redirect", "disarm", "break_free", "vital", "combo"]:
 		var req: Dictionary = SchoolData.REQ.get(m, {})

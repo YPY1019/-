@@ -1,182 +1,217 @@
 extends SceneTree
 
-## 整輪模擬（開發用）：電腦玩家不會死（壽命拉到很長），一直玩到好東西全拿完（或打不動了），
-## 看每樣好東西大約幾歲拿到，再估算「死在幾歲時，拿得到幾樣」。
-## 策略很簡單：傷了就休養、能學就學、能讀就讀、能考就考、買得起更好的劍就買、換上最好的武器；
-## 委託挑「還沒打贏過的最弱對手」，在目前實力下連輸兩次就回去打打得贏的。戰鬥是自動的（AutoPilot）。
-## 真人大約比電腦玩家快一倍（2026-10-06 試玩：真人 22 歲 10 月打倒食人魔，電腦玩家約 30 歲），
-## 所以也印出「照真人速度」的估算（月數減半）。
-## 電腦玩家花的時間是真人的兩倍，老化也照「真人那時候幾歲」算（HumanAged），不然電腦玩家會老得太早。
-## 執行：Godot.exe --headless --path . --script res://tests/career.gd
+## 整輪模擬（開發用）：電腦玩家在活的世界裡過一輩子，看好東西（稀有武器、秘笈）幾歲拿到、
+## 有多少被世界上的人先拿走、最後落在誰手上。
+## 策略很簡單：傷了就回城休養、能學就學、能讀就讀、能考就考、買得起更好的劍就買、換上最好的武器；
+## 挑「打得過的」懸賞（看 Person.power，比自己強不超過一點）去接、走過去找人打；沒有就打委託的怪物練身體。
+## 有人找上門就打。戰鬥是自動的（AutoPilot）。
+## 真人大約比電腦玩家快一倍（2026-10-06 試玩），電腦拿到的只當下限參考。
+## 執行：Godot --headless --path . --script res://tests/career.gd -- [幾輪] [印第一輪的過程 1/0]
 
-const RUNS := 30
-## 挑戰的順序（大約由弱到強）
-const LADDER := ["wolf", "bandit_leader", "deserter", "bear", "merc_captain", "raider", "duelist",
-	"black_knight", "ogre", "old_captain", "rebel_lord"]
-## 好東西：打倒有名字的強者（拿到他身上的武器或秘笈）、讀完秘笈、打倒食人魔
-const PRIZES := ["打贏羅德里克", "打贏烏爾夫", "打贏伊薇特", "打贏黑騎士", "打贏葛雷森", "打贏瓦倫",
-	"打贏食人魔", "讀完北境裁決", "讀完隼之一刺", "讀完不落要塞"]
-## 真人比電腦玩家快幾倍
-const HUMAN_SPEED := 2.0
-## 估算「死在幾歲」
-const DEATH_AGES := [26, 28, 30, 32, 34, 36, 38, 40]
+const PRIZES := ["red_fang", "knell", "gatebreaker", "nightwatch", "sunder_book", "falcon_book", "bastion_book"]
+## 怪物由弱到強
+const LADDER := ["wolf", "bandit_leader", "deserter", "bear", "ogre"]
 
-
-## 老化照真人的年紀算（電腦玩家過了 n 個月，真人才過了 n / HUMAN_SPEED 個月）
-class HumanAged extends Adventurer:
-	func decline(stat: String) -> int:
-		return LifeData.decline(stat, LifeData.age_at(int(month / HUMAN_SPEED)))
+var verbose := false
 
 
 func _init() -> void:
-	var all := []
-	for run in RUNS:
-		all.append(_career(run, run < 1))
-	var when := {}
-	for r in all:
-		for k in r["when"]:
-			when[k] = when.get(k, []) + [r["when"][k]]
-	print("\n好東西大約幾歲拿到（中位數，幾輪拿到）：")
+	var args := OS.get_cmdline_user_args()
+	var runs := int(args[0]) if args.size() > 0 else 20
+	verbose = args.size() > 1 and args[1] == "1"
+	var got_ages := {}
+	var counts := []
+	var lost := {}
+	var deaths := []
+	for run in runs:
+		var r := _career(run)
+		counts.append(r["got"].size())
+		deaths.append(r["age"])
+		for k in r["got"]:
+			got_ages[k] = got_ages.get(k, []) + [r["got"][k]]
+		for k in r["lost"]:
+			lost[k] = lost.get(k, 0) + 1
+	print("\n%d 輪。好東西幾歲拿到（中位數，幾輪拿到）、幾輪是別人先拿走或跟著下葬的：" % runs)
 	for k in PRIZES:
-		var v: Array = when.get(k, [])
-		if v.is_empty():
-			print("　%s：沒有一輪拿到" % k)
-			continue
+		var v: Array = got_ages.get(k, [])
 		v.sort()
-		var med: int = v[v.size() / 2]
-		print("　%s：電腦 %s，真人約 %s（%d/%d 輪）" % [k, LifeData.date_text(med), LifeData.date_text(int(med / HUMAN_SPEED)), v.size(), RUNS])
-	var fights := all.map(func(r): return r["fights"])
-	fights.sort()
-	print("\n全部拿完（或打不動）要打幾場：中位數 %d" % fights[fights.size() / 2])
-	print("\n死在幾歲時，拿得到幾樣（共 %d 樣，中位數）：" % PRIZES.size())
-	for age in DEATH_AGES:
-		var end: int = (age - LifeData.START_AGE) * 12 - (LifeData.START_MONTH - 1)
-		var bot := []
-		var human := []
-		for r in all:
-			bot.append(_count(r["when"], end))
-			human.append(_count(r["when"], end * HUMAN_SPEED))
-		bot.sort()
-		human.sort()
-		print("　%d 歲：電腦 %d 樣，真人約 %d 樣" % [age, bot[bot.size() / 2], human[human.size() / 2]])
-	# 照遊戲裡的隨機壽命，每輪擲一次
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 1
-	var got := []
-	for r in all:
-		got.append(_count(r["when"], LifeData.roll_life_months(rng) * HUMAN_SPEED))
-	got.sort()
-	print("\n照遊戲的隨機壽命（%d～%d 歲），真人一輩子拿到幾樣：最少 %d、四分之一 %d、中位數 %d、四分之三 %d、最多 %d" % [
-		LifeData.LIFESPAN_MIN, LifeData.LIFESPAN_MAX, got[0], got[got.size() / 4], got[got.size() / 2], got[got.size() * 3 / 4], got[-1]])
+		var name := _name(k)
+		if v.is_empty():
+			print("　%s：沒有一輪拿到，%d 輪被別人拿走／下葬" % [name, lost.get(k, 0)])
+		else:
+			print("　%s：%d 歲（%d/%d 輪），%d 輪被別人拿走／下葬" % [name, v[v.size() / 2], v.size(), runs, lost.get(k, 0)])
+	counts.sort()
+	deaths.sort()
+	print("一輩子拿到幾樣：最少 %d、中位數 %d、最多 %d（死在 %d～%d 歲）" % [counts[0], counts[counts.size() / 2], counts[-1], deaths[0], deaths[-1]])
 	quit()
 
 
-func _count(when: Dictionary, end: float) -> int:
-	var n := 0
-	for k in PRIZES:
-		if when.has(k) and when[k] <= end:
-			n += 1
-	return n
-
-
-func _career(run: int, verbose: bool) -> Dictionary:
-	var town := Town.new()
-	town.hero = HumanAged.new()
+func _career(run: int) -> Dictionary:
+	var town := Town.new(run + 1)
+	var w := town.world
 	var h := town.hero
-	h.life_months = 99999
 	var pilot := AutoPilot.new()
 	pilot.retreat_at = 0.2  # 代替玩家按撤退
-	var fights := 0
-	var lost_at := {}  # enemy -> 在目前實力下輸了幾次
-	var spar_tries := 0
-	var when := {}
-	var power := _power_sig(h)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = run * 7919
-	while fights < 250 and h.month < 600 and not PRIZES.all(func(k): return when.has(k)):
-		var sig := _power_sig(h)
-		if sig != power:
-			power = sig
-			lost_at.clear()
-			spar_tries = 0
-		# 休養
+	var got := {}
+	var lost := {}
+	var fails := {}  # 對手 id -> 在目前實力下輸了幾次
+	var spar_tries := 0
+	var guard := 0
+	while not h.dying() and guard < 2000:
+		guard += 1
+		# 有人找上門
+		var comer := town.comer()
+		if comer != null:
+			_fight(town, pilot, rng, func(): return town.start_person(comer.id), "person", got, h)
+			continue
+		# 傷了就回城休養
 		if h.hp < h.max_hp() * 0.6:
-			town.rest(town.months_to_full())
+			if not town.in_city():
+				town.travel(MapData.HOME)
+			else:
+				town.rest(town.months_to_full())
 			continue
-		# 學招、讀秘笈
-		var learned_any := false
-		for t in SchoolData.TIERS:
-			for id in t["moves"]:
-				if town.move_state(id)["ok"]:
-					town.learn_move(id)
-					learned_any = true
-		for id in h.books:
-			if town.book_state(id)["ok"]:
-				town.read_book(id)
-				when["讀完" + BookData.get_def(id)["name"]] = h.month
-				learned_any = true
-		if learned_any:
+		# 城裡有事可做（學得起的招、能讀的秘笈、能考的考驗）就回城
+		if not town.in_city() and _city_wanted(town):
+			town.travel(MapData.HOME)
 			continue
-		# 換上拿得動的最好的武器；店裡的比較好就買
-		var best_w := h.weapon
-		for w in h.owned_weapons:
-			if h.can_wield(w) and WeaponData.get_def(w)["power"] > WeaponData.get_def(best_w)["power"]:
-				best_w = w
-		if best_w != h.weapon:
-			town.equip(best_w)
-		var bought := false
-		for w in WeaponData.SHOP:
-			if WeaponData.get_def(w)["power"] > WeaponData.get_def(h.weapon)["power"] and town.weapon_state(w)["ok"]:
-				town.buy_weapon(w)
-				bought = true
-				break
-		if bought:
+		if town.in_city() and _city_chores(town, pilot, rng, spar_tries):
+			spar_tries += 1 if h.approved_tier < 2 and town.spar_state()["ok"] else 0
 			continue
-		# 考驗
-		if town.spar_state()["ok"] and h.learned.size() >= 2 and spar_tries < 3:
-			spar_tries += 1
-			var sb := town.start_spar()
-			sb.rng.seed = rng.randi()
-			pilot.play(sb)
-			town.finish_spar(sb)
-			fights += 1
-			continue
-		# 挑委託：還沒打贏過的最弱對手；在目前實力下連輸兩次（或欠錢），就回去打打得贏的
+		# 挑懸賞：打得過的（看粗略的強弱），在目前實力下輸了兩次的先不去
+		# 會的招多，比粗略的強弱估得強一點
+		var me := h.power() + 0.25 * h.learned.size()
 		var target := ""
-		for id in LADDER:
-			if not h.beaten.has(id) and lost_at.get(id, 0) < 2:
+		for id in w.bounties:
+			var p := w.person(id)
+			if p.power() <= me + 0.5 and fails.get(id, 0) < 2 and (target == "" or p.power() > w.person(target).power()):
 				target = id
-				break
-		if target == "" or h.money < 0:
-			var safe := EnemyData.ORDER.filter(func(id): return h.beaten.has(id))
-			target = safe[-1] if not safe.is_empty() else EnemyData.ORDER[0]
-		town.depart(target)
-		var b := town.start_commission()
-		b.rng.seed = rng.randi()
-		var r := pilot.play(b)
-		town.finish_commission(b)
-		for id in town.loot.duplicate():
-			town.take_loot(id)
-		town.return_to_town()
-		fights += 1
-		if r["outcome"] != "win":
-			lost_at[target] = lost_at.get(target, 0) + 1
+		if target != "":
+			if not town.took_bounty(target):
+				if not town.in_city():
+					town.travel(MapData.HOME)
+					continue
+				town.accept_bounty(target)
+			var p := w.person(target)
+			if p.travel_left > 0:
+				town.rest(1) if town.in_city() and h.hp < h.max_hp() else town._pass_months(1)
+				continue
+			if p.location != h.location:
+				town.travel(p.location)
+				continue
+			var r := _fight(town, pilot, rng, func(): return town.start_person(target), "person", got, h)
+			if r != "win":
+				fails[target] = fails.get(target, 0) + 1
+			continue
+		# 沒有打得過的懸賞：打委託的怪物練身體（還沒打贏過的最弱的；都打贏過就打打得贏的最強的）
+		# 缺錢學招的時候先打打贏過的賺錢；不然打還沒打贏過的最弱的；都不行就打打贏過的最強的
+		var poor := h.money < 80 and h.learned.size() < 3
+		var beaten := LADDER.filter(func(id): return w.monster_open(id) and h.beaten.has(id))
+		var fresh := LADDER.filter(func(id): return w.monster_open(id) and not h.beaten.has(id) and fails.get(id, 0) < 2)
+		var mon := ""
+		if poor and not beaten.is_empty():
+			mon = beaten[-1]
+		elif not fresh.is_empty():
+			mon = fresh[0]
+		elif not beaten.is_empty():
+			mon = beaten[-1]
+		if mon == "":
+			fails.clear()
+			town._pass_months(1)
+			continue
+		var place: String = TownData.COMMISSIONS[mon]["place"]
+		if h.location != place:
+			town.travel(place)
+			continue
+		var r2 := _fight(town, pilot, rng, func(): return town.start_monster(mon), "monster", got, h)
+		if r2 != "win":
+			fails[mon] = fails.get(mon, 0) + 1
 		else:
-			# 去別處打贏一場、喘口氣，就再去試打不贏的
-			for k in lost_at:
-				if k != target:
-					lost_at[k] = mini(lost_at[k], 1)
-			var key: String = "打贏" + EnemyData.ENEMIES[target]["name"]
-			if not when.has(key):
-				when[key] = h.month
-		if verbose:
-			print("%s %-5s %-4s 血%3d/%3d 錢%5d 力%d(%d) 敏%d(%d) %s %s 招%d" % [
-				h.date_text(), EnemyData.ENEMIES[target]["name"], r["outcome"], h.hp, h.max_hp(), h.money,
-				h.body("str"), h.stats["str"], h.body("agi"), h.stats["agi"], h.realm_text(),
-				WeaponData.get_def(h.weapon)["name"], h.learned.size()])
-	return {"months": h.month, "fights": fights, "when": when}
+			fails.clear()
+	# 好東西最後在誰手上
+	var where := {}
+	for p in w.people.values():
+		for it in p.items():
+			where[it] = p
+	for k in PRIZES:
+		if not got.has(k):
+			var holder: Person = where.get(k)
+			if holder == null or holder.dead or holder.id != w.hero_id:
+				lost[k] = true
+	if verbose:
+		print("—— 第 %d 輪：%s 死在 %d 歲。拿到：%s" % [run, h.display_name, h.age_at(h.dies_at), "、".join(got.keys().map(func(k): return "%s(%d)" % [_name(k), got[k]]))])
+		for k in PRIZES:
+			var holder: Person = where.get(k)
+			print("　　%s：%s" % [_name(k), "沒了（下葬）" if holder == null else ("你" if holder.id == w.hero_id else holder.display_name + ("（死了）" if holder.dead else ""))])
+	return {"got": got, "lost": lost, "age": h.age_at(h.dies_at)}
 
 
-func _power_sig(h: Adventurer) -> String:
-	var total: int = h.body("str") + h.body("agi")
-	return "%d %d %d %d %s" % [total / 2, h.learned.size(), h.realm, h.approved_tier, h.weapon]
+## 不在城裡時，城裡有沒有事可做（只看「要在城裡」以外的條件）
+func _city_wanted(town: Town) -> bool:
+	for t in SchoolData.TIERS:
+		for id in t["moves"]:
+			var st := town.move_state(id)
+			if not st["learned"] and st["why"] == ["要在城裡"]:
+				return true
+	for id in town.hero.books:
+		if town.book_state(id)["why"] == "要在城裡":
+			return true
+	return false
+
+
+## 城裡的事：學招、讀秘笈、考驗、買劍、換劍。做了一件就回傳 true
+func _city_chores(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, spar_tries: int) -> bool:
+	var h := town.hero
+	for t in SchoolData.TIERS:
+		for id in t["moves"]:
+			if town.move_state(id)["ok"]:
+				town.learn_move(id)
+				return true
+	for id in h.books:
+		if town.book_state(id)["ok"]:
+			town.read_book(id)
+			return true
+	var best_w := h.weapon
+	for wid in h.owned_weapons:
+		if h.can_wield(wid) and WeaponData.get_def(wid)["power"] > WeaponData.get_def(best_w)["power"]:
+			best_w = wid
+	if best_w != h.weapon:
+		town.equip(best_w)
+	for wid in WeaponData.SHOP:
+		if WeaponData.get_def(wid)["power"] > WeaponData.get_def(h.weapon)["power"] and town.weapon_state(wid)["ok"]:
+			town.buy_weapon(wid)
+			return true
+	if town.spar_state()["ok"] and h.learned.size() >= 2 and spar_tries < 3:
+		var sb := town.start_spar()
+		sb.rng.seed = rng.randi()
+		pilot.play(sb)
+		town.finish_spar(sb)
+		return true
+	return false
+
+
+## 打一場、拿光戰利品、結算。回傳勝負
+func _fight(town: Town, pilot: AutoPilot, rng: RandomNumberGenerator, start: Callable, kind: String, got: Dictionary, h: Person) -> String:
+	var b: Battle = start.call()
+	b.rng.seed = rng.randi()
+	var r := pilot.play(b)
+	if kind == "person":
+		town.finish_person(b)
+	else:
+		town.finish_monster(b)
+	for id in town.loot.duplicate():
+		town.take_loot(id)
+		if PRIZES.has(id) and not got.has(id):
+			got[id] = h.age()
+	town.clear_loot()
+	town.after_fight()
+	if verbose:
+		print("%s %-6s %-4s 血%3d/%3d 錢%5d 力%d 敏%d %s %s" % [h.date_text(), town.world.who(b.enemies[0].person.id) if b.enemies[0].person != null else b.enemies[0].display_name,
+			r["outcome"], h.hp, h.max_hp(), h.money, h.body("str"), h.body("agi"), h.realm_text(), WeaponData.get_def(h.weapon)["name"]])
+	return r["outcome"]
+
+
+func _name(id: String) -> String:
+	return BookData.get_def(id)["name"] if BookData.is_book(id) else WeaponData.get_def(id)["name"]

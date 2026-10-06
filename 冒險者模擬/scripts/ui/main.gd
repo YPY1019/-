@@ -1,7 +1,9 @@
 extends Control
 
-## 原型：城鎮 ⇄ 戰鬥，壽命用完時看這一生（沒有通關）。花時間的事在城鎮畫面裡演（年月往上跳）。
-## 這裡只負責切換畫面；城鎮規則在 Town，戰鬥規則在 Battle。
+## 原型：主畫面 ⇄ 戰鬥，死後看這一生，再換一個人接著玩（沒有通關）。花時間的事在主畫面裡演（年月往上跳）。
+## 這裡只負責切換畫面和流程；規則在 Town（你能做的事）、World（世界自己過日子）、Battle（戰鬥）。
+##
+## 花了時間之後（_after_time）：死了 → 這一生；病倒了 → 安排後事；有人找上門 → 開打；都沒有 → 回主畫面。
 
 var town := Town.new()
 var play_log := PlayLog.new()
@@ -11,9 +13,11 @@ var battle_view: BattleView
 var blocker: Control
 var life_view: LifeView
 var battle: Battle
-## 現在打的是 commission 委託 / spar 師傅的考驗
+## 現在打的是 monster 委託的怪物 / person 世界上的人 / spar 師傅的考驗
 var fight_kind := ""
 var _settled := []
+## 走到委託的地方之後要打的怪物
+var _then_monster := ""
 ## 死去那一句停多久，才換到「這一生」
 const DEATH_PAUSE := 2.5
 
@@ -32,18 +36,22 @@ func _ready() -> void:
 	add_child(margin)
 
 	town_view = TownView.new(town)
-	town_view.commission_requested.connect(_depart)
+	town_view.commission_requested.connect(_commission)
+	town_view.fight_requested.connect(_fight_person)
+	town_view.travel_requested.connect(_travel)
 	town_view.spar_requested.connect(_start_spar)
+	town_view.heir_chosen.connect(_heir_chosen)
 	town_view.wait_requested.connect(_on_wait_requested)
 	town_view.messages_added.connect(_on_town_messages)
 	margin.add_child(town_view)
 	battle_view = BattleView.new()
 	battle_view.ended.connect(_on_battle_ended)
-	battle_view.closed.connect(_back_to_town)
+	battle_view.closed.connect(_close_battle)
 	battle_view.loot_taken.connect(_take_loot)
 	battle_view.equip_requested.connect(_equip)
 	margin.add_child(battle_view)
 	life_view = LifeView.new()
+	life_view.continue_requested.connect(_continue_as_heir)
 	life_view.restart_requested.connect(func(): get_tree().reload_current_scene())
 	margin.add_child(life_view)
 	blocker = Control.new()
@@ -52,12 +60,12 @@ func _ready() -> void:
 	blocker.visible = false
 	add_child(blocker)
 
+	var h := town.hero
 	town_view.add_messages([
-		{"kind": "big", "text": "你 %d 歲，帶著一把舊鐵劍和 %d 銀來到北境的小城。城裡有冒險者公會的委託板、北境劍術的道場和一間武器店。" % [LifeData.START_AGE, town.hero.money]},
+		{"kind": "big", "text": "你叫%s，%d 歲，帶著一把舊鐵劍和 %d 銀來到北境的霜溪城。城裡有冒險者公會的委託板、北境劍術的道場和一間武器店。" % [h.display_name, h.age(), h.money]},
 		{"kind": "info", "text": "每個月生活費 %d 銀。" % TownData.LIVING_COST},
 	])
 	_show(town_view)
-	town_view.refresh()
 
 
 func _make_theme() -> Theme:
@@ -69,7 +77,7 @@ func _make_theme() -> Theme:
 	return t
 
 
-## 一次只顯示一個畫面。refresh = false：城鎮畫面先不更新（等的時候，跳完才更新）
+## 一次只顯示一個畫面。refresh = false：主畫面先不更新（等的時候，跳完才更新）
 func _show(view: Control, refresh := true) -> void:
 	for v in [town_view, battle_view, life_view]:
 		v.visible = v == view
@@ -79,7 +87,7 @@ func _show(view: Control, refresh := true) -> void:
 
 # ---------- 等（花時間的事） ----------
 
-## w：Town.take_wait() 那一段。在城鎮畫面裡跳年月，跳的時候按鈕按不了。after：跳完之後
+## w：Town.take_wait() 那一段。在主畫面裡跳年月，跳的時候按鈕按不了。after：跳完之後
 func _wait(w: Dictionary, after: Callable) -> void:
 	_show(town_view, false)
 	blocker.visible = true
@@ -92,39 +100,75 @@ func _wait(w: Dictionary, after: Callable) -> void:
 func _on_wait_requested(w: Dictionary, msgs: Array) -> void:
 	_wait(w, func():
 		town_view.add_messages(msgs)
-		_to_town_or_end())
+		_after_time())
 
 
-## 回城。壽命用完了，停一下讓人看到最後那句，再看這一生
-func _to_town_or_end() -> void:
+## 花了時間之後：死了看這一生；有人找上門就開打；不然回主畫面（病倒了主畫面會換成安排後事）
+func _after_time() -> void:
 	if town.hero.dead:
 		_show(town_view)
 		blocker.visible = true
 		await get_tree().create_timer(DEATH_PAUSE).timeout
 		blocker.visible = false
-		life_view.show_life(town.hero)
+		var heir := town.world.person(town.heir_id) if town.heir_id != "" else null
+		life_view.show_life(town.world, town.hero, heir)
 		_show(life_view)
-	else:
-		_show(town_view)
+		return
+	var comer := town.comer()
+	if comer != null:
+		town_view.add_messages([{"kind": "bad", "text": town.comer_text(comer)}])
+		_start_person(comer.id, "找上門來")
+		return
+	_show(town_view)
 
 
-# ---------- 委託 ----------
+# ---------- 走路、委託、找人打 ----------
 
-## 出發：路上的時間先跳，到了才開打
-func _depart(enemy_id: String) -> void:
-	var msgs := town.depart(enemy_id)
+## 走到別的地方：路上的時間先跳，到了打開地圖
+func _travel(place: String) -> void:
+	var msgs := town.travel(place)
+	if msgs.is_empty():
+		return
 	_wait(town.take_wait(), func():
 		town_view.add_messages(msgs)
-		if town.hero.dead:
-			_to_town_or_end()
+		var monster := _then_monster
+		_then_monster = ""
+		if town.hero.dying() or town.hero.dead:
+			_after_time()
+			return
+		town_view.show_map()
+		if monster != "" and town.monsters_at(town.hero.location).has(monster) and town.comer() == null:
+			_start_monster(monster)
 		else:
-			_start_commission(enemy_id))
+			_after_time())
 
 
-func _start_commission(enemy_id: String) -> void:
-	fight_kind = "commission"
-	battle = town.start_commission()
+## 接下委託：在那裡就直接打，不在就先走過去
+func _commission(enemy_id: String) -> void:
+	var place: String = TownData.COMMISSIONS[enemy_id]["place"]
+	if town.hero.location == place:
+		_start_monster(enemy_id)
+	else:
+		_then_monster = enemy_id
+		_travel(place)
+
+
+func _start_monster(enemy_id: String) -> void:
+	fight_kind = "monster"
+	battle = town.start_monster(enemy_id)
 	play_log.battle_start("委託：%s" % EnemyData.ENEMIES[enemy_id]["name"], battle)
+	_show_battle()
+
+
+func _fight_person(id: String) -> void:
+	if town.can_fight(id):
+		_start_person(id, "動手")
+
+
+func _start_person(id: String, why: String) -> void:
+	fight_kind = "person"
+	battle = town.start_person(id)
+	play_log.battle_start("%s：%s" % [why, town.world.who(id)], battle)
 	_show_battle()
 
 
@@ -142,13 +186,19 @@ func _show_battle() -> void:
 
 func _on_battle_ended() -> void:
 	play_log.battle_end(battle)
-	_settled = town.finish_commission(battle) if fight_kind == "commission" else town.finish_spar(battle)
+	match fight_kind:
+		"monster":
+			_settled = town.finish_monster(battle)
+		"person":
+			_settled = town.finish_person(battle)
+		_:
+			_settled = town.finish_spar(battle)
 	battle_view.show_settlement(_settled)
 	if not town.loot.is_empty():
 		battle_view.show_loot(town.hero, town.loot)
 
 
-## 拿到的東西接在結算後面，回城時一起寫進城裡的紀錄
+## 拿到的東西接在結算後面，回主畫面時一起寫進紀錄
 func _take_loot(id: String) -> void:
 	var msgs := town.take_loot(id)
 	_settled.append_array(msgs)
@@ -161,19 +211,39 @@ func _equip(id: String) -> void:
 	battle_view.refresh_loot(town.hero, town.loot)
 
 
-## 回城。打輸了要先躺幾個月（在城鎮畫面裡跳年月），跳完才寫結算
-func _back_to_town() -> void:
+## 離開戰鬥畫面。打輸了要先躺幾個月（在主畫面裡跳年月），跳完才寫結算
+func _close_battle() -> void:
 	town.clear_loot()
-	var msgs := _settled + town.return_to_town()
+	var msgs := _settled + town.after_fight()
 	_settled = []
 	var w := town.take_wait()
 	if w.is_empty():
 		town_view.add_messages(msgs)
-		_to_town_or_end()
+		_after_time()
 		return
 	_wait(w, func():
 		town_view.add_messages(msgs)
-		_to_town_or_end())
+		_after_time())
+
+
+# ---------- 臨終、換人 ----------
+
+## 選好接手的人：躺到最後
+func _heir_chosen(id: String) -> void:
+	town.choose_heir(id)
+	var p := town.world.person(id)
+	var msgs := town.wait_out()
+	msgs.push_front({"kind": "big", "text": "你把%s叫到床邊，把東西交給了%s。" % [p.display_name, p.pron]})
+	_wait(town.take_wait(), func():
+		town_view.add_messages(msgs)
+		_after_time())
+
+
+func _continue_as_heir() -> void:
+	var msgs := town.succeed()
+	town_view.add_messages(msgs)
+	_show(town_view)
+	town_view.show_map()
 
 
 func _on_town_messages(msgs: Array) -> void:

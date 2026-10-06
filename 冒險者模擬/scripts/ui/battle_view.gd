@@ -7,7 +7,7 @@ extends VBoxContainer
 ## 戰報像小說一樣一段接一段：每回合寫成一段，不列回合數，對手一般出手的架勢不單獨寫
 ## （蓄勢、破綻、被抱住才寫）。傷害數字另外放一行小字。不寫雙方的數值（show don't tell）。
 ##
-## 打完發出 ended（外面結算後呼叫 show_settlement），按「回到城裡」發出 closed。
+## 打完發出 ended（外面結算後呼叫 show_settlement），按「繼續」發出 closed。
 
 signal ended
 signal closed
@@ -124,7 +124,7 @@ func _init() -> void:
 	add_child(loot_box)
 
 	end_box = UiKit.hbox(10)
-	var back := UiKit.button("回到城裡", 170, 52)
+	var back := UiKit.button("繼續", 170, 52)
 	back.pressed.connect(func(): closed.emit())
 	end_box.add_child(back)
 	add_child(end_box)
@@ -143,11 +143,15 @@ func begin(p_battle: Battle, note := "") -> void:
 	_para.clear()
 	loot_box.visible = false
 	# 人標境界，怪物標危險度，都用境界的顏色
-	var a := hero_c.adventurer
+	var a := hero_c.person
 	hero_name_label.text = "你　%s　%s" % [a.realm_text(), WeaponData.get_def(a.weapon)["name"]]
 	hero_name_label.add_theme_color_override("font_color", Color(a.realm_color()))
 	var dg := EnemyData.danger(foe_c.enemy_id)
-	if foe_c.enemy_def.has("title"):
+	if foe_c.person != null:
+		var p := foe_c.person
+		dg = {"color": p.realm_color()}
+		foe_name_label.text = ("%s %s" % [p.title, p.display_name]).strip_edges() + "　" + p.realm_text()
+	elif foe_c.enemy_def.has("title"):
 		foe_name_label.text = ("%s %s" % [foe_c.enemy_def["title"], foe_c.display_name]).strip_edges() + "　" + dg["text"]
 	elif foe_c.enemy_def.has("realm"):
 		foe_name_label.text = "%s　%s" % [foe_c.display_name, dg["text"]]
@@ -301,13 +305,13 @@ func _condition(c: Combatant, is_hero: bool) -> String:
 # ---------- 戰利品 ----------
 
 ## 打贏後，對方身上有東西才打開。drops：還沒拿的武器 id
-func show_loot(hero: Adventurer, drops: Array) -> void:
+func show_loot(hero: Person, drops: Array) -> void:
 	loot_box.visible = true
 	drop_title.text = "%s身上" % foe_c.display_name
 	refresh_loot(hero, drops)
 
 
-func refresh_loot(hero: Adventurer, drops: Array) -> void:
+func refresh_loot(hero: Person, drops: Array) -> void:
 	UiKit.clear(mine_list)
 	for id in hero.owned_weapons:
 		var right: Control

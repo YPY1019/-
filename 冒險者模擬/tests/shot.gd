@@ -1,154 +1,157 @@
 extends SceneTree
 
-## 截圖檢查（開發用）：打開主畫面，城鎮、道場、武器店、戰鬥、結算各截一張圖，再每種委託打一輪確認不會壞掉。
-## 執行：Godot.exe --path . --script res://tests/shot.gd -- <輸出資料夾>
+## 截圖檢查（開發用）：打開主畫面，走一遍「世界是活的」會碰到的畫面，各截一張圖，確認不會壞掉。
+## 委託板、地圖、人物面板、接懸賞（家人傳話）、走路、打委託、打人（拿東西、家人來報仇）、被搶、
+## 世界過了幾年、病倒、安排後事、這一生、換人接著玩。
+## 執行（要有畫面）：Godot --path . --script res://tests/shot.gd -- <輸出資料夾>
+
+var main: Control
+var out := ""
 
 
 func _init() -> void:
-	var out: String = OS.get_cmdline_user_args()[0]
-	var main: Control = load("res://main.tscn").instantiate()
+	out = OS.get_cmdline_user_args()[0]
+	main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await _frames(5)
-	_save(out + "/town.png")
+	_save("01_town")
+	var tv: TownView = main.town_view
+	var town: Town = main.town
+	var w: World = town.world
+	var h: Person = town.hero
 
-	var tabs: TabContainer = main.town_view.find_children("*", "TabContainer", true, false)[0]
-	main.town.hero.money = 300
-	main.town_view.add_messages(main.town.learn_move("parry"))
-	tabs.current_tab = 1
+	# 委託板、地圖、人物
+	tv.tabs.current_tab = 0
 	await _frames(3)
-	_save(out + "/dojo.png")
-	main.town.hero.stats["str"] = 12
-	main.town_view.refresh()
-	tabs.current_tab = 2
+	_save("02_board")
+	tv.show_map()
 	await _frames(3)
-	_save(out + "/shop.png")
-	main.town_view.add_messages(main.town.buy_weapon("steel_sword"))
-	tabs.current_tab = 0
+	_save("03_map")
+	tv.show_person("roderick")
+	await _frames(3)
+	_save("04_person")
 
-	# 自動播放幾回合
-	_fight(main, "bandit_leader")
-	await create_timer(2.8).timeout
-	_save(out + "/battle.png")
+	# 接下布蘭的懸賞：葛雷森傳話
+	tv.add_messages(town.accept_bounty("bran"))
+	tv._act(town.rest(1)) if h.hp < h.max_hp() else null
+	h.hp = h.max_hp() - 10
+	tv._act(town.rest(1))
+	await _idle()
+	_save("05_warned")
+
+	# 接委託：走到牧羊村打野狼
+	h.hp = h.max_hp()
+	main._commission("wolf")
+	await _until(func(): return main.battle_view.visible)
+	await create_timer(1.5).timeout
+	_save("06_battle_wolf")
 	main.battle_view._skip()
 	await _frames(3)
-	_save(out + "/settle_first.png")
-	await _back(main)
+	_save("07_settle_wolf")
+	main._close_battle()
+	await _idle()
+	_save("08_after_wolf")
 
-	# 第二次打同一個
-	main.town.hero.hp = main.town.hero.max_hp()
-	main.town.hero.learn("heavy")
-	_fight(main, "bandit_leader")
-	main.battle_view._skip()
-	await _frames(3)
-	_save(out + "/settle_again.png")
-	await _back(main)
-	await _frames(3)
-	_save(out + "/town_after.png")
-
-	# 師傅的考驗
-	main._start_spar()
-	main.battle_view._skip()
-	await _frames(3)
-	_save(out + "/spar.png")
-	await _back(main)
-
-	# 按撤退
-	main.town.hero.hp = main.town.hero.max_hp()
-	_fight(main, "bear")
-	main.battle_view._request_flee()
-	main.battle_view._skip()
-	await _frames(3)
-	_save(out + "/flee.png")
-	await _back(main)
-
-	# 每種委託都打一次，確認不會壞掉
-	for enemy in EnemyData.ORDER:
-		main.town.hero.hp = main.town.hero.max_hp()
-		_fight(main, enemy)
-		main.battle_view._skip()
-		await _back(main)
-	await _frames(3)
-	_save(out + "/end.png")
-	# 有名的強者：用強一點的角色打，看絕學、稀有的劍、升境的寫法
-	var h: Adventurer = main.town.hero
-	h.stats = {"str": 18, "agi": 18}
+	# 變強，去找布蘭
+	h.stats = {"str": 19, "agi": 18}
 	h.realm = 1
-	h.approved_tier = 2
+	for m in ["parry", "sweep_kick", "heavy", "redirect", "disarm", "break_free", "vital", "combo"]:
+		h.learn(m)
 	h.hp = h.max_hp()
-	main.town_view.refresh()
+	var bran := w.person("bran")
+	bran.travel_left = 0
+	bran.location = "bridge"
+	main._travel("bridge")
+	await _idle()
+	_save("09_at_bridge")
+	main._fight_person("bran")
 	await _frames(3)
-	_save(out + "/board_before.png")
-	_fight(main, "merc_captain")
 	main.battle_view._skip()
 	await _frames(3)
-	_save(out + "/named.png")
-	# 劍譜在戰利品裡：拿走
-	if main.town.loot.has("sunder_book"):
-		main._take_loot("sunder_book")
-		await _frames(3)
-		_save(out + "/book_loot.png")
-	await _back(main)
+	_save("10_bran_done")
+	for id in town.loot.duplicate():
+		main._take_loot(id)
 	await _frames(3)
-	_save(out + "/book_town.png")
-	# 讀秘笈：等的畫面跳到一半、跳完
-	main.town_view._act(main.town.read_book("sunder_book"))
-	await create_timer(2.2).timeout
-	_save(out + "/wait_read.png")
-	await create_timer(3.0).timeout
-	_save(out + "/wait_read_done.png")
+	_save("11_bran_loot")
+	main._close_battle()
+	await _idle()
+	_save("12_after_bran")
+
+	# 葛雷森來找你：讓他走到你這裡
+	var gray := w.person("grayson")
+	gray.target = w.hero_id
+	gray.rest_left = 0
+	gray.travel_left = 0
+	gray.location = h.location
+	main._after_time()
 	await _frames(3)
-	_save(out + "/book_read.png")
-	h.hp = h.max_hp()
-	_fight(main, "black_knight")
-	main.battle_view._skip()
-	await _back(main)
-	var tabs2: TabContainer = main.town_view.find_children("*", "TabContainer", true, false)[0]
-	tabs2.current_tab = 2
-	await _frames(3)
-	_save(out + "/weapons.png")
-	tabs2.current_tab = 0
-	await _frames(3)
-	_save(out + "/board.png")
-	# 老了：身體掉下來，打一場看戰報
-	h.month = h.life_months - 30
-	h.hp = h.max_hp()
-	main.town_view.refresh()
-	await _frames(3)
-	_save(out + "/old_town.png")
-	_fight(main, "bear")
+	await create_timer(1.5).timeout
+	_save("13_grayson_comes")
 	main.battle_view._skip()
 	await _frames(3)
-	_save(out + "/old_battle.png")
-	await _back(main)
-	# 壽命用完：休養到死，看這一生
-	h.month = h.life_months - 1
-	h.hp = 1
-	main.town_view._act(main.town.rest(3))
-	await create_timer(3.0).timeout
-	_save(out + "/death_wait.png")
-	await create_timer(2.0).timeout
-	_save(out + "/life.png")
+	_save("14_grayson_done")
+	main._close_battle()
+	await _idle()
+	_save("15_after_grayson")
+	tv.show_person("grayson")
+	await _frames(3)
+	_save("16_grayson_panel")
+
+	# 世界過了幾年
+	h.dies_at = 99999
+	h.hp = h.max_hp()
+	for i in 8:
+		town._pass_months(12)
+	tv.refresh()
+	tv.tabs.current_tab = 0
+	await _frames(3)
+	_save("17_board_later")
+	tv.show_map()
+	await _frames(3)
+	_save("18_map_later")
+	tv.show_person("roderick")
+	await _frames(3)
+	_save("19_roderick_later")
+
+	# 快死了：休養到病倒
+	h.dies_at = w.month() + LifeData.DYING_MONTHS + 2
+	h.hp = 10
+	main._travel("pasture") if h.location == MapData.HOME else null
+	await _idle()
+	tv._act(town.rest(5)) if town.in_city() else main._travel(MapData.HOME)
+	await _idle()
+	_save("20_deathbed")
+	var cands := town.heir_candidates()
+	main._heir_chosen(cands[0].id)
+	await _until(func(): return main.life_view.visible)
+	await _frames(3)
+	_save("21_life")
+	main._continue_as_heir()
+	await _frames(3)
+	_save("22_heir_town")
+	tv.show_person(w.lives[0])
+	await _frames(3)
+	_save("23_old_hero_panel")
 	quit()
 
 
-## 出發（跳過路上的等）再開打
-func _fight(main: Node, enemy: String) -> void:
-	main.town.depart(enemy)
-	main.town.take_wait()
-	main._start_commission(enemy)
-
-
-## 回城。打輸要躺的那段，等它跳完
-func _back(main: Node) -> void:
-	main._back_to_town()
-	while main.blocker.visible:
-		await create_timer(0.2).timeout
-
-
-func _save(path: String) -> void:
-	root.get_texture().get_image().save_png(path)
+func _save(name: String) -> void:
+	root.get_texture().get_image().save_png("%s/%s.png" % [out, name])
 
 
 func _frames(n: int) -> void:
 	for i in n:
 		await process_frame
+
+
+## 等跳年月跳完
+func _idle() -> void:
+	await _frames(2)
+	while main.blocker.visible:
+		await create_timer(0.2).timeout
+	await _frames(3)
+
+
+func _until(cond: Callable) -> void:
+	while not cond.call():
+		await create_timer(0.2).timeout
