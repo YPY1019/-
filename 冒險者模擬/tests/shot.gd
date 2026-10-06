@@ -30,6 +30,14 @@ func _init() -> void:
 	tv.show_person("roderick")
 	await _frames(3)
 	_save("04_person")
+	h.money = 500
+	main.person_panel.inquiry_done.emit(town.inquire("roderick"))
+	main.person_panel.refresh()
+	await _frames(3)
+	_save("04_person_inquired")
+	tv.show_map()
+	await _frames(3)
+	_save("04_map_inquired")
 	main.person_panel.close()
 
 	# 練武場、獅心劍庭：學一招、接庭主三招入門

@@ -62,6 +62,7 @@ func _ready() -> void:
 	person_panel = PersonPanel.new(town)
 	person_panel.travel_requested.connect(_travel)
 	person_panel.fight_requested.connect(_fight_person)
+	person_panel.inquiry_done.connect(func(msgs): town_view.add_messages(msgs))
 	add_child(person_panel)
 	encounter = EncounterDialog.new()
 	encounter.chosen.connect(_answer_comer)
@@ -75,7 +76,6 @@ func _ready() -> void:
 	var h := town.hero
 	town_view.add_messages([
 		{"kind": "big", "text": "你叫%s，%d 歲，帶著一把舊鐵劍和 %d 銀來到北境的霜溪城。城裡有冒險者公會、練武場、獅心劍庭和一間武器店。" % [h.display_name, h.age(), h.money]},
-		{"kind": "info", "text": "每個月生活費 %d 銀。" % TownData.LIVING_COST},
 	])
 	_show(town_view)
 

@@ -142,11 +142,14 @@ static func heard_when(t: Town, id: String) -> String:
 	return "這個月" if ago <= 0 else "%s前" % LifeData.span_text(ago)
 
 
-## 你在找的人（接下的懸賞、劍庭要你討伐的人）
+## 你在找的人（接下的懸賞、在公會打聽的人、劍庭要你討伐的人）
 static func tracked(t: Town) -> Array:
 	var out := []
 	for id in t.world.bounties:
 		if t.took_bounty(id):
+			out.append(id)
+	for id in t.hero.inquired:
+		if t.hero.inquired[id] >= t.world.month() and not out.has(id):
 			out.append(id)
 	for j in t.hero.school_jobs:
 		var job: Dictionary = SchoolData.JOBS[j]

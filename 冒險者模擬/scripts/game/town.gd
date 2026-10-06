@@ -69,6 +69,9 @@ func travel(place: String) -> Array:
 		return msgs
 	world.look_around()
 	msgs.append(_m("info", "你到了%s。" % MapData.place_name(place)))
+	# 委託的怪物在這裡：看得到牠留下的痕跡
+	for id in monsters_at(place):
+		msgs.append(_m("info", TownData.COMMISSIONS[id]["sign"]))
 	msgs.append_array(_deliver(place))
 	if MapData.is_city(place):
 		if not claims("guild").is_empty():
@@ -352,6 +355,35 @@ func _expel() -> Array:
 	return [_m("bad", "消息傳回劍庭。第二天，你的名字從劍庭的名冊上劃掉了。")]
 
 
+## 在公會打聽一個人的下落：付錢，之後幾個月都知道他在哪（地圖上標出來）。要在城裡
+func inquire_state(id: String) -> Dictionary:
+	var p := world.person(id)
+	var cost := TownData.INQUIRE_COST + (TownData.INQUIRE_PER_REALM * p.realm if p != null else 0)
+	var st := {"ok": false, "why": "", "cost": cost, "tracking": hero.inquired.get(id, -1) >= world.month()}
+	if p == null or p.dead or id == world.hero_id:
+		st["why"] = "-"
+	elif not in_city():
+		st["why"] = "要在城裡"
+	elif hero.money < st["cost"]:
+		st["why"] = "錢不夠"
+	else:
+		st["ok"] = true
+	return st
+
+
+func inquire(id: String) -> Array:
+	var st := inquire_state(id)
+	if not st["ok"]:
+		return []
+	hero.money -= st["cost"]
+	hero.inquired[id] = world.month() + TownData.INQUIRE_MONTHS
+	world.hear(id)
+	var p := world.person(id)
+	var where := MapData.place_name(p.travel_to if p.travel_left > 0 else p.location)
+	var line := "往%s的路上" % where if p.travel_left > 0 else "在%s" % where
+	return [_m("info", "公會的人收下 %d 銀，翻了翻簿子：「%s%s。之後有消息，會再告訴你。」" % [st["cost"], p.display_name, line])]
+
+
 ## 接下懸賞（不花時間）
 func accept_bounty(id: String) -> Array:
 	if not world.bounties.has(id):
@@ -538,7 +570,7 @@ func rest(months: int) -> Array:
 	return msgs
 
 
-## 花掉 n 個月：世界跟著走、扣生活費、變老。病倒（臨終）就停在那一刻；臨終時壽命用完就死了。
+## 花掉 n 個月：世界跟著走、變老（沒有生活費：錢只花在你自己決定的事上）。病倒（臨終）就停在那一刻；臨終時壽命用完就死了。
 ## kind 不是空的就留給等的畫面演（title：畫面上寫在做什麼）。世界上發生的事放在 wait["news"]，跳到那個月才寫
 func _pass_months(n: int, kind := "", title := "") -> Array:
 	var h := hero
@@ -548,20 +580,16 @@ func _pass_months(n: int, kind := "", title := "") -> Array:
 	var limit := h.months_left() if was_dying else h.months_left() - LifeData.DYING_MONTHS
 	var passed := clampi(n, 0, limit)
 	var news := world.advance(passed)
-	var cost := TownData.LIVING_COST * passed
-	h.money -= cost
 	# 快死的徵兆：旁人說你氣色不好（等的時候偶爾寫一句）
 	if h.omen() > 0.2 and passed > 0 and world.rng.randf() < h.omen():
 		news.append({"month": world.month(), "kind": "omen",
 			"text": LifeData.OMEN_TOWN_LINES[world.rng.randi_range(0, LifeData.OMEN_TOWN_LINES.size() - 1)]})
 	if kind != "":
 		wait = {"kind": kind, "title": title, "from": from, "months": passed, "age_from": age_from, "news": news}
-	var msgs := [_m("info", "過了 %s，生活費 %d 銀。" % [LifeData.span_text(passed), cost])]
+	var msgs := []
 	if kind == "":
 		for e in news:
 			msgs.append(_m(e["kind"], e["text"]))
-	if h.money < 0:
-		msgs.append(_m("bad", "你已經欠了 %d 銀。" % -h.money))
 	if not was_dying and h.dying():
 		var away := h.location != MapData.HOME or h.travel_left > 0
 		h.location = MapData.HOME

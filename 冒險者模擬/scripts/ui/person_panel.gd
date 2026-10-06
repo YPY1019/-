@@ -10,6 +10,8 @@ extends Control
 
 signal travel_requested(place: String)
 signal fight_requested(person_id: String)
+## 打聽完的訊息（給主畫面寫進紀錄）
+signal inquiry_done(msgs: Array)
 
 const ROLE_NAMES := {"villain": "亡命之徒", "hunter": "冒險者", "duelist": "決鬥家", "settled": "隱居",
 	"youth": "平民", "follower": "手下", "master": "庭主"}
@@ -206,6 +208,18 @@ func _build_buttons(p: Person, me: bool) -> void:
 			close()
 			travel_requested.emit(place))
 		button_box.add_child(go)
+	# 在公會打聽他的下落
+	var iq := town.inquire_state(p.id)
+	if iq["tracking"]:
+		button_box.add_child(UiKit.label("公會有%s的消息。" % p.pron, 16, 0.7))
+	elif iq["why"] != "-":
+		var ib := UiKit.button("打聽%s的下落（%d 銀）" % [p.pron, iq["cost"]], 260)
+		ib.disabled = not iq["ok"]
+		ib.tooltip_text = iq["why"]
+		ib.pressed.connect(func():
+			inquiry_done.emit(town.inquire(p.id))
+			refresh())
+		button_box.add_child(ib)
 	if town.world.wanted(p.id):
 		var w := UiKit.label("公會懸賞%s。" % p.pron, 16)
 		w.add_theme_color_override("font_color", Color(TownView.GOLD))

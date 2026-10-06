@@ -67,6 +67,8 @@ var fought: Array[String] = []
 var claims: Array = []
 ## 劍庭的事：辦完之後第幾個月才會再有（世界的月）
 var job_back := {}
+## 在公會打聽的人：人 id -> 消息斷掉的那個月（世界的月）
+var inquired := {}
 ## 被逐出流派了（不能再回去）
 var expelled := false
 ## 哪一年考過劍庭的選拔（一年一次）

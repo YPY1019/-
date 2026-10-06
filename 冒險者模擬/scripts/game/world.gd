@@ -41,7 +41,7 @@ var people := {}
 var hero_id := ""
 ## 有懸賞的人 id -> {"reward", "text", "takers": [接下的人]}
 var bounties := {}
-## 委託板上的怪物 id -> {"count": 打過幾次, "back": 世界的第幾個月再出現, "place": 這次在哪出沒}
+## 委託板上的怪物 id -> {"count": 打過幾次, "back": 世界的第幾個月再出現}
 var monsters := {}
 ## 武器店收來的東西（世界上的人用不到的稀有武器、秘笈）。你買得到
 var shop_stock: Array = []
@@ -67,8 +67,6 @@ func _init(seed := -1) -> void:
 	for id in PeopleData.PEOPLE:
 		if PeopleData.PEOPLE[id].get("arrive", 0) == 0:
 			_spawn(id)
-	for id in TownData.COMMISSIONS:
-		monsters[id] = {"count": 0, "back": 0, "place": _monster_spot(id)}
 
 
 # ---------- 查 ----------
@@ -135,23 +133,17 @@ func monster_open(enemy_id: String) -> bool:
 	return monsters.get(enemy_id, {}).get("back", 0) <= month()
 
 
-## 打完一次怪物的委託：越打越久才再出現，下次換個地方出沒
+## 打完一次怪物的委託：越打越久才再出現
 func monster_done(enemy_id: String) -> void:
 	var m: Dictionary = monsters.get(enemy_id, {"count": 0, "back": 0})
 	m["back"] = month() + MONSTER_BACK[mini(m["count"], MONSTER_BACK.size() - 1)]
 	m["count"] += 1
-	m["place"] = _monster_spot(enemy_id)
 	monsters[enemy_id] = m
 
 
-## 委託的怪物這次在哪出沒
+## 委託的怪物在哪出沒
 func monster_place(enemy_id: String) -> String:
-	return monsters[enemy_id]["place"]
-
-
-func _monster_spot(enemy_id: String) -> String:
-	var places: Array = TownData.COMMISSIONS[enemy_id]["places"]
-	return places[rng.randi_range(0, places.size() - 1)]
+	return TownData.COMMISSIONS[enemy_id]["place"]
 
 
 ## 你聽說誰在哪（傳聞提到他、或你親眼看到）
@@ -323,6 +315,11 @@ func tick() -> void:
 	if LifeData.month_of_year(month()) == SchoolData.SELECTION_MONTHS[-1]:
 		_spring()
 	look_around()
+	# 你花錢打聽的人：消息還沒斷，就知道他在哪
+	if people.has(hero_id):
+		for id in hero().inquired:
+			if hero().inquired[id] >= month():
+				hear(id)
 
 
 ## 春天：劍庭選拔新學徒（城裡夠結實的年輕人），劍庭的人各自往上學一招
