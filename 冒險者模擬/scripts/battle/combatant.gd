@@ -125,8 +125,8 @@ static func from_person(p: Person, place: String, lethal := true) -> Combatant:
 	var d: Dictionary = c.enemy_def.duplicate()
 	d["title"] = p.title
 	d["scene"] = MapData.PLACES[place]["scene"]
-	if not p.start_lines.is_empty():
-		d["start"] = p.start_lines
+	# 打法資料的登場句是寫給那個有名字的人的；別人（外地來的、孩子）用一般的
+	d["start"] = p.start_lines if not p.start_lines.is_empty() else ["{name}拔出{weapon}，擺好了架勢。", "{name}看著你，慢慢把{weapon}舉了起來。"]
 	if not lethal:
 		d["win_text"] = "{name}倒在地上，撐了幾次都爬不起來。"
 	d.erase("hide_hp")

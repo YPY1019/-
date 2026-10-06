@@ -909,18 +909,18 @@ const ENEMIES := {
 		"start": ["{name}握著劍，朝你點了點頭。"],
 		"actions": {
 			"cut": {"type": "sweep", "w": 35, "power": 1.0,
-				"tell": ["{name}腳下一錯，木劍從身側橫掃過來。"],
+				"tell": ["{name}腳下一錯，{weapon}從身側橫掃過來。"],
 				"hit": ["{weapon}抽在你的肋下，你彎下了腰。", "啪的一聲，{weapon}掃在你的手臂上，整條手臂都麻了。"]},
 			"thrust": {"type": "thrust", "w": 30, "power": 1.0,
 				"tell": ["{name}往前踏了半步，劍尖直刺你的胸口。"],
 				"hit": ["劍尖戳在你的胸口，你一口氣差點喘不上來。", "劍尖點在你的肩窩，整條手臂一軟。"]},
 			"cleave": {"type": "smash", "w": 35, "power": 1.1,
-				"tell": ["{name}雙手把木劍舉過頭頂，重心沉了下去，一劍劈下。"],
+				"tell": ["{name}雙手把{weapon}舉過頭頂，重心沉了下去，一劍劈下。"],
 				"hit": ["{weapon}劈在你的肩膀上，你膝蓋一軟，差點跪下去。", "{weapon}敲在你的額頭上，咚的一聲。"]},
 		},
 		"habits": [
 			# 你閃避完腳步還沒站穩，他就劈下來
-			{"player": ["dodge"], "then": "cleave", "tell": "你腳步還沒站穩，{name}的木劍已經舉過頭頂：「躲完了呢？」"},
+			{"player": ["dodge"], "then": "cleave", "tell": "你腳步還沒站穩，{name}的{weapon}已經舉過頭頂。"},
 		],
 		"pain": {
 			"light": ["{name}輕輕「嗯」了一聲。", "{name}退了半步，嘴角動了一下。"],
@@ -933,8 +933,8 @@ const ENEMIES := {
 		"name": "劍術教師",
 		"approach": "穀倉前，一個人正拿著長劍教幾個孩子比劃。他身上的灰衣，跟劍庭的很像。",
 		"blurb": "",
-		"hp": 170, "str": 13, "agi": 13, "armor": "light", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
-		"weapon": "長劍", "guard": "盾牌", "moves": ["knee", "dust", "fallstone"],
+		"hp": 130, "str": 12, "agi": 11, "armor": "light", "traits": ["disarmable"], "kinds": ["sword"], "pron": "他",
+		"weapon": "長劍", "guard": "盾牌", "moves": ["dust"],
 		"parry": ["你搶上去出手，{name}把盾往上一甩，擋住了。"],
 		"fear": ["{name}的眼睛往村口瞄了一下。"],
 		"fear_flee": ["{name}丟下盾，翻過籬笆跑了。"],

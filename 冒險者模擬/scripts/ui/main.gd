@@ -139,6 +139,7 @@ func _after_time() -> void:
 
 
 func _answer_comer(choice: String) -> void:
+	play_log.write(["【找上門】選了 %s" % choice])
 	var p := _comer
 	_comer = null
 	var r := town.answer_comer(p, choice)
@@ -191,6 +192,11 @@ func _road_dialog() -> void:
 
 
 func _answer_road(choice: String) -> void:
+	# 試玩紀錄：碰上什麼、選了什麼
+	var ev := town.road_event()
+	for o in ev["options"]:
+		if o[0] == choice:
+			play_log.write(["【路上】%s　→ 選了「%s」" % [ev["text"], o[1]]])
 	var r := town.answer_road(choice)
 	town_view.add_messages(r["msgs"])
 	var fight: String = r["fight"]
@@ -218,6 +224,7 @@ func _meet_monster(enemy_id: String) -> void:
 
 
 func _answer_monster(choice: String, enemy_id: String) -> void:
+	play_log.write(["【碰上%s】選了 %s" % [EnemyData.ENEMIES[enemy_id]["name"], choice]])
 	var r := town.answer_monster(enemy_id, choice)
 	town_view.add_messages(r["msgs"])
 	if r["fight"]:
@@ -227,7 +234,7 @@ func _answer_monster(choice: String, enemy_id: String) -> void:
 func _start_monster(enemy_id: String) -> void:
 	fight_kind = "monster"
 	battle = town.start_monster(enemy_id)
-	play_log.battle_start("委託：%s" % EnemyData.ENEMIES[enemy_id]["name"], battle)
+	play_log.battle_start("%s：%s" % ["路上" if not town.road.is_empty() else "委託", EnemyData.ENEMIES[enemy_id]["name"]], battle)
 	_show_battle()
 
 

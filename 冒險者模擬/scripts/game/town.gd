@@ -365,7 +365,7 @@ func finish_monster(battle: Battle) -> Array:
 					var e: Dictionary = EnemyData.ENEMIES[id]
 					_claim("guild", e["name"], TownData.COMMISSIONS[id]["reward"], 0)
 					msgs.append(_m("info", "你帶上能證明的東西，回公會交差。"))
-				elif not _fight_has_job:
+				elif not _fight_has_job and road.is_empty():
 					msgs.append(_m("info", "這一趟沒有人付錢。"))
 			msgs.append_array(_jobs_done("duel", id))
 			msgs.append_array(_after_monster(id))
@@ -486,7 +486,8 @@ func start_person(id: String) -> Battle:
 	_fight_enemy = ""
 	_fight_person = p
 	_fight_lethal = world.lethal(hero, p)
-	_fight_kin = same_school(id)
+	# 對同門動手（他找上門來、你只是還手的不算）
+	_fight_kin = same_school(id) and not (p.target == world.hero_id)
 	if not hero.fought.has(p.id):
 		hero.fought.append(p.id)
 	loot.clear()
@@ -529,7 +530,7 @@ func finish_person(battle: Battle) -> Array:
 			for it in taken:
 				msgs.append(_m("bad", "你身上的%s不見了。" % _item_name(it)))
 	msgs.append_array(_grow(p.body_stats(), r))
-	if _fight_kin:
+	if _fight_kin and fate_pending == null:
 		msgs.append_array(_expel())
 	if r["outcome"] == "lose":
 		msgs.append_array(_pass_months(TownData.INJURED_MONTHS, "injured", "養傷"))
@@ -554,6 +555,8 @@ func decide_fate(kill: bool) -> Array:
 			msgs.append(_m("info", "你帶上能證明的東西，回公會交差。"))
 	else:
 		msgs.append(_m("info", "你收起%s，讓%s走了。" % [WeaponData.get_def(hero.weapon).get("noun", "兵器"), p.display_name]))
+	if _fight_kin:
+		msgs.append_array(_expel())
 	return msgs
 
 
