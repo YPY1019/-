@@ -5,8 +5,8 @@ extends RefCounted
 ## 練武場、獅心劍庭（入門、委託和貢獻、換招、公開比試）、秘笈、武器店、戰利品、戰鬥打完的結算（數值成長、瓶頸）、臨終和換人接著玩。
 ## 世界上的人自己的事在 World；你也是 World 裡的一個人（hero）。
 ## 不碰畫面：每個動作回傳訊息清單 [{"kind", "text"}]，畫面照著顯示。
-##   kind：info 一般、good 好事、bad 壞事、big 大事、epic 一輩子記得的大事（升境、拿到秘笈、讀完秘笈、病倒、死去）、
-##   news 傳聞（世界上發生的事）
+##   kind：info 一般、good 好事、bad 壞事、big 大事、epic 一輩子記得的大事（升境、拿到秘笈、讀完秘笈、病倒、死去）
+## 紀錄只寫你做的事：世界上的事在酒館（World.rumors），跟你有關的事有人來說（Visits），人說話照口氣、記得你（Talk）。
 ## 花時間的事（走路、學招、讀秘笈、休養、養傷）會在 wait 留下要演的那一段，畫面演完等的畫面才給結果。
 ## 快死時病倒（臨終）：正在做的事做不完，之後只能安排後事。壽命用完了 hero.dead 就是 true。
 
@@ -45,12 +45,21 @@ var _spared: Person = null
 var _spared_robbed := false
 ## 選拔的對手（世界上的人；沒有就是 null）
 var _selection_foe: Person = null
+## 放走的人身上拿走的東西
+var _spared_items: Array = []
+## 人開口說話（口氣、記得你）、有人來找你
+var talk: Talk
+var visits: Visits
+## 這段時間世界上的傳聞（只寫進試玩紀錄，不寫進你的紀錄）。main 拿走
+var rumor_log: Array = []
 
 
 ## seed：-1 = 隨機（測試用固定的）
 func _init(seed := -1) -> void:
 	world = World.new(seed)
 	_road = Road.new(self)
+	talk = Talk.new(world)
+	visits = Visits.new(self)
 	var pick: Array = TownData.HERO_NAMES[world.rng.randi_range(0, TownData.HERO_NAMES.size() - 1)]
 	world.make_hero(pick[0], pick[1])
 
@@ -152,6 +161,20 @@ func answer_road(choice: String) -> Dictionary:
 
 func road_after_fight(won: bool) -> void:
 	_road.after_fight(won)
+
+
+# ---------- 有人來找你（Visits） ----------
+
+## 下一個來找你的人（傳話、主動找你）：{"title", "color", "text", "options"}，沒有就是空的
+func next_visit() -> Dictionary:
+	if hero.dead or hero.dying() or not visits.next():
+		return {}
+	return visits.view()
+
+
+## 選了：{"fight": 空的 / "duel:人 id", "msgs"}。花了時間（一起去打懸賞）的話 wait 有要演的那一段
+func answer_visit(choice: String) -> Dictionary:
+	return visits.answer(choice)
 
 
 ## 送貨：走到那裡就交了，回劍庭交差
@@ -342,16 +365,16 @@ func comer() -> Person:
 	return world.comer()
 
 
-## 找上門的人開口說的話
+## 找上門的人開口說的話（他的口氣、為什麼找你、跟你之間的舊事）
 func comer_text(p: Person) -> String:
 	var d: Dictionary = PeopleData.PEOPLE.get(p.id, {})
-	if p.role == "duelist" and d.has("challenge"):
+	var duel := not world.lethal(p, hero) and p.role == "duelist"
+	if duel and d.has("challenge") and p.memo_of(hero.id).is_empty():
 		return d["challenge"]
-	if d.has("avenge"):
-		return "%s找上了你。\n%s" % [p.display_name, d["avenge"]]
-	if world.bounties.has(hero.id) or p.role == "hunter":
-		return "%s找上了你，手按在%s上。" % [p.display_name, WeaponData.get_def(p.weapon).get("noun", "兵器")]
-	return "%s找上了你，擋在你面前不走。" % p.display_name
+	var text := talk.scene(p, TalkData.COMER_SCENE, true) + "\n"
+	if duel:
+		return text + talk.say(p, "challenge", {"{rank}": talk.rank_line(p)})
+	return text + talk.revenge(p)
 
 
 ## 找上門的人：你可以怎麼回應 [[id, 按鈕的字]]。fight 應戰；decline 不跟他打（決鬥的人會走）；slip 想辦法走掉
@@ -395,11 +418,19 @@ func start_person(id: String) -> Battle:
 	fate_pending = null
 	_spared = null
 	_spared_robbed = false
+	_spared_items.clear()
 	# 打贏之後殺不殺由你決定（decide_fate），戰鬥本身只寫到他倒下
 	var foe := Combatant.from_person(p, hero.location, false)
 	if not road.is_empty():
 		foe.enemy_def["scene"] = RoadData.SCENE
+	_again(foe, p)
 	return Battle.new([hero.to_combatant()], [foe])
+
+
+## 交過手、有過節的人：打起來之前那一句，換成他記得你的話
+func _again(foe: Combatant, p: Person) -> void:
+	if not p.memo_of(hero.id).is_empty():
+		foe.enemy_def["start"] = [talk.say(p, "again")]
 
 
 func finish_person(battle: Battle) -> Array:
@@ -419,6 +450,7 @@ func finish_person(battle: Battle) -> Array:
 			hero.hp = r["hp"]
 			if not hero.beaten.has(p.id):
 				hero.beaten.append(p.id)
+			world.remember(p, "lost_to_you", {"place": road.get("at", hero.location)})
 			fate_pending = p
 			for it in p.items():
 				if it != WeaponData.FIST:
@@ -469,7 +501,9 @@ func start_duel(id: String) -> Battle:
 	var me := hero.to_combatant()
 	me.yield_hp = roundi(me.max_hp * SchoolData.MATCH_YIELD)
 	var foe := Combatant.from_person(p, hero.location, false)
-	foe.enemy_def["scene"] = RoadData.SCENE
+	if not road.is_empty():
+		foe.enemy_def["scene"] = RoadData.SCENE
+	_again(foe, p)
 	foe.enemy_def["win_text"] = "{name}退了一步，把兵器放低：「是你贏了。」"
 	foe.enemy_def["lose_text"] = "{name}的兵器停在你的喉前，停了一下，才收回去。"
 	foe.yield_hp = roundi(foe.max_hp * SchoolData.MATCH_YIELD)
@@ -484,18 +518,21 @@ func finish_duel(battle: Battle) -> Array:
 	hero.hp = maxi(1, r["hp"])
 	p.hp = maxi(1, battle.enemies[0].hp)
 	var msgs := []
-	var place := MapData.place_name(road.get("at", hero.location))
+	var at: String = road.get("at", hero.location)
+	var place := MapData.place_name(at)
 	match r["outcome"]:
 		"win":
 			world.duel_done(hero, p)
 			hero.note("在%s跟{p:%s}比劍，贏了" % [place, p.id])
 			p.note("在%s跟{p:%s}比劍，認輸了" % [place, hero.id])
+			world.remember(p, "duel_lost", {"place": at})
 			msgs.append(_m("good", "%s揉著手腕，把兵器收好：「下次。」" % p.display_name))
 			msgs.append_array(_maybe_break_through(maxi(p.body("str"), p.body("agi"))))
 		"lose":
 			world.duel_done(p, hero)
 			hero.note("在%s跟{p:%s}比劍，認輸了" % [place, p.id])
 			p.note("在%s跟{p:%s}比劍，贏了" % [place, hero.id])
+			world.remember(p, "duel_won", {"place": at})
 			msgs.append(_m("info", "%s朝你點了點頭，走了。" % p.display_name))
 		_:
 			p.note("在%s跟{p:%s}比劍，{p:%s}跑了" % [place, hero.id, hero.id])
@@ -521,12 +558,9 @@ func decide_fate(kill: bool) -> Array:
 		_spared_robbed = false
 	if kill:
 		msgs.append(_m("big", "你走上前，結果了%s。" % p.display_name))
+		# 殺了不該殺的人：回城才會有人告訴你懸賞的事（見 Visits）
 		if murder:
-			world.news.clear()
 			world.hero_murdered(p, place)
-			for e in world.news:
-				msgs.append(_m(e["kind"], e["text"]))
-			world.news.clear()
 		msgs.append_array(_jobs_done("kill", p.id))
 		if paid:
 			_claim("guild", "%s的懸賞" % p.display_name, b["reward"], 0)
@@ -627,7 +661,9 @@ func take_loot(id: String) -> Array:
 		_fight_person.remove_item(id)
 		if _fight_person == _spared:
 			_spared_robbed = true
+			_spared_items.append(id)
 	hero.give_item(id)
+	hero.lost_items.erase(id)
 	if BookData.is_book(id):
 		var b := BookData.get_def(id)
 		hero.note("拿到%s" % _item_name(id))
@@ -657,6 +693,10 @@ func _settle_spared() -> void:
 		return
 	var h := hero
 	var owed := world.lethal(h, p) or _fight_justified
+	if _spared_robbed:
+		world.remember(p, "robbed_by_you", {"item": _spared_items[0], "place": road.get("at", h.location)})
+	else:
+		world.remember(p, "spared", {"place": road.get("at", h.location)})
 	if _spared_robbed or not owed:
 		world.add_grudge(p, h.id, "beaten")
 	else:
@@ -824,7 +864,12 @@ func _pass_months(n: int, kind := "", title := "") -> Array:
 	var was_dying := h.dying()
 	var limit := h.months_left() if was_dying else h.months_left() - LifeData.DYING_MONTHS
 	var passed := clampi(n, 0, limit)
-	var news := world.advance(passed)
+	# 世界上的事是傳聞，放在酒館（只寫進試玩紀錄）；你的紀錄只寫你做的事
+	for e in world.advance(passed):
+		rumor_log.append(e["text"])
+	if passed > 0:
+		visits.reset()
+	var news := []
 	# 快死的徵兆：旁人說你氣色不好（等的時候偶爾寫一句）
 	if h.omen() > 0.2 and passed > 0 and world.rng.randf() < h.omen():
 		news.append({"month": world.month(), "kind": "omen",
@@ -1270,6 +1315,7 @@ func buy_weapon(id: String) -> Array:
 	hero.money -= cost
 	world.shop_stock.erase(id)
 	hero.give_item(id)
+	hero.lost_items.erase(id)
 	if BookData.is_book(id):
 		return [_m("good", "你花了 %d 銀買下%s。" % [cost, _item_name(id)])]
 	hero.weapon = id

@@ -31,9 +31,11 @@ extends RefCounted
 ##     bury true：把 who 埋了（他的家人欠你一份情）
 ##     drifter 沒名字的小賊活下來，變成世界上的人：robbed 他搶了你、pitied 你給了他錢、fled 被你嚇跑、spared 你打倒他又放了他、stripped 你打倒他還搜他身上
 ##     note "who"/"other" 的經歷上記一筆（大家都知道）：{"who": 文字}
+##     memo who 記下跟你之間的這件事（TalkData.MEMO 的 kind），之後說話會提
 ## 文字裡：{my} 你的兵器 {me} 你的名字 {road} 往哪裡的路上 {place} 在哪一帶 {dest} 要去的地方
 ##   {name}{pron}{look}{noun} who 的名字、他、拿的東西（樣子、叫法）；{other}{opron}{olook} other 的
-##   {n} 錢 {pay} {bribe} 要付多少 {line} 找上你的人說的話 {why} 要比劍的原因 {wound} 傷口 {wplace} who 往哪裡去了
+##   {n} 錢 {pay} {bribe} 要付多少 {line} 找上你算帳的人說的話 {wound} 傷口 {wplace} who 往哪裡去了
+##   {say:情況} who 用自己的口氣說話（TalkData.SAY，先提跟你的舊事）、{voice:情況} 不提舊事、{past} 只提舊事、{gesture} 怕你或看不起你的動作
 ##   {lead}{leadplace}{lead_line} 你在找的人和他在哪 {who}{where} 聽說的人和他在哪
 
 ## 每件事每走一個月的機率（條件成立時）
@@ -77,13 +79,6 @@ const PURSE := [10, 40]
 const ROB_SHARE := 0.2
 const ROB_MIN := 10
 
-## 找上你的人說的話（PeopleData 沒寫 avenge 的人）
-const LINES := {
-	"kin": "「{victim}是我{rel}。」",
-	"beaten": "「{gplace}那一次，你拿走的東西，我來拿回去。」",
-	"bounty": "{pron}從懷裡掏出一張摺起來的紙，攤開。上面畫的是你，畫得不太像。\n「死活不論。」",
-	"heir": "「{victim}欠的帳，{victim}死了，你來還。」",
-}
 ## 被殺的人身上的傷口（看兇手拿的兵器）
 const WOUNDS := {
 	"sword": "傷口在胸口，一劍透了過去，乾乾淨淨。",
@@ -98,36 +93,36 @@ const WOUNDS := {
 const EVENTS := {
 	# ---------- 人找上你 ----------
 	"ambush": {"title": "who", "steps": {
-		"start": {"title": "路邊", "text": "{road}，路邊有一片草被踩倒了，倒下去的方向朝著路。草還沒直起來。", "options": [
+		"start": {"title": "路邊", "text": "{road}，路邊有一片草被踩倒了，倒下去的方向朝著路。草還沒直起來。四周很靜，連鳥叫都沒有。", "options": [
 			{"label": "握住{my}，照走", "next": "face"},
 			{"label": "離開大路，從林子裡繞過去", "check": {"stat": "agi", "vs": "who"},
-				"ok": {"text": "你在林子裡多繞了半天。出林子的時候回頭看了一眼：路邊的石頭上坐著一個人，{look}擱在腳邊，一直望著大路。", "escape": "who", "hear": "who"},
+				"ok": {"text": "你在林子裡多繞了半天，衣服被荊棘勾破了好幾處。出林子的時候回頭看了一眼：路邊的石頭上坐著一個人，{look}擱在腳邊，一直望著大路。{who_line}", "escape": "who", "hear": "who"},
 				"fail": {"text": "你才鑽進林子，前面的樹後就走出一個人。", "next": "face"}},
-			{"label": "撿一塊石頭，往草裡丟", "text": "石頭落進草裡。草裡站起來一個人。", "next": "face"},
+			{"label": "撿一塊石頭，往草裡丟", "text": "石頭落進草裡。草裡站起來一個人，拍掉身上的草屑。", "next": "face"},
 		]},
-		"face": {"text": "{name}擋在路中間，手上拿著{look}。\n{line}", "options": [
+		"face": {"text": "{name}擋在路中間，手上拿著{look}。{gesture}\n{line}", "options": [
 			{"label": "拔出{my}", "fight": "who"},
 			{"label": "想辦法走掉", "check": {"stat": "agi", "vs": "who"},
 				"ok": {"text": "你往旁邊的斜坡一滑，滾進溝裡，爬起來就跑。{name}追了一段，停下來了。", "escape": "who"},
 				"fail": {"text": "你才轉身，{name}已經擋在你前面。", "fight": "who"}},
-			{"label": "給{pron} {pay} 銀，了結這件事", "need": {"kind": "beaten", "pay": true}, "pay": true,
+			{"label": "給{pron} {pay} 銀，了結這件事", "need": {"kind": "beaten", "pay": true}, "pay": true, "memo": "paid",
 				"text": "{name}把錢袋掂了掂，收進懷裡。{pron}看了你很久：「這件事到這裡。」"},
-			{"label": "給{pron} {bribe} 銀，當作沒看見你", "need": {"kind": "bounty", "bribe": true}, "bribe": true,
+			{"label": "給{pron} {bribe} 銀，當作沒看見你", "need": {"kind": "bounty", "bribe": true}, "bribe": true, "memo": "bribed",
 				"text": "{name}看了看錢袋，又看了看手上的紙。{pron}把紙對摺兩次，塞回懷裡，轉身走了。"},
 			{"label": "叫{pron}回去", "check": {"power": "who"},
-				"ok": {"text": "{name}握著{noun}的手指一根一根收緊，又鬆開。{pron}看著你，看了很久，最後往後退了一步：「我會再來。」", "backoff": true},
+				"ok": {"text": "{name}握著{noun}的手指一根一根收緊，又鬆開。{pron}看著你，看了很久，最後往後退了一步：「我會再來。」", "backoff": true, "memo": "backed_off"},
 				"fail": {"text": "{name}沒有說話，往前走了一步。", "fight": "who"}},
 		]},
 	}},
 	"robbers": {"title": "who", "steps": {
-		"start": {"text": "{road}，一棵倒下來的樹橫在路中間。樹後站起來三四個人，帶頭的手上拿著{look}。\n「東西留下，人可以走。」", "options": [
+		"start": {"text": "{road}，一棵倒下來的樹橫在路中間，斷口很新，是剛砍的。樹後站起來三四個人，帶頭的手上拿著{look}。{gesture}\n{say:rob}", "options": [
 			{"label": "「懸賞單上有你。」", "need": {"took_bounty": true}, "fight": "who",
 				"text": "帶頭的臉上的笑不見了。他身後的人慢慢散開，把路的兩頭堵住。"},
 			{"label": "動手", "fight": "who"},
-			{"label": "把錢袋丟過去", "rob": true, "note": {"who": "在{place}攔路，搶了{p:hero}"},
-				"text": "你把錢袋丟過去，裡面有 {n} 銀。帶頭的撿起來掂了掂，讓開了路。"},
+			{"label": "把錢袋丟過去", "rob": true, "memo": "robbed_you", "note": {"who": "在{place}攔路，搶了{p:hero}"},
+				"text": "你把錢袋丟過去，裡面有 {n} 銀。帶頭的撿起來掂了掂，讓開了路。你走過去的時候，後面有人笑了一聲。"},
 			{"label": "拔出{my}，往前走", "check": {"power": "who"},
-				"ok": {"text": "帶頭的盯著你握{my}的手。你走到離他三步的地方，他往旁邊讓了一步。他身後的人沒有動。", "fame": 0.5},
+				"ok": {"text": "帶頭的盯著你握{my}的手。你走到離他三步的地方，他往旁邊讓了一步。他身後的人沒有動。", "fame": 0.5, "memo": "scared"},
 				"fail": {"text": "帶頭的笑了一聲，迎了上來。", "fight": "who"}},
 		]},
 	}},
@@ -138,41 +133,41 @@ const EVENTS := {
 		]},
 	}},
 	"challenge": {"title": "who", "steps": {
-		"start": {"text": "{road}，岔路口的里程石上坐著一個人，{look}擱在膝上。看見你，{pron}站了起來：「你是{me}？」", "options": [
+		"start": {"text": "{road}，岔路口的里程石上坐著一個人，{look}擱在膝上，腳邊的乾糧袋已經空了一半，看樣子等了好幾天。看見你，{pron}站了起來：「你是{me}？」", "options": [
 			{"label": "「是我。」", "next": "ask"},
-			{"label": "「認錯人了。」", "note": {"who": "在{place}等{p:hero}比劍，{p:hero}說{pron}認錯人了"},
+			{"label": "「認錯人了。」", "memo": "duel_declined", "note": {"who": "在{place}等{p:hero}比劍，{p:hero}說{pron}認錯人了"},
 				"text": "{name}沒有攔你。你走出很遠，還覺得背上有{pron}的目光。"},
 		]},
-		"ask": {"text": "{why}\n{pron}把{noun}抽出來一半：「比一場，點到為止。」", "options": [
+		"ask": {"text": "{say:challenge}\n{name}把{noun}抽出來一半，等你回話。", "options": [
 			{"label": "比", "duel": true},
-			{"label": "「不比。」", "fame": -0.5, "note": {"who": "在{place}找{p:hero}比劍，{p:hero}不肯"},
-				"text": "{name}把{noun}推回去：「怕了？」{pron}沒等你回答，轉身走了。"},
+			{"label": "「不比。」", "fame": -0.5, "memo": "duel_declined", "note": {"who": "在{place}找{p:hero}比劍，{p:hero}不肯"},
+				"text": "{voice:challenge_no}"},
 		]},
 	}},
 	"kin_help": {"title": "who", "steps": {
-		"start": {"text": "{road}，前面有兵器相碰的聲音。轉過山坳，一個穿劍庭灰衣的人背靠著石牆，是{name}。圍著{pron}的有三個人，帶頭的拿著{olook}。", "options": [
+		"start": {"text": "{road}，前面有兵器相碰的聲音，還有人在喊。轉過山坳，一個穿劍庭灰衣的人背靠著石牆，是{name}。{pron}的左臂垂著，血順著袖口往下滴。圍著{pron}的有三個人，帶頭的拿著{olook}。", "options": [
 			{"label": "上去幫{pron}", "fight": "other", "win": "thanks", "text": "你衝了上去。帶頭的回過頭來。"},
 			{"label": "大喊一聲", "check": {"power": "other"},
 				"ok": {"text": "那幾個人回頭看了你一眼，又看了看你的{my}。帶頭的罵了一聲，帶著人退進林子。", "escape": "other", "next": "thanks"},
 				"fail": {"text": "帶頭的回頭看了你一眼，沒有停手，只分了一個人過來擋你。你推開那個人，帶頭的轉過身來。", "fight": "other", "win": "thanks"}},
 			{"label": "轉身走開", "leave_fight": true, "text": "你轉身走了。身後的聲音響了很久才停。"},
 		]},
-		"thanks": {"text": "{name}靠著石牆坐下來，喘了好一會兒，才把劍插回鞘裡。「這次欠你的。」", "options": [
-			{"label": "扶{pron}回劍庭", "grateful": "who", "merit": 8, "note": {"who": "在{place}被圍，{p:hero}救了{pron}"},
+		"thanks": {"text": "{name}靠著石牆坐下來，把劍插回鞘裡，手還在抖。\n{voice:saved}", "options": [
+			{"label": "扶{pron}回劍庭", "grateful": "who", "merit": 8, "memo": "saved", "note": {"who": "在{place}被圍，{p:hero}救了{pron}"},
 				"text": "你扶著{name}走了一段。回到劍庭，{pron}把路上的事說了一遍。（貢獻 +8）"},
-			{"label": "「路上小心。」", "grateful": "who", "note": {"who": "在{place}被圍，{p:hero}救了{pron}"},
+			{"label": "「路上小心。」", "grateful": "who", "memo": "saved", "note": {"who": "在{place}被圍，{p:hero}救了{pron}"},
 				"text": "{name}點了點頭，一跛一跛地往城裡走了。"},
 		]},
 	}},
 	"repay": {"title": "who", "steps": {
-		"start": {"text": "{road}，路邊茶棚裡有人叫了你一聲。是{name}。{pron}把凳子往旁邊挪了挪，讓你坐。", "options": [
-			{"label": "聽{pron}說", "need": {"lead": true}, "hear": "lead", "repaid": true, "text": "{name}壓低了聲音：{lead_line}"},
-			{"label": "收下{pron}塞過來的布包", "money": "gift", "repaid": true, "text": "布包裡是 {n} 銀。{name}說，上次的事一直沒機會謝你。"},
+		"start": {"text": "{road}，路邊茶棚裡有人叫了你一聲。是{name}。{pron}把凳子往旁邊挪了挪，讓你坐，又跟老闆多要了一個杯子。\n{say:repay}", "options": [
+			{"label": "聽{pron}說", "need": {"lead": true}, "hear": "lead", "repaid": true, "memo": "gift", "text": "{name}壓低了聲音：{lead_line}"},
+			{"label": "收下{pron}塞過來的布包", "money": "gift", "repaid": true, "memo": "gift", "text": "布包裡是 {n} 銀。"},
 			{"label": "喝完茶就走", "text": "你們喝完了那壺茶。{name}搶著付了錢。"},
 		]},
 	}},
 	"traveler": {"title": "who", "steps": {
-		"start": {"text": "你在路邊的酒館歇腳。{name}也坐在角落裡，{look}靠在桌邊。{pron}看了你一眼。", "options": [
+		"start": {"text": "你在路邊的酒館歇腳。屋裡很暗，爐火燒得正旺。{name}也坐在角落裡，{look}靠在桌邊。{voice:traveler}{past}", "options": [
 			{"label": "點個頭", "text": "你朝{pron}點了點頭。{pron}也點了點頭，沒有說話。"},
 			{"label": "請{pron}喝一杯", "need": {"money": 5}, "money": -5, "next": "drink"},
 			{"label": "動手", "fight": "who"},

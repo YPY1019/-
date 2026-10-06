@@ -128,6 +128,18 @@ var stay_left := 0
 var rest_left := 0
 ## 世界上的人的特別打算：{"target", "month"}（到了那個月就去找那個人）
 var vow := {}
+## 說話的口氣（TalkData.VOICES）：rough 粗魯、cold 冷淡、proud 傲慢、plain 老實
+var voice := "plain"
+## 跟誰之間發生過的事（記得你）：人 id -> [{"kind", "month", "place", 其他}]。kind 見 TalkData.MEMO
+var memo := {}
+
+# ---- 玩家角色才用 ----
+## 答應過別人的事：[{"asker", "target", "month", "done"}]（替他對付某人）
+var promises: Array = []
+## 被人拿走的東西：東西 id -> 拿走的人 id（東西換手時有人來告訴你）
+var lost_items := {}
+## 有人主動找你：事 id 或「p:人 id」-> 世界的第幾個月（同一件事、同一個人隔一陣子才再來）
+var talk_seen := {}
 
 
 func _init() -> void:
@@ -187,6 +199,11 @@ func body_stats() -> Dictionary:
 ## 記一筆這個人做過的事。public = false：只有自己知道（例如沒人看見是誰下的手）
 func note(text: String, public := true) -> void:
 	history.append({"month": now(), "text": text, "public": public})
+
+
+## 跟這個人之間的事（舊的在前）
+func memo_of(id: String) -> Array:
+	return memo.get(id, [])
 
 
 # ---------- 血量、境界、數值 ----------

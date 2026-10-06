@@ -12,13 +12,15 @@ extends RefCounted
 ## relations：跟別人的關係（見 Person.relations）。寫一邊就好，另一邊自動補上。
 ## bounty：懸賞 {"reward", "text"}（誰、做了什麼、賞多少）。
 ## vow：到了那個月就去找那個人（例如替師叔報仇）。
+## voice：說話的口氣（TalkData.VOICES：rough 粗魯、cold 冷淡、proud 傲慢、plain 老實）。
 ## start：跟你打的時候登場。warn：你要動他的家人時，他傳來的話。
 ## avenge：他來找你算帳時說的話。crimes：有懸賞的人在外面做的事（傳聞）。arrive_text：出現時的傳聞。
+## why：他跟誰有仇、為什麼（求你幫忙時說的）。
 
 const PEOPLE := {
 	# ---------- 有懸賞的人 ----------
 	"roderick": {
-		"name": "羅德里克", "title": "傭兵隊長", "pron": "他", "age": 38, "life": [56, 64],
+		"name": "羅德里克", "voice": "proud", "title": "傭兵隊長", "pron": "他", "age": 38, "life": [56, 64],
 		"style": "merc_captain", "hp": 450, "stats": {"str": 20, "agi": 20}, "potential": {"str": 20, "agi": 20}, "growth": 0.0,
 		"weapon": "red_fang", "learned": ["knee", "fallstone", "deflect", "triple", "needle"], "items": ["verdict_1"], "place": "wheat", "haunts": ["wheat", "relay", "bridge"],
 		"role": "villain",
@@ -27,7 +29,7 @@ const PEOPLE := {
 		"crimes": ["紅鬃的人在{place}搶了收稅官的馬車。", "聽說紅鬃的傭兵在{place}一帶放火燒了一座穀倉。", "{place}的商隊被紅鬃攔下來，貨被拿走了一半。"],
 	},
 	"magnus": {
-		"name": "馬格努斯", "title": "紅鬃副隊長", "pron": "他", "age": 30, "life": [52, 62],
+		"name": "馬格努斯", "voice": "rough", "title": "紅鬃副隊長", "pron": "他", "age": 30, "life": [52, 62],
 		"style": "merc_captain", "hp": 200, "stats": {"str": 16, "agi": 16}, "potential": {"str": 19, "agi": 18}, "growth": 0.8,
 		"weapon": "knight_sword", "learned": ["knee", "fallstone", "triple"], "items": [], "place": "wheat",
 		"role": "follower", "follows": "roderick", "relations": {"roderick": "boss"},
@@ -36,7 +38,7 @@ const PEOPLE := {
 		"crimes": ["紅鬃的人又在{place}鬧事，帶頭的是一個臉上有疤的傢伙。"],
 	},
 	"ulf": {
-		"name": "烏爾夫", "title": "劫掠者", "school": "frostbear", "rank": 2, "pron": "他", "age": 33, "life": [50, 60],
+		"name": "烏爾夫", "voice": "rough", "title": "劫掠者", "school": "frostbear", "rank": 2, "pron": "他", "age": 33, "life": [50, 60],
 		"style": "raider", "hp": 480, "stats": {"str": 21, "agi": 15}, "potential": {"str": 21, "agi": 15}, "growth": 0.0,
 		"weapon": "gatebreaker", "learned": ["fb_cleave", "fb_hug", "fb_whirl", "fb_hook", "fallstone"], "items": [], "place": "coast", "haunts": ["coast", "old_wall", "lodge"],
 		"role": "villain",
@@ -47,7 +49,7 @@ const PEOPLE := {
 		"crimes": ["{place}那邊又有人被搶，聽說是一群紅鬍子的北方人幹的。", "有人在{place}看見烏爾夫，斧頭上還有血。"],
 	},
 	"erik": {
-		"name": "埃里克", "title": "", "school": "frostbear", "rank": 1, "pron": "他", "age": 22, "life": [48, 60],
+		"name": "埃里克", "voice": "rough", "title": "", "school": "frostbear", "rank": 1, "pron": "他", "age": 22, "life": [48, 60],
 		"style": "raider", "hp": 220, "stats": {"str": 15, "agi": 13}, "potential": {"str": 20, "agi": 16}, "growth": 1.2,
 		"weapon": "hand_axe", "learned": ["fb_cleave", "fb_hug", "knee"], "items": [], "place": "coast",
 		"role": "follower", "follows": "ulf", "relations": {"ulf": "sibling"},
@@ -56,7 +58,7 @@ const PEOPLE := {
 		"avenge": "「我哥的斧頭，我要拿回來。」",
 	},
 	"yvette": {
-		"name": "伊薇特", "title": "決鬥家", "pron": "她", "age": 27, "life": [50, 64],
+		"name": "伊薇特", "voice": "proud", "title": "決鬥家", "pron": "她", "age": 27, "life": [50, 64],
 		"style": "duelist", "hp": 370, "stats": {"str": 15, "agi": 22}, "potential": {"str": 16, "agi": 23}, "growth": 0.6,
 		"weapon": "rapier", "learned": ["deflect", "needle", "dust", "leg_rain"], "items": ["rain_book"], "place": "frost", "haunts": ["frost", "wheat", "relay"],
 		"role": "duelist",
@@ -65,7 +67,7 @@ const PEOPLE := {
 		"challenge": "一個穿深色外套的女人在旅店門口等你。她把一隻手套丟在你腳邊：「聽說你很能打。」",
 	},
 	"black_knight": {
-		"name": "黑騎士", "title": "", "pron": "他", "age": 35, "life": [52, 62],
+		"name": "黑騎士", "voice": "cold", "title": "", "pron": "他", "age": 35, "life": [52, 62],
 		"style": "black_knight", "hp": 560, "stats": {"str": 23, "agi": 21}, "potential": {"str": 23, "agi": 21}, "growth": 0.0,
 		"weapon": "knell", "learned": ["fallstone", "triple", "needle", "deflect", "knee"], "items": [], "place": "relay", "haunts": ["relay"],
 		"role": "villain",
@@ -74,7 +76,7 @@ const PEOPLE := {
 		"crimes": ["又一個往王都送信的信使沒有回來。最後有人看見他，是在舊王家驛站附近。"],
 	},
 	"varen": {
-		"name": "瓦倫", "title": "叛將", "pron": "他", "age": 45, "life": [56, 64],
+		"name": "瓦倫", "voice": "proud", "title": "叛將", "pron": "他", "age": 45, "life": [56, 64],
 		"style": "rebel_lord", "hp": 960, "stats": {"str": 35, "agi": 29}, "potential": {"str": 35, "agi": 29}, "growth": 0.0,
 		"weapon": "warhammer", "learned": ["fallstone", "triple", "knee", "deflect", "leg_siege"], "items": ["siege_book"], "place": "fortress", "haunts": ["fortress"],
 		"role": "villain",
@@ -83,7 +85,7 @@ const PEOPLE := {
 		"crimes": ["領主又派兵去打山口要塞，又敗回來了。", "山口要塞往南的商路，抽成又漲了。"],
 	},
 	"bran": {
-		"name": "布蘭", "title": "", "pron": "他", "age": 24, "life": [50, 62],
+		"name": "布蘭", "voice": "rough", "title": "", "pron": "他", "age": 24, "life": [50, 62],
 		"style": "bandit_leader", "hp": 200, "stats": {"str": 16, "agi": 14}, "potential": {"str": 20, "agi": 17}, "growth": 0.8,
 		"weapon": "bandit_blade", "learned": ["dust", "knee", "fallstone"], "items": [], "place": "south_road", "haunts": ["south_road", "bridge", "pasture"],
 		"role": "villain", "relations": {"grayson": "parent"},
@@ -94,28 +96,28 @@ const PEOPLE := {
 
 	# ---------- 冒險者 ----------
 	"hakon": {
-		"name": "哈康", "title": "冒險者", "pron": "他", "age": 36, "life": [52, 62],
+		"name": "哈康", "voice": "plain", "title": "冒險者", "pron": "他", "age": 36, "life": [52, 62],
 		"style": "deserter", "hp": 220, "stats": {"str": 19, "agi": 18}, "potential": {"str": 19, "agi": 18}, "growth": 0.0,
 		"weapon": "knight_sword", "learned": ["knee", "fallstone", "shed", "deflect"], "items": [], "place": "frost",
 		"role": "hunter", "boldness": 0.3,
 		"start": ["哈康把舊圓盾往前一擋，長劍搭在盾邊：「你想清楚了？」"],
 	},
 	"sira": {
-		"name": "席拉", "title": "冒險者", "pron": "她", "age": 21, "life": [44, 56],
+		"name": "席拉", "voice": "plain", "title": "冒險者", "pron": "她", "age": 21, "life": [44, 56],
 		"style": "merc_captain", "stats": {"str": 14, "agi": 17}, "potential": {"str": 20, "agi": 24}, "growth": 1.6,
 		"weapon": "steel_sword", "learned": ["knee", "dust"], "items": [], "place": "frost",
 		"role": "hunter", "boldness": 1.0,
 		"start": ["席拉把紅頭巾綁緊，拔出劍：「我早就想跟你打一場了。」"],
 	},
 	"oskar": {
-		"name": "奧斯卡", "title": "劍術教師", "pron": "他", "age": 41, "life": [54, 64],
+		"name": "奧斯卡", "voice": "proud", "title": "劍術教師", "pron": "他", "age": 41, "life": [54, 64],
 		"style": "old_captain", "hp": 300, "stats": {"str": 20, "agi": 20}, "potential": {"str": 20, "agi": 20}, "growth": 0.0,
 		"weapon": "knight_sword", "learned": ["deflect", "needle", "triple", "knee"], "items": ["verdict_3"], "place": "frost",
 		"role": "hunter", "boldness": 0.0, "vow": {"target": "yvette", "month": 8},
 		"start": ["奧斯卡脫下手套，慢慢拔出長劍：「我教人用劍三十年了。」"],
 	},
 	"leonard": {
-		"name": "雷納德", "title": "白手", "pron": "他", "age": 31, "life": [56, 66], "arrive": 100,
+		"name": "雷納德", "voice": "cold", "title": "白手", "pron": "他", "age": 31, "life": [56, 66], "arrive": 100,
 		"style": "old_captain", "hp": 360, "stats": {"str": 20, "agi": 20}, "potential": {"str": 21, "agi": 21}, "growth": 0.3,
 		"weapon": "knight_sword", "learned": ["deflect", "needle", "triple", "knee", "fallstone"], "items": [], "place": "frost",
 		"role": "hunter", "boldness": 0.5,
@@ -125,13 +127,13 @@ const PEOPLE := {
 
 	# ---------- 獅心劍庭 ----------
 	"master": {
-		"name": "埃德溫", "title": "庭主", "pron": "他", "age": 52, "school": "lionheart", "rank": 3, "life": [66, 74],
+		"name": "埃德溫", "voice": "plain", "title": "庭主", "pron": "他", "age": 52, "school": "lionheart", "rank": 3, "life": [66, 74],
 		"style": "master", "hp": 999, "stats": {"str": 21, "agi": 22}, "potential": {"str": 21, "agi": 22}, "growth": 0.0,
 		"weapon": "old_sword", "learned": ["lh_cross", "lh_pommel", "lh_half", "lh_advance", "lh_bind", "knee", "deflect"], "items": [], "place": "frost",
 		"role": "master",
 	},
 	"matthias": {
-		"name": "馬提亞斯", "title": "大師兄", "pron": "他", "age": 24, "life": [44, 56],
+		"name": "馬提亞斯", "voice": "proud", "title": "大師兄", "pron": "他", "age": 24, "life": [44, 56],
 		"style": "master", "stats": {"str": 15, "agi": 15}, "potential": {"str": 21, "agi": 20}, "growth": 1.0,
 		"weapon": "steel_sword", "learned": ["lh_cross", "lh_pommel", "lh_half", "knee", "fallstone"], "items": [], "school": "lionheart", "rank": 2,
 		"place": "frost", "role": "youth", "relations": {"master": "master"}, "vow": {"target": "roderick", "month": 40},
@@ -139,7 +141,7 @@ const PEOPLE := {
 		"avenge": "「庭主待你不薄。」",
 	},
 	"allen": {
-		"name": "艾倫", "title": "", "school": "lionheart", "rank": 1, "pron": "他", "age": 15, "life": [36, 44],
+		"name": "艾倫", "voice": "plain", "title": "", "school": "lionheart", "rank": 1, "pron": "他", "age": 15, "life": [36, 44],
 		"style": "master", "stats": {"str": 10, "agi": 10}, "potential": {"str": 20, "agi": 19}, "growth": 1.2,
 		"weapon": "old_sword", "learned": ["lh_cross"], "items": [],
 		"place": "frost", "role": "youth", "relations": {"master": "master"},
@@ -147,7 +149,7 @@ const PEOPLE := {
 		"avenge": "「我練到今天，就是為了這一天。」",
 	},
 	"lina": {
-		"name": "莉娜", "title": "", "pron": "她", "age": 14, "life": [36, 44],
+		"name": "莉娜", "voice": "cold", "title": "", "pron": "她", "age": 14, "life": [36, 44],
 		"style": "duelist", "stats": {"str": 9, "agi": 11}, "potential": {"str": 17, "agi": 22}, "growth": 1.2,
 		"weapon": "old_sword", "learned": [], "items": [],
 		"place": "frost", "role": "youth",
@@ -156,7 +158,7 @@ const PEOPLE := {
 
 	# ---------- 其他 ----------
 	"grayson": {
-		"name": "葛雷森", "title": "老衛隊長", "pron": "他", "age": 56, "life": [62, 68],
+		"name": "葛雷森", "voice": "cold", "title": "老衛隊長", "pron": "他", "age": 56, "life": [62, 68],
 		"style": "old_captain", "hp": 620, "stats": {"str": 29, "agi": 30}, "potential": {"str": 29, "agi": 30}, "growth": 0.0,
 		"weapon": "nightwatch", "learned": ["deflect", "needle", "triple", "knee", "shed"], "items": ["verdict_2"], "place": "frost",
 		"role": "settled",
@@ -167,7 +169,7 @@ const PEOPLE := {
 
 	# ---------- 後來才來的人 ----------
 	"sigurd": {
-		"name": "西格德", "title": "灰狼", "pron": "他", "age": 34, "life": [50, 60], "arrive": 30,
+		"name": "西格德", "voice": "rough", "title": "灰狼", "pron": "他", "age": 34, "life": [50, 60], "arrive": 30,
 		"style": "bandit_leader", "hp": 260, "stats": {"str": 19, "agi": 17}, "potential": {"str": 20, "agi": 18}, "growth": 0.3,
 		"weapon": "bandit_blade", "learned": ["dust", "knee", "fallstone", "triple"], "items": [], "place": "pasture", "haunts": ["pasture", "lodge", "south_road"],
 		"role": "villain",
@@ -177,15 +179,15 @@ const PEOPLE := {
 		"crimes": ["{place}又有羊被搶了，牧羊人被打斷了一條腿。", "灰狼的人在{place}燒了一間農舍。"],
 	},
 	"ora": {
-		"name": "歐拉", "title": "", "school": "frostbear", "rank": 1, "pron": "她", "age": 17, "life": [36, 44], "arrive": 48,
+		"name": "歐拉", "voice": "cold", "title": "", "school": "frostbear", "rank": 1, "pron": "她", "age": 17, "life": [36, 44], "arrive": 48,
 		"style": "raider", "stats": {"str": 13, "agi": 13}, "potential": {"str": 21, "agi": 19}, "growth": 1.4,
 		"weapon": "hand_axe", "learned": ["fb_cleave"], "items": [], "place": "frost",
-		"role": "youth", "grudges": ["ulf"],
+		"role": "youth", "grudges": ["ulf"], "why": {"ulf": "烏爾夫燒了我們的村子。我父母都在裡面。"},
 		"start": ["歐拉握緊{weapon}，一句話都沒說。"],
 		"arrive_text": "城裡來了一個從北岸逃出來的女孩，背著一把手斧，到處問烏爾夫在哪裡。",
 	},
 	"hogg": {
-		"name": "霍格", "title": "黑帆", "pron": "他", "age": 36, "life": [50, 60], "arrive": 120,
+		"name": "霍格", "voice": "rough", "title": "黑帆", "pron": "他", "age": 36, "life": [50, 60], "arrive": 120,
 		"style": "raider", "hp": 340, "stats": {"str": 22, "agi": 17}, "potential": {"str": 22, "agi": 17}, "growth": 0.0,
 		"weapon": "hand_axe", "learned": ["fallstone", "triple", "dust", "shed"], "items": [], "place": "coast", "haunts": ["coast", "old_wall", "lodge"],
 		"role": "villain",
@@ -195,7 +197,7 @@ const PEOPLE := {
 		"crimes": ["{place}有一座村子被燒了，有人看見海上掛著黑帆。"],
 	},
 	"tim": {
-		"name": "提姆", "title": "", "pron": "他", "age": 14, "life": [36, 44], "arrive": 110,
+		"name": "提姆", "voice": "plain", "title": "", "pron": "他", "age": 14, "life": [36, 44], "arrive": 110,
 		"style": "master", "stats": {"str": 9, "agi": 10}, "potential": {"str": 19, "agi": 20}, "growth": 1.3,
 		"weapon": "old_sword", "learned": [], "items": [], "place": "frost",
 		"role": "youth",

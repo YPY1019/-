@@ -20,6 +20,8 @@ var battle: Battle
 ## 現在打的是 monster 委託的怪物（和劍庭要你去打的人）/ person 世界上的人 / spar 劍庭的選拔 / trial 劍庭的公開比試 / duel 路上的比劍
 var fight_kind := ""
 var _settled := []
+## 剛走到一個地方：對話都處理完之後，看這裡有沒有接下的委託
+var _check_jobs := false
 ## 死去那一句停多久，才換到「這一生」
 const DEATH_PAUSE := 2.5
 
@@ -76,7 +78,7 @@ func _ready() -> void:
 
 	var h := town.hero
 	town_view.add_messages([
-		{"kind": "big", "text": "你叫%s，%d 歲，帶著一把舊鐵劍和 %d 銀來到北境的霜溪城。城裡有冒險者公會、練武場、獅心劍庭和一間武器店。" % [h.display_name, h.age(), h.money]},
+		{"kind": "big", "text": "你叫%s，%d 歲，帶著一把舊鐵劍和 %d 銀來到北境的霜溪城。城裡有冒險者公會、練武場、獅心劍庭、一間武器店，旅店樓下是酒館。" % [h.display_name, h.age(), h.money]},
 	])
 	_show(town_view)
 
@@ -117,8 +119,10 @@ func _on_wait_requested(w: Dictionary, msgs: Array) -> void:
 		_after_time())
 
 
-## 花了時間之後：死了看這一生；有人找上門就開打；不然回主畫面（病倒了主畫面會換成安排後事）
+## 花了時間之後：死了看這一生；有人找上門就開打；有人來找你（傳話、主動找你）就跳對話；
+## 都沒有了，剛走到的地方有接下的委託就碰上；不然回主畫面（病倒了主畫面會換成安排後事）
 func _after_time() -> void:
+	_log_rumors()
 	if town.hero.dead:
 		_show(town_view)
 		blocker.visible = true
@@ -128,14 +132,31 @@ func _after_time() -> void:
 		life_view.show_life(town.world, town.hero, heir)
 		_show(life_view)
 		return
+	# 已經有對話開著：等它選完（選完會再回到這裡）
+	if encounter.visible:
+		return
 	var comer := town.comer()
 	if comer != null:
 		# 先跳對話：他說什麼、你怎麼回
 		_show(town_view)
 		_comer = comer
-		encounter.ask(comer, town.comer_text(comer), town.comer_options(comer))
+		var text := town.comer_text(comer)
+		play_log.write(["【找上門】%s" % text])
+		encounter.ask(comer, text, town.comer_options(comer))
+		return
+	var v := town.next_visit()
+	if not v.is_empty():
+		_show(town_view)
+		play_log.write(["【有人來找你】%s：%s" % [v["title"], v["text"]]])
+		encounter.show_choice(v["title"], v["color"], v["text"], v["options"], _answer_visit)
 		return
 	_show(town_view)
+	if _check_jobs:
+		_check_jobs = false
+		if not town.hero.dying():
+			var jobs := town.jobs_here()
+			if not jobs.is_empty():
+				_meet_monster(jobs[0])
 
 
 func _answer_comer(choice: String) -> void:
@@ -143,9 +164,38 @@ func _answer_comer(choice: String) -> void:
 	var p := _comer
 	_comer = null
 	var r := town.answer_comer(p, choice)
-	town_view.add_messages([{"kind": "bad", "text": town.comer_text(p)}] + r["msgs"])
+	town_view.add_messages([{"kind": "bad", "text": "%s找上了你。" % p.display_name}] + r["msgs"])
 	if r["fight"]:
 		_start_person(p.id, "找上門來")
+	else:
+		_after_time()
+
+
+## 有人來找你：選了之後，要比劍就開打；花了時間（一起去打懸賞）就演那段時間；之後看還有沒有下一個
+func _answer_visit(choice: String) -> void:
+	play_log.write(["【有人來找你】選了 %s" % choice])
+	var r := town.answer_visit(choice)
+	var fight: String = r["fight"]
+	if fight.begins_with("duel:"):
+		town_view.add_messages(r["msgs"])
+		_start_duel(fight.substr(5))
+		return
+	var w := town.take_wait()
+	if w.is_empty():
+		town_view.add_messages(r["msgs"])
+		_after_time()
+		return
+	_wait(w, func():
+		town_view.add_messages(r["msgs"])
+		_after_time())
+
+
+## 試玩紀錄：這段時間世界上的傳聞（畫面上在酒館裡）
+func _log_rumors() -> void:
+	if town.rumor_log.is_empty():
+		return
+	play_log.write(town.rumor_log.map(func(t): return "【傳聞】" + t))
+	town.rumor_log.clear()
 
 
 # ---------- 走路、委託、找人打 ----------
@@ -173,15 +223,12 @@ func _walk_then(msgs: Array) -> void:
 		_wait(w, after)
 
 
-## 到了：打開地圖；有人找上門先處理；走到接了委託的地方，碰上了
+## 到了：打開地圖；有人找上門、有人來找你先處理；走到接了委託的地方，碰上了
 func _arrived() -> void:
 	if not town.hero.dying() and not town.hero.dead:
 		town_view.show_map()
+	_check_jobs = true
 	_after_time()
-	if town_view.visible and not encounter.visible and not town.hero.dying() and not town.hero.dead:
-		var jobs := town.jobs_here()
-		if not jobs.is_empty():
-			_meet_monster(jobs[0])
 
 
 ## 路上碰上的事

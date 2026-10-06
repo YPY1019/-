@@ -19,6 +19,9 @@ var trial_year := -1
 var road_log := false
 var trips := 0
 var road_counts := {}
+## 印出有人來找你（環境變數 VISITLOG=1）；碰上幾次、哪幾種
+var visit_log := false
+var visit_counts := {}
 
 
 func _init() -> void:
@@ -26,6 +29,7 @@ func _init() -> void:
 	var runs := int(args[0]) if args.size() > 0 else 20
 	verbose = args.size() > 1 and args[1] == "1"
 	road_log = OS.get_environment("ROADLOG") == "1"
+	visit_log = OS.get_environment("VISITLOG") == "1"
 	var got_ages := {}
 	var counts := []
 	var lost := {}
@@ -52,6 +56,9 @@ func _init() -> void:
 	var ids := road_counts.keys()
 	ids.sort_custom(func(a, b): return road_counts[a] > road_counts[b])
 	print("走了 %d 趟，碰上 %d 件事：%s" % [trips, road_counts.values().reduce(func(a, b): return a + b, 0), "、".join(ids.map(func(k): return "%s %d" % [k, road_counts[k]]))])
+	var vids := visit_counts.keys()
+	vids.sort_custom(func(a, b): return visit_counts[a] > visit_counts[b])
+	print("有人來找你 %d 次：%s" % [visit_counts.values().reduce(func(a, b): return a + b, 0), "、".join(vids.map(func(k): return "%s %d" % [k, visit_counts[k]]))])
 	print("一輩子拿到幾樣：最少 %d、中位數 %d、最多 %d（死在 %d～%d 歲）" % [counts[0], counts[counts.size() / 2], counts[-1], deaths[0], deaths[-1]])
 	quit()
 
@@ -76,6 +83,24 @@ func _career(run: int) -> Dictionary:
 		var comer := town.comer()
 		if comer != null:
 			_fight(town, pilot, rng, func(): return town.start_person(comer.id), "person", got, h)
+			continue
+		# 有人來找你（傳話、主動找你）：隨便選一個
+		var v := town.next_visit()
+		if not v.is_empty():
+			var c: Dictionary = town.visits.current
+			var vk: String = c["kind"] if c["kind"] != "tiding" else "傳話:" + c["tiding"]["kind"]
+			visit_counts[vk] = visit_counts.get(vk, 0) + 1
+			var opt: Array = v["options"][rng.randi_range(0, v["options"].size() - 1)]
+			if visit_log:
+				print("\n【%s　%s】%s\n%s\n　→ %s" % [h.date_text(), vk, v["title"], v["text"], opt[1]])
+			var vr := town.answer_visit(opt[0])
+			town.take_wait()
+			if visit_log:
+				for m in vr["msgs"]:
+					print("　　", m["text"])
+			var vf: String = vr["fight"]
+			if vf.begins_with("duel:"):
+				_fight(town, pilot, rng, func(): return town.start_duel(vf.substr(5)), "duel", got, h)
 			continue
 		# 傷了就回城休養
 		if h.hp < h.max_hp() * 0.6:

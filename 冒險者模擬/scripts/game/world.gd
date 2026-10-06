@@ -5,7 +5,11 @@ extends RefCounted
 ## 世界上的人自己過日子：移動、變強、變老、老死、互相打、拿走輸的人身上的東西、替家人報仇。
 ## 玩家角色也是世界上的一個人（hero_id），但他的事由 Town 照玩家的決定去做，World 不替他決定。
 ## 跟玩家角色有關的打鬥（有人找上門）World 只負責走過去，打由 Town 開戰鬥。
-## 不碰畫面：傳到你耳裡的事放在 news（[{"month", "text", "kind"}]），由 Town 交給畫面。
+## 不碰畫面。資訊推少、自己去聽多（2026-10-07）：
+##   世界上發生的事是傳聞（rumors），放在酒館，想知道自己去聽；不寫進你的紀錄。
+##   跟你有關的事是傳話（tidings），回城時由一個人來告訴你（見 Visits）。
+##   跟你之間的事記在那個人身上（remember），他說話時會提（見 Talk）。
+##   news 是這次推的時候發生的傳聞（測試用）。
 
 ## 一般委託越打越少：第 n 次打完，要再過幾個月才會再出現
 const MONSTER_BACK := [2, 3, 4, 6, 9, 12, 18]
@@ -73,12 +77,16 @@ var shop_stock: Array = []
 var _crime_told := {}
 ## 還沒長大的孩子：[{"due": 進城的月, "parents": [id, id], "name", "pron", "born": 生在哪一年}]
 var _children: Array = []
-## 這次推的時候傳到你耳裡的事
+## 這次推的時候發生的傳聞（測試用）
 var news: Array = []
+## 酒館裡的傳聞：[{"month", "raw": 還沒換名字的文字（{p:id}）}]
+var rumors: Array = []
+## 傳聞留幾個月
+const RUMOR_MONTHS := 36
+## 要傳給你的話（跟你有關的事）：[{"kind", "month", "about", 其他}]。見 Visits
+var tidings: Array = []
 ## 已經傳過話給你的人（target id）
 var warned: Array = []
-## 下個月要傳到你耳裡的話
-var _mail: Array = []
 ## 以前的玩家角色（照順序）
 var lives: Array = []
 ## 最近死在外面的人（路上的事用）：[{"id", "killer", "place", "month", "weapon": 下手的人拿的武器}]
@@ -240,6 +248,7 @@ func _spawn(id: String) -> Person:
 	p.display_name = d["name"]
 	p.title = d.get("title", "")
 	p.pron = d.get("pron", "他")
+	p.voice = d.get("voice", "plain")
 	p.style = d["style"]
 	p.start_lines = d.get("start", [])
 	p.born_year = LifeData.year_of(month()) - d["age"]
@@ -295,6 +304,7 @@ func newcomer() -> Person:
 	p.clock = clock
 	p.display_name = pick[0]
 	p.pron = pick[1]
+	p.voice = _pick(TalkData.VOICES)
 	p.style = "master"
 	p.born_year = LifeData.year_of(month()) - LifeData.START_AGE
 	p.dies_at = LifeData.roll_dies_at(rng, p.born_year, LifeData.LIFESPAN_MIN, LifeData.LIFESPAN_MAX, month())
@@ -319,9 +329,6 @@ func advance(n: int) -> Array:
 
 func tick() -> void:
 	clock.month += 1
-	for m in _mail:
-		_tell(m, "big")
-	_mail.clear()
 	for id in PeopleData.PEOPLE:
 		if PeopleData.PEOPLE[id].get("arrive", 0) == month() and not people.has(id):
 			var p := _spawn(id)
@@ -353,6 +360,7 @@ func tick() -> void:
 	_replenish()
 	recent_deaths = recent_deaths.filter(func(e): return month() - e["month"] <= RECENT_MONTHS)
 	recent_crimes = recent_crimes.filter(func(e): return month() - e["month"] <= RECENT_MONTHS)
+	rumors = rumors.filter(func(e): return month() - e["month"] <= RUMOR_MONTHS)
 	if LifeData.month_of_year(month()) == SchoolData.SELECTION_MONTHS[-1]:
 		_spring()
 	look_around()
@@ -447,7 +455,7 @@ func _act(p: Person) -> void:
 func _set_target(p: Person, id: String) -> void:
 	p.target = id
 	if id == hero_id:
-		_tell(NewsData.HUNT_YOU.replace("{p:who}", "{p:%s}" % p.id), "bad")
+		tiding("hunted", {"about": p.id})
 
 
 ## 去找要找的人。到了同一個地方就打（找的是你的話，等 Town 開戰鬥）
@@ -460,9 +468,6 @@ func _chase(p: Person) -> void:
 	if t.travel_left > 0:
 		return
 	if t.location != p.location:
-		if t.id == hero_id and p.rest_left <= 0:
-			var text := NewsData.HUNT.replace("{p:who}", "{p:%s}" % p.id).replace("{item}", _look_short(p.weapon))
-			_tell(text.replace("{place}", MapData.place_name(t.location)), "bad")
 		_go(p, t.location)
 		return
 	if t.id == hero_id:
@@ -544,6 +549,8 @@ func _hunt(p: Person) -> void:
 	if not bounties[best]["takers"].has(p.id):
 		bounties[best]["takers"].append(p.id)
 		_tell(NewsData.BOUNTY_TAKEN.replace("{p:hunter}", "{p:%s}" % p.id).replace("{p:target}", "{p:%s}" % best))
+		if best == hero_id:
+			tiding("bounty_taker", {"about": p.id})
 
 
 ## 決鬥家：隔一陣子找一個差不多強的人決鬥（可能是你）
@@ -722,6 +729,7 @@ func _new_person(name: String, pron: String, style: String, role: String, born_y
 	p.clock = clock
 	p.display_name = name
 	p.pron = pron
+	p.voice = _pick(TalkData.VOICES)
 	p.style = style
 	p.role = role
 	p.born_year = born_year
@@ -820,7 +828,7 @@ func settle(w: Person, l: Person, kill: bool, told := true) -> Array:
 		if told:
 			l.note("在%s被{p:%s}殺了" % [place, w.id])
 		recent_deaths.append({"id": l.id, "killer": w.id, "place": l.location, "month": month(), "weapon": w.weapon})
-		_kill(l, w)
+		_kill(l, w, told)
 	else:
 		if l.id != hero_id:
 			l.hp = maxi(1, roundi(l.max_hp() * ROBBED_HP))
@@ -876,6 +884,8 @@ func _sell_off(p: Person) -> void:
 		if not shop_stock.has(it):
 			shop_stock.append(it)
 		_tell(NewsData.SOLD.replace("{p:who}", "{p:%s}" % p.id).replace("{item}", WeaponData.get_def(it)["name"]))
+		if people.has(hero_id) and hero().lost_items.has(it):
+			tiding("item_sold", {"about": p.id, "item": it})
 	p.to_sell.clear()
 
 
@@ -898,6 +908,7 @@ func _take_from_hero(w: Person, h: Person) -> Array:
 	if pick == "":
 		return []
 	h.remove_item(pick)
+	h.lost_items[pick] = w.id
 	w.give_item(pick)
 	if BookData.is_book(pick):
 		w.learn(BookData.get_def(pick)["move"])
@@ -906,13 +917,15 @@ func _take_from_hero(w: Person, h: Person) -> Array:
 
 
 ## 死了：懸賞撕掉；家人、師徒、手下記仇；手下接手老大的人
-func _kill(l: Person, killer: Person) -> void:
+## told：說得出是誰下的手。跟你有關的人死了，有人來告訴你；你殺的人，他的家人知道是你
+func _kill(l: Person, killer: Person, told := true) -> void:
 	l.dead = true
 	l.died_at = month()
 	l.travel_left = 0
 	if bounties.has(l.id):
 		bounties.erase(l.id)
 		_tell(NewsData.BOUNTY_GONE.replace("{p:who}", "{p:%s}" % l.id))
+	var by_hero := killer != null and killer.id == hero_id
 	for r in l.relations:
 		var p: Person = people.get(r)
 		if p == null or p.dead or p == killer or not l.relations[r] in AVENGER_RELATIONS:
@@ -921,7 +934,38 @@ func _kill(l: Person, killer: Person) -> void:
 			add_grudge(p, killer.id, "kin", l.id)
 			p.note("{p:%s}死了" % l.id)
 			_tell(NewsData.GRIEF.replace("{p:who}", "{p:%s}" % p.id).replace("{p:victim}", "{p:%s}" % l.id), "info")
+			if by_hero:
+				remember(p, "killed_kin", {"victim": l.id})
+				tiding("kin_knows", {"about": p.id, "victim": l.id})
+	if not by_hero:
+		_tell_death(l, "killed" if told and killer != null else "anon", killer.id if killer != null else "")
+	_promise_over(l, by_hero)
 	_takeover(l)
+
+
+## 跟你有關的人死了（不是你殺的）：有人來告訴你
+func _tell_death(l: Person, how: String, killer := "") -> void:
+	if not people.has(hero_id) or l.id == hero_id:
+		return
+	var h := hero()
+	if not (l.memo.has(hero_id) or l.relations.has(hero_id) or l.grateful.has(hero_id) or l.grudges.has(hero_id) \
+			or h.lost_items.values().has(l.id) or h.promises.any(func(pr): return pr["asker"] == l.id or pr["target"] == l.id)):
+		return
+	tiding("death", {"about": l.id, "how": how, "killer": killer, "place": l.location})
+
+
+## 答應過要對付的人死了：你殺的，求你的人會來謝你；別人殺的，這件事就沒了
+func _promise_over(l: Person, by_hero: bool) -> void:
+	if not people.has(hero_id):
+		return
+	var h := hero()
+	for pr in h.promises.duplicate():
+		if pr["target"] != l.id:
+			continue
+		if by_hero:
+			pr["done"] = true
+		else:
+			h.promises.erase(pr)
 
 
 ## 老大死了，手下接手（有懸賞的老大，手下也被懸賞）
@@ -970,6 +1014,8 @@ func _die(p: Person) -> void:
 	if bounties.has(p.id):
 		bounties.erase(p.id)
 		_tell(NewsData.BOUNTY_GONE.replace("{p:who}", "{p:%s}" % p.id))
+	_tell_death(p, "old")
+	_promise_over(p, false)
 	_takeover(p)
 
 
@@ -1015,7 +1061,9 @@ func hero_murdered(victim: Person, place: String) -> void:
 		for o in others():
 			if o != victim and o.school == victim.school and o.rank >= 2:
 				add_grudge(o, hero_id, "kin", victim.id)
-	_tell(NewsData.MURDER_POSTED, "bad")
+				remember(o, "killed_kin", {"victim": victim.id})
+	_tell(text)
+	tiding("bounty_on_you", {"victim": victim.id, "place_name": place})
 
 
 ## 你被來收懸賞的人打倒：押回城裡關一陣子，身上的錢賠給苦主，懸賞撤下。回傳賠了多少
@@ -1029,6 +1077,7 @@ func hero_captured(hunter: Person) -> int:
 	hunter.rest_left = rng.randi_range(HUNT_REST[0], HUNT_REST[1])
 	hunter.note("抓到了{p:%s}，領了懸賞" % hero_id)
 	h.note("被{p:%s}抓到，押回霜溪城" % hunter.id)
+	remember(hunter, "beat_you")
 	bounties.erase(hero_id)
 	return fine
 
@@ -1039,6 +1088,7 @@ func make_drifter(place: String) -> Person:
 	var age := rng.randi_range(18, 30)
 	var p := _new_person(pick[0], pick[1], "highwayman", "villain", LifeData.year_of(month()) - age)
 	p.title = "攔路的"
+	p.voice = "rough" if rng.randf() < 0.6 else "plain"
 	p.location = place
 	p.haunts = [place] + MapData.neighbors(place).filter(func(x): return not MapData.is_city(x))
 	p.stats = {"str": rng.randi_range(11, 13), "agi": rng.randi_range(10, 12)}
@@ -1056,16 +1106,11 @@ func make_drifter(place: String) -> Person:
 	p.fame = p.power() * 0.3
 	return p
 
-## 你接下懸賞。他有家人、老大護著的話，過一陣子會傳話給你
+## 你接下懸賞。他有家人、老大護著的話，那個人會來找你（見 Visits）
 func accept_bounty(id: String) -> void:
 	if not bounties.has(id) or bounties[id]["takers"].has(hero_id):
 		return
 	bounties[id]["takers"].append(hero_id)
-	var guard := protector_of(id)
-	if guard != null and not warned.has(id):
-		warned.append(id)
-		var text: String = PeopleData.PEOPLE.get(guard.id, {}).get("warn", NewsData.WARN)
-		_mail.append(text.replace("{p:who}", "{p:%s}" % guard.id).replace("{p:target}", "{p:%s}" % id))
 
 
 ## 你打贏一個人：settle 之後，輸的人死了就記仇；沒死的人身上剩下的東西還是他的
@@ -1078,6 +1123,7 @@ func hero_lost(w: Person) -> Array:
 	var taken := settle(w, hero(), false, true)
 	w.grudges.erase(hero_id)
 	w.target = ""
+	remember(w, "beat_you", {"item": taken[0] if not taken.is_empty() else ""})
 	return taken
 
 
@@ -1135,14 +1181,17 @@ func pass_on(heir_id: String) -> void:
 			p.grudges.erase(old.id)
 			p.grudge_why.erase(old.id)
 			add_grudge(p, heir.id, "heir", old.id)
-			_mail.append(NewsData.GRUDGE_PASSED.replace("{p:who}", "{p:%s}" % p.id).replace("{p:old}", "{p:%s}" % old.id).replace("{p:heir}", "{p:%s}" % heir.id))
+			tidings.append({"kind": "heir_grudge", "month": month(), "about": p.id, "old": old.id})
 		if p.target == old.id:
 			p.target = ""
 	bounties.erase(old.id)
 	for b in bounties:
 		bounties[b]["takers"].erase(old.id)
 	hero_id = heir_id
-	_mail.append(_pick(NewsData.REMEMBER).replace("{p:who}", "{p:%s}" % old.id))
+	# 上一個人的事：傳話換成新的人的（舊的人的仇、死訊都不用再傳了）
+	tidings = tidings.filter(func(t): return t["kind"] == "heir_grudge")
+	warned.clear()
+	_tell(_pick(NewsData.REMEMBER).replace("{p:who}", "{p:%s}" % old.id))
 
 
 ## 可以接手的人：活著、跟你沒仇、沒有懸賞、不是師傅、不太老。不夠就找剛到城裡的年輕人
@@ -1162,8 +1211,10 @@ func heir_candidates() -> Array:
 
 # ---------- 小工具 ----------
 
+## 一件事傳開了：放進酒館的傳聞（不寫進你的紀錄）
 func _tell(text: String, kind := "news") -> void:
 	news.append({"month": month(), "text": fmt(text), "kind": kind})
+	rumors.append({"month": month(), "raw": text})
 	# 傳聞提到的人、也說了在哪：你知道他大概在哪了
 	var said := fmt(text)
 	var i := text.find("{p:")
@@ -1173,6 +1224,33 @@ func _tell(text: String, kind := "news") -> void:
 		if p != null and p.id != hero_id and said.contains(MapData.place_name(p.travel_to if p.travel_left > 0 else p.location)):
 			hear(p.id)
 		i = text.find("{p:", j)
+
+
+## 要傳給你的話（同一件事還沒傳到，就不再記一次）
+func tiding(kind: String, data := {}) -> void:
+	if not people.has(hero_id):
+		return
+	for t in tidings:
+		if t["kind"] == kind and t.get("about", "") == data.get("about", "") and t.get("item", "") == data.get("item", ""):
+			return
+	var t := data.duplicate()
+	t["kind"] = kind
+	t["month"] = month()
+	tidings.append(t)
+
+
+## p 記下跟你之間的一件事（說話時會提、人物面板上看得到）。place 沒寫就是你現在在的地方
+func remember(p: Person, kind: String, extra := {}) -> void:
+	if p == null or not people.has(hero_id) or p.id == hero_id:
+		return
+	var e := extra.duplicate()
+	e["kind"] = kind
+	e["month"] = month()
+	if not e.has("place"):
+		e["place"] = hero().location
+	var list: Array = p.memo.get(hero_id, [])
+	list.append(e)
+	p.memo[hero_id] = list
 
 
 func _pick(list: Array) -> String:
@@ -1185,9 +1263,3 @@ func _shuffle(list: Array) -> void:
 		var t = list[i]
 		list[i] = list[j]
 		list[j] = t
-
-
-## 武器、秘笈的樣子（短的，去掉句號）
-func _look_short(item: String) -> String:
-	var look: String = WeaponData.get_def(item).get("look", WeaponData.get_def(item)["name"])
-	return look.trim_suffix("。").split("，")[0]

@@ -314,6 +314,9 @@ func answer(choice: String) -> Dictionary:
 			p.grateful.append(h.id)
 	if out.get("repaid", false) and who != null:
 		who.grateful.erase(h.id)
+	# 他記下跟你之間的這件事
+	if out.has("memo") and who != null and not who.dead:
+		world.remember(who, out["memo"], {"place": st["at"]})
 	for key in out.get("note", {}):
 		var p := _p(key)
 		if p != null and not p.dead:
@@ -361,17 +364,13 @@ func after_fight(won: bool) -> void:
 
 # ---------- 結果 ----------
 
-## 你走開了：other 跟 who 自己打，傳到你耳裡
+## 你走開了：other 跟 who 自己打。結果你不知道（之後聽說、或有人來告訴你）
 func _leave(who: Person, other: Person) -> Array:
-	world.news.clear()
+	world.remember(who, "left", {"place": town.road["at"]})
 	world.fight(other, who)
-	var msgs := []
-	for e in world.news:
-		msgs.append(_m(e["kind"], e["text"]))
-	world.news.clear()
 	if not who.dead:
 		who.note("在%s被{p:%s}的人圍住，{p:%s}路過，沒有停下來" % [MapData.place_name(town.road["at"]), other.id, hero.id])
-	return msgs
+	return []
 
 
 ## 把死人埋了：他的家人、師徒欠你一份情
@@ -384,6 +383,7 @@ func _bury(dead: Person) -> void:
 		if not p.grateful.has(hero.id):
 			p.grateful.append(hero.id)
 		p.note("聽說{p:%s}在%s把{p:%s}埋了" % [hero.id, MapData.place_name(town.road["at"]), dead.id])
+		world.remember(p, "buried", {"place": town.road["at"], "victim": dead.id})
 
 
 ## 沒名字的小賊活下來：變成世界上的人
@@ -396,19 +396,24 @@ func _drifter(kind: String, n: int) -> void:
 		"robbed":
 			p.money += n
 			p.note("在%s攔路，搶了{p:%s}" % [place, h.id])
+			world.remember(p, "robbed_you", {"place": at})
 		"pitied":
 			p.grateful.append(h.id)
 			p.note("在%s攔路，{p:%s}丟了錢給%s" % [place, h.id, p.pron])
+			world.remember(p, "pitied", {"place": at})
 		"fled":
 			p.note("在%s攔路，被{p:%s}嚇跑了" % [place, h.id])
+			world.remember(p, "scared", {"place": at})
 		"spared":
 			p.hp = maxi(1, roundi(p.max_hp() * World.ROBBED_HP))
 			p.grateful.append(h.id)
 			p.note("在%s攔路，被{p:%s}打倒，放了一條生路" % [place, h.id])
+			world.remember(p, "spared", {"place": at})
 		"stripped":
 			p.hp = maxi(1, roundi(p.max_hp() * World.ROBBED_HP))
 			world.add_grudge(p, h.id, "beaten")
 			p.note("在%s攔路，被{p:%s}打倒，搜光了身上" % [place, h.id])
+			world.remember(p, "stripped", {"place": at})
 
 
 # ---------- 小工具 ----------
@@ -483,19 +488,19 @@ func _knows(p: Person) -> bool:
 	return hero.heard.has(p.id) or hero.fought.has(p.id) or hero.relations.has(p.id) or p.relations.has(hero.id)
 
 
-## 文字：換上你、碰到的人、在哪
+## 文字：換上你、碰到的人、在哪。{say:情況} 他用自己的口氣說（先提舊事）、{voice:情況} 不提舊事、{past} 只提舊事、{gesture} 怕你或看不起你
 func _fmt(text: String) -> String:
 	var h := hero
 	var st := town.road
+	var who := _p("who")
+	var other := _p("other")
+	if who != null:
+		text = _talk_tokens(text, who)
+		if text.contains("{line}"):
+			text = text.replace("{line}", town.talk.revenge(who))
 	text = text.replace("{my}", WeaponData.get_def(h.weapon).get("noun", "兵器")).replace("{me}", h.display_name)
 	text = text.replace("{road}", "往%s的路上" % MapData.place_name(st["place"])).replace("{dest}", MapData.place_name(st["place"]))
 	text = text.replace("{place}", MapData.place_name(st["at"]))
-	var who := _p("who")
-	var other := _p("other")
-	if text.contains("{line}") and who != null:
-		text = text.replace("{line}", _line(who))
-	if text.contains("{why}") and who != null:
-		text = text.replace("{why}", _why(who))
 	if text.contains("{who_line}") and who != null:
 		text = text.replace("{who_line}", "是{name}。" if _knows(who) else "你不認得{pron}。")
 	if text.contains("{wound}") and who != null:
@@ -516,53 +521,24 @@ func _fmt(text: String) -> String:
 	return text
 
 
-## 找上你的人說的話
-func _line(p: Person) -> String:
-	var kind := _kind(p)
-	var why: Dictionary = p.grudge_why.get(hero.id, {})
-	var d: Dictionary = PeopleData.PEOPLE.get(p.id, {})
-	if kind == "kin" and d.has("avenge") and p.relations.has(why.get("victim", "")):
-		return d["avenge"]
-	var line: String = RoadData.LINES.get(kind, RoadData.LINES["beaten"])
-	var victim := world.person(why.get("victim", ""))
-	if victim != null:
-		line = line.replace("{victim}", victim.display_name).replace("{rel}", _rel(p, victim))
-	return line.replace("{gplace}", MapData.place_name(why.get("place", town.road["at"]))).replace("{pron}", p.pron)
-
-
-## victim 是 p 的誰
-func _rel(p: Person, victim: Person) -> String:
-	var she := victim.pron == "她"
-	match p.relations.get(victim.id, ""):
-		"parent":
-			return "母親" if she else "父親"
-		"child":
-			return "女兒" if she else "兒子"
-		"master":
-			return "師傅"
-		"disciple":
-			return "徒弟"
-		"sibling":
-			return "姊妹" if she else "兄弟"
-		"boss":
-			return "老大"
-		"follower":
-			return "兄弟"
-		"spouse":
-			return "妻子" if she else "丈夫"
-	return "同門"
-
-
-## 要比劍的原因：強者榜上誰在前面
-func _why(p: Person) -> String:
-	var r := world.ranking()
-	var me := r.find(hero)
-	var them := r.find(p)
-	if me >= 0 and (them < 0 or me < them):
-		return "「公會牆上，你的名字寫在我前面。」"
-	if them >= 0:
-		return "「公會牆上，我的名字寫在你前面。有人說你不服。」"
-	return "「有人說你很能打。」"
+## 他說話：{say:情況}、{voice:情況}、{past}、{gesture}
+func _talk_tokens(text: String, who: Person) -> String:
+	var t := town.talk
+	for tag in ["{say:", "{voice:"]:
+		var i := text.find(tag)
+		while i >= 0:
+			var j := text.find("}", i)
+			var key := text.substr(i + tag.length(), j - i - tag.length())
+			var vals := {"{rank}": t.rank_line(who)}
+			var line := t.say(who, key, vals) if tag == "{say:" else t.say(who, key, vals, ["*"])
+			text = text.substr(0, i) + line + text.substr(j + 1)
+			i = text.find(tag)
+	if text.contains("{past}"):
+		var past := t.past_line(who)
+		text = text.replace("{past}", "\n" + past if past != "" else "")
+	if text.contains("{gesture}"):
+		text = text.replace("{gesture}", t.gesture(who))
+	return text
 
 
 ## 死人身上的傷口：看兇手拿的兵器

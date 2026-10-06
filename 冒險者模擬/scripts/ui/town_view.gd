@@ -1,7 +1,8 @@
 class_name TownView
 extends VBoxContainer
 
-## 主畫面：你的狀態、地圖、人物、休養；在城裡才有委託板（冒險者公會）、練武場、獅心劍庭、武器店的分頁。
+## 主畫面：你的狀態、地圖、人物、休養；在城裡才有委託板（冒險者公會）、練武場、獅心劍庭、酒館（傳聞）、武器店的分頁。
+## 下面的紀錄只寫你做的事。
 ## 點人的名字發出 person_requested，由 main 打開人物面板。
 ## 只負責顯示和按鈕，規則都在 Town。城外只能走路、找人打；接委託、休養、學招、讀秘笈、買武器要在城裡。
 ## 要開打、要走路時發出 monster_requested / fight_requested / travel_requested / spar_requested，由 main 處理。
@@ -42,6 +43,7 @@ var log_label: RichTextLabel
 var tabs: TabContainer
 var map_view: MapView
 var people_view: PeopleView
+var tavern_view: TavernView
 ## 跳出來的選擇（main 給的）
 var dialog: EncounterDialog
 ## 臨終時換掉中間的分頁
@@ -117,6 +119,10 @@ func _init(p_town: Town) -> void:
 	people_view.name = "人物"
 	people_view.person_requested.connect(show_person)
 	tabs.add_child(people_view)
+	tavern_view = TavernView.new(town)
+	tavern_view.name = "酒館"
+	tavern_view.person_requested.connect(show_person)
+	tabs.add_child(tavern_view)
 	shop_box = UiKit.vbox(10)
 	var shop := _scroll(shop_box)
 	shop.name = "武器"
@@ -229,7 +235,7 @@ func refresh() -> void:
 	rest_row.visible = town.in_city() and not h.dying()
 	# 城裡才有的地方：公會的委託板、道場、武器店
 	var city := town.in_city()
-	for tab in [board_box.get_parent(), training_view, school_view, shop_box.get_parent()]:
+	for tab in [board_box.get_parent(), training_view, school_view, tavern_view, shop_box.get_parent()]:
 		var idx: int = tab.get_index()
 		tabs.set_tab_hidden(idx, not city)
 		if not city and tabs.current_tab == idx:
@@ -248,6 +254,7 @@ func refresh() -> void:
 	_build_shop()
 	map_view.refresh()
 	people_view.refresh()
+	tavern_view.refresh()
 	if h.dying():
 		_build_deathbed()
 
@@ -448,7 +455,9 @@ func _build_board() -> void:
 		info.add_child(name_row)
 		info.add_child(UiKit.label(bounty["text"], 16, 0.75, true))
 		# 公會知道的：最近有人在哪裡看到他
-		var line := "最近有人在%s看到%s・%d 銀" % [MapData.place_name(p.travel_to if p.travel_left > 0 else p.location), p.pron, bounty["reward"]]
+		# 在路上就寫要去的地方（你自己在路上時 travel_to 是空的，location 就是要去的地方）
+		var where: String = p.travel_to if p.travel_left > 0 and p.travel_to != "" else p.location
+		var line := "最近有人在%s看到%s・%d 銀" % [MapData.place_name(where), p.pron, bounty["reward"]]
 		var takers: Array = bounty["takers"].filter(func(t): return t != town.world.hero_id and not town.world.person(t).dead)
 		if not takers.is_empty():
 			line += "・接下的人：" + "、".join(takers.map(func(t): return town.world.who(t)))

@@ -3,7 +3,7 @@ extends Control
 
 ## 人物面板（參考龍胤立志傳、鬼谷八荒）：點任何人的名字就蓋在畫面上跳出來。你和世界上的人用同一個面板。
 ## 左邊：頭像框（還沒有美術，用境界顏色的框和名字的第一個字）、身分資料、按鈕（動手、去找他）。
-## 右邊分頁：屬性、武學、物品、關係、經歷。
+## 右邊分頁：屬性、武學、物品、關係（最上面是跟你之間的事）、經歷。
 ## show don't tell：別人的面板不寫數字（身體只寫印象）；武學只列你跟他交過手、看過的招；物品寫樣子不寫名字；
 ## 經歷只寫世界上的人知道的事。不寫背景故事說明。
 ## 只負責顯示和按鈕，規則都在 Town。
@@ -495,6 +495,14 @@ func _build_relations(p: Person) -> void:
 	UiKit.clear(rel_box)
 	var w := town.world
 	var any := false
+	# 跟你之間的事（新的在上面）
+	var mine: Array = town.talk.memo_lines(p) if p.id != w.hero_id else []
+	if not mine.is_empty():
+		rel_box.add_child(UiKit.label("跟你", 17, 0.6))
+		for i in range(mine.size() - 1, -1, -1):
+			rel_box.add_child(UiKit.label("%s，%s" % [_when(mine[i]["month"]), mine[i]["text"]], 17, 0.9, true))
+		rel_box.add_child(HSeparator.new())
+		any = true
 	for r in p.relations:
 		var o := w.person(r)
 		if o == null:

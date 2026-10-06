@@ -1,7 +1,7 @@
 class_name NewsData
 extends RefCounted
 
-## 世界上發生的事傳到你耳裡的寫法（傳聞）。只有資料。
+## 世界上發生的事傳開來的寫法（傳聞，在酒館聽得到）。只有資料。跟你有關的事有人來說，寫法在 TalkData。
 ## {p:id} 換成那個人的名字（是你就寫「你」）；{place} 地名；{item} 東西的樣子。
 ## 有些事有時候會說是誰做的，有時候不說（要自己在人物面板上認出那把劍）：見 World。
 
@@ -69,20 +69,12 @@ const GREW := [
 ]
 ## 家人、師徒、手下被殺了，要找兇手算帳
 const GRIEF := "{p:who}聽說了{p:victim}的事。"
-## 要找人算帳、出城去了（是去找你的話，你會先聽到風聲）
-const HUNT := "有人看見{p:who}帶著{item}，往{place}去了。"
-const HUNT_YOU := "有人說，{p:who}在打聽你的下落。"
 ## 為了誓言出城
 const VOW := "{p:who}背著劍出了城，說是要去找{p:target}。"
-## 你要動他的家人時，他傳來的話（沒寫自己的話就用這個）
-const WARN := "一個陌生人在旅店門口攔住你：「{p:who}要我帶句話：{p:target}是{p:who}的人。別動。」"
 ## 換人接著玩：世界記得上一個人
 const REMEMBER := [
 	"城裡的人還在說{p:who}的事。",
 	"旅店老闆娘把{p:who}住過的房間收拾乾淨，好一陣子沒讓別人住。",
 ]
-## 上一個人的仇人，找上了接手的人
-const GRUDGE_PASSED := "{p:who}聽說{p:old}死了，東西到了{p:heir}手上。"
-## 你殺了不該殺的人：公會貼出你的懸賞（懸賞板上的字、傳到你耳裡的話）
+## 你殺了不該殺的人：公會貼出你的懸賞（懸賞板上的字）
 const MURDER_BOUNTY := "{p:who}在{place}殺了{p:victim}。苦主湊了一筆錢，懸賞{p:who}的人頭。"
-const MURDER_POSTED := "公會的牆上多了一張懸賞。上面畫的是你，畫得不太像。"
