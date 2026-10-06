@@ -96,6 +96,11 @@ const SCHOOLS := {
 }
 
 
+## 「3 月、4 月」
+static func selection_text() -> String:
+	return "、".join(SELECTION_MONTHS.map(func(m): return "%d 月" % m))
+
+
 static func school_name(id: String) -> String:
 	return SCHOOLS[id]["name"] if SCHOOLS.has(id) else ""
 

@@ -69,7 +69,7 @@ func _build_school() -> void:
 	# 入門考驗、公開比試
 	var spar := town.spar_state()
 	if not spar["passed"] and not h.expelled:
-		box.add_child(UiKit.label("劍庭門口的告示：開春選拔新學徒。", 17, 0.8, true))
+		box.add_child(UiKit.label("劍庭門口的告示：每年 %s選拔新學徒。" % SchoolData.selection_text(), 17, 0.8, true))
 		var b := UiKit.button("參加選拔", 230)
 		b.disabled = not spar["ok"]
 		b.tooltip_text = spar["why"]

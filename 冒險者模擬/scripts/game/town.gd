@@ -647,7 +647,7 @@ func spar_state() -> Dictionary:
 	elif not in_city():
 		st["why"] = "要在城裡"
 	elif not SchoolData.SELECTION_MONTHS.has(LifeData.month_of_year(world.month())):
-		st["why"] = "選拔在春天"
+		st["why"] = "選拔在 %s" % SchoolData.selection_text()
 	elif hero.selection_year == LifeData.year_of(world.month()):
 		st["why"] = "今年考過了"
 	else:
