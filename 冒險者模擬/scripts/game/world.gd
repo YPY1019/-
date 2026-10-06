@@ -687,6 +687,7 @@ func pass_on(heir_id: String) -> void:
 		heir.give_item(it)
 	heir.money += maxi(0, old.money)
 	heir.role = ""
+	heir.jobs.clear()
 	heir.target = ""
 	heir.grudges.clear()
 	heir.vow = {}

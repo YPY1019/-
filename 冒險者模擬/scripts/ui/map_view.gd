@@ -73,6 +73,8 @@ func refresh() -> void:
 			n.add_theme_color_override("font_color", Color(dg["color"]))
 			n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(n)
+			if town.took_job(id):
+				row.add_child(UiKit.label("你接下了", 15, 0.7))
 			if here:
 				var b := UiKit.button("動手", 90, 36)
 				b.pressed.connect(func(): monster_requested.emit(id))

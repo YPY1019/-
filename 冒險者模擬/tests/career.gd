@@ -122,6 +122,11 @@ func _career(run: int) -> Dictionary:
 			town._pass_months(1)
 			continue
 		var place: String = TownData.COMMISSIONS[mon]["place"]
+		if not town.took_job(mon):
+			if not town.in_city():
+				town.travel(MapData.HOME)
+				continue
+			town.accept_job(mon)
 		if h.location != place:
 			town.travel(place)
 			continue

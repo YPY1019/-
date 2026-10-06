@@ -39,9 +39,13 @@ func _init() -> void:
 	await _idle()
 	_save("05_warned")
 
-	# 接委託：走到牧羊村打野狼
+	# 接委託：在公會接下，走到牧羊村，在地圖上動手打野狼
 	h.hp = h.max_hp()
-	main._commission("wolf")
+	tv.add_messages(town.accept_job("wolf"))
+	main._travel("pasture")
+	await _idle()
+	_save("05b_pasture_tabs")
+	main._start_monster("wolf")
 	await _until(func(): return main.battle_view.visible)
 	await create_timer(1.5).timeout
 	_save("06_battle_wolf")

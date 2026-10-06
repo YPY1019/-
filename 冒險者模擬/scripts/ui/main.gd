@@ -16,8 +16,6 @@ var battle: Battle
 ## 現在打的是 monster 委託的怪物 / person 世界上的人 / spar 師傅的考驗
 var fight_kind := ""
 var _settled := []
-## 走到委託的地方之後要打的怪物
-var _then_monster := ""
 ## 死去那一句停多久，才換到「這一生」
 const DEATH_PAUSE := 2.5
 
@@ -36,7 +34,7 @@ func _ready() -> void:
 	add_child(margin)
 
 	town_view = TownView.new(town)
-	town_view.commission_requested.connect(_commission)
+	town_view.monster_requested.connect(_start_monster)
 	town_view.fight_requested.connect(_fight_person)
 	town_view.travel_requested.connect(_travel)
 	town_view.spar_requested.connect(_start_spar)
@@ -131,26 +129,9 @@ func _travel(place: String) -> void:
 		return
 	_wait(town.take_wait(), func():
 		town_view.add_messages(msgs)
-		var monster := _then_monster
-		_then_monster = ""
-		if town.hero.dying() or town.hero.dead:
-			_after_time()
-			return
-		town_view.show_map()
-		if monster != "" and town.monsters_at(town.hero.location).has(monster) and town.comer() == null:
-			_start_monster(monster)
-		else:
-			_after_time())
-
-
-## 接下委託：在那裡就直接打，不在就先走過去
-func _commission(enemy_id: String) -> void:
-	var place: String = TownData.COMMISSIONS[enemy_id]["place"]
-	if town.hero.location == place:
-		_start_monster(enemy_id)
-	else:
-		_then_monster = enemy_id
-		_travel(place)
+		if not town.hero.dying() and not town.hero.dead:
+			town_view.show_map()
+		_after_time())
 
 
 func _start_monster(enemy_id: String) -> void:

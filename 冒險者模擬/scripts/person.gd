@@ -52,6 +52,8 @@ var approved_tier := 1
 var books: Array[String] = []
 ## 師傅交代的事：劍譜拿回去給師傅看過了沒
 var errand_reported := false
+## 接下的一般委託（怪物 id）。打贏才拿得到報酬
+var jobs: Array[String] = []
 ## 打贏過的對手（委託的怪物 id、人的 id）
 var beaten: Array[String] = []
 ## 拿著的武器和身上有的武器（買的、從人身上拿的）

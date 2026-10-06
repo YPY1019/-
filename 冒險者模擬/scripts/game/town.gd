@@ -75,11 +75,27 @@ func monsters_at(place: String) -> Array:
 	return board().filter(func(id): return TownData.COMMISSIONS[id]["place"] == place)
 
 
+## 在公會接下委託（不花時間）。接了才拿得到報酬，地方自己走過去
+func accept_job(enemy_id: String) -> Array:
+	if hero.jobs.has(enemy_id) or not world.monster_open(enemy_id):
+		return []
+	hero.jobs.append(enemy_id)
+	return [_m("info", "你接下了委託：%s。" % EnemyData.ENEMIES[enemy_id]["name"])]
+
+
+func took_job(enemy_id: String) -> bool:
+	return hero.jobs.has(enemy_id)
+
+
+## 開打：場景照所在的地方寫
 func start_monster(enemy_id: String) -> Battle:
 	_fight_enemy = enemy_id
 	_fight_person = null
 	loot.clear()
-	return Battle.new([hero.to_combatant()], [Combatant.from_enemy(enemy_id)])
+	var foe := Combatant.from_enemy(enemy_id)
+	foe.enemy_def = foe.enemy_def.duplicate()
+	foe.enemy_def["scene"] = MapData.PLACES[hero.location]["scene"]
+	return Battle.new([hero.to_combatant()], [foe])
 
 
 func finish_monster(battle: Battle) -> Array:
@@ -90,9 +106,13 @@ func finish_monster(battle: Battle) -> Array:
 	match r["outcome"]:
 		"win":
 			hero.hp = r["hp"]
-			hero.money += c["reward"]
 			world.monster_done(id)
-			msgs.append(_m("good", "報酬 %d 銀。" % c["reward"]))
+			if hero.jobs.has(id):
+				hero.jobs.erase(id)
+				hero.money += c["reward"]
+				msgs.append(_m("good", "報酬 %d 銀。" % c["reward"]))
+			else:
+				msgs.append(_m("info", "你沒有接這張委託，報酬拿不到。"))
 			msgs.append_array(_after_monster(id))
 		"flee":
 			hero.hp = r["hp"]

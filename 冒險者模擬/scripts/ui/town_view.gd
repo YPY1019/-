@@ -1,13 +1,13 @@
 class_name TownView
 extends VBoxContainer
 
-## 主畫面：你的狀態、委託板（一般委託和懸賞）、地圖、人物、北境劍術道場、武器（你的武器和武器店）、休養。
-## 只負責顯示和按鈕，規則都在 Town。城外只能走路、找人打；休養、學招、讀秘笈、買武器要在城裡。
-## 要開打、要走路時發出 commission_requested / fight_requested / travel_requested / spar_requested，由 main 處理。
+## 主畫面：你的狀態、地圖、人物、休養；在城裡才有委託板（公會）、北境劍術道場、武器店的分頁。
+## 只負責顯示和按鈕，規則都在 Town。城外只能走路、找人打；接委託、休養、學招、讀秘笈、買武器要在城裡。
+## 要開打、要走路時發出 monster_requested / fight_requested / travel_requested / spar_requested，由 main 處理。
 ## 花時間的事（學招、讀秘笈、休養）發出 wait_requested，由 main 擋住按鈕、呼叫 play_wait 演那段時間。
 ## 臨終時中間換成安排後事（選誰接手），選好發出 heir_chosen。
 
-signal commission_requested(enemy_id: String)
+signal monster_requested(enemy_id: String)
 signal fight_requested(person_id: String)
 signal travel_requested(place: String)
 signal heir_chosen(person_id: String)
@@ -95,7 +95,7 @@ func _init(p_town: Town) -> void:
 	map_view.name = "地圖"
 	map_view.travel_requested.connect(func(p): travel_requested.emit(p))
 	map_view.fight_requested.connect(func(id): fight_requested.emit(id))
-	map_view.monster_requested.connect(func(id): commission_requested.emit(id))
+	map_view.monster_requested.connect(func(id): monster_requested.emit(id))
 	map_view.person_selected.connect(show_person)
 	tabs.add_child(map_view)
 	people_view = PeopleView.new(town)
@@ -205,6 +205,15 @@ func refresh() -> void:
 	home_button.visible = home > 0 and not h.dying()
 	home_button.text = "回城（%s）" % LifeData.span_text(home)
 	tabs.visible = not h.dying()
+	# 旅店在城裡：城外不能休養
+	rest_row.visible = town.in_city() and not h.dying()
+	# 城裡才有的地方：公會的委託板、道場、武器店
+	var city := town.in_city()
+	for tab in [board_box, dojo_box, shop_box]:
+		var idx: int = tab.get_parent().get_index()
+		tabs.set_tab_hidden(idx, not city)
+		if not city and tabs.current_tab == idx:
+			tabs.current_tab = map_view.get_index()
 	deathbed_panel.visible = h.dying()
 	money_label.text = "%d 銀" % h.money
 	money_label.add_theme_color_override("font_color", Color(BAD) if h.money < 0 else Color(GOLD))
@@ -374,11 +383,7 @@ func _build_board() -> void:
 		info.add_child(UiKit.label(c["text"], 16, 0.75, true))
 		info.add_child(UiKit.label("%s・%d 銀" % [MapData.place_name(c["place"]), c["reward"]], 15, 0.6))
 		row.add_child(info)
-		var months := MapData.distance(h.location, c["place"])
-		var b := UiKit.button("接下" if months == 0 else "前往（%s）" % LifeData.span_text(months), 150, 52)
-		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		b.pressed.connect(func(): commission_requested.emit(id))
-		row.add_child(b)
+		row.add_child(_take_button(town.took_job(id), func(): add_messages(town.accept_job(id))))
 		board_box.add_child(row)
 		board_box.add_child(HSeparator.new())
 
@@ -407,21 +412,22 @@ func _build_board() -> void:
 			line += "・接下的人：" + "、".join(takers.map(func(t): return town.world.who(t)))
 		info.add_child(UiKit.label(line, 15, 0.6))
 		row.add_child(info)
-		if town.took_bounty(id):
-			var took := UiKit.label("你接下了", 17)
-			took.add_theme_color_override("font_color", Color("#9be39b"))
-			took.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			row.add_child(took)
-		else:
-			var b := UiKit.button("接下", 110, 52)
-			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			b.disabled = not town.in_city()
-			if b.disabled:
-				b.tooltip_text = "要在城裡的公會登記"
-			b.pressed.connect(func(): add_messages(town.accept_bounty(id)))
-			row.add_child(b)
+		row.add_child(_take_button(town.took_bounty(id), func(): add_messages(town.accept_bounty(id))))
 		board_box.add_child(row)
 		board_box.add_child(HSeparator.new())
+
+
+## 「接下」按鈕；接過了就寫「你接下了」
+func _take_button(took: bool, on_take: Callable) -> Control:
+	if took:
+		var l := UiKit.label("你接下了", 17)
+		l.add_theme_color_override("font_color", Color("#9be39b"))
+		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		return l
+	var b := UiKit.button("接下", 110, 52)
+	b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	b.pressed.connect(on_take)
+	return b
 
 
 # ---------- 臨終 ----------
@@ -461,9 +467,6 @@ func _build_deathbed() -> void:
 func _build_dojo() -> void:
 	UiKit.clear(dojo_box)
 	var h := town.hero
-	if not town.in_city():
-		dojo_box.add_child(UiKit.label("道場在霜溪城。", 18, 0.6))
-		return
 	for t in SchoolData.TIERS:
 		match t["exam"]:
 			"spar":
@@ -547,9 +550,6 @@ func _build_shop() -> void:
 
 	shop_box.add_child(HSeparator.new())
 	shop_box.add_child(UiKit.heading("武器店"))
-	if not town.in_city():
-		shop_box.add_child(UiKit.label("武器店在霜溪城。", 18, 0.6))
-		return
 	for id in WeaponData.SHOP:
 		var w := WeaponData.get_def(id)
 		var st := town.weapon_state(id)
