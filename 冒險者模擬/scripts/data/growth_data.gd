@@ -111,10 +111,13 @@ static func win_chance(power_a: float, power_b: float) -> float:
 	return 1.0 / (1.0 + exp(-(power_a - power_b) / POWER_SPREAD))
 
 
-## 在這一境的前段 0、中段 1、後段 2
+## 在這一境的前段 0、中段 1、後段 2。後段 = 頂到瓶頸了；前段、中段把這一境的下半、上半分開
+## （每一境只差三五點，照三等分算的話，前段只有一點，升境那一仗多長一點就直接跳中段）
 static func stage(realm: int, value: int) -> int:
+	if value >= CAPS[realm]:
+		return 2
 	var span: int = maxi(1, CAPS[realm] - REALM_FLOOR[realm])
-	return clampi(int(float(value - REALM_FLOOR[realm]) * 3.0 / span), 0, 2)
+	return 0 if value - REALM_FLOOR[realm] < ceili(span / 2.0) else 1
 
 
 static func realm_text(realm: int, value: int) -> String:

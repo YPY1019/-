@@ -69,6 +69,8 @@ const GREW := [
 ]
 ## 家人、師徒、手下被殺了，要找兇手算帳
 const GRIEF := "{p:who}聽說了{p:victim}的事。"
+## 跟你結了仇、出城去練的人回來了
+const TRAINED := "{p:who}回到了{place}。有人說{p:who}這段時間一直在山裡，天不亮就起來練。"
 ## 為了誓言出城
 const VOW := "{p:who}背著劍出了城，說是要去找{p:target}。"
 ## 換人接著玩：世界記得上一個人

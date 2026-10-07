@@ -6,10 +6,13 @@ extends CenterContainer
 
 signal continue_requested
 signal restart_requested
+## 死得突然（被人殺了），沒來得及交代：在這裡選誰接著玩
+signal heir_picked(person_id: String)
 
 var title_label: Label
 var text: RichTextLabel
 var continue_button: Button
+var pick_row: HBoxContainer
 
 
 func _init() -> void:
@@ -29,6 +32,9 @@ func _init() -> void:
 	text.add_theme_constant_override("line_separation", 8)
 	panel.add_child(text)
 	box.add_child(panel)
+	pick_row = UiKit.hbox(12)
+	pick_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_child(pick_row)
 	var row := UiKit.hbox(16)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	continue_button = UiKit.button("", 260, 50)
@@ -40,8 +46,14 @@ func _init() -> void:
 	box.add_child(row)
 
 
-## heir：接手的人（沒有就只能重新開始）
-func show_life(world: World, h: Person, heir: Person) -> void:
+## heir：接手的人。沒有（死得突然）就從 candidates 裡選一個；都沒有就只能重新開始
+func show_life(world: World, h: Person, heir: Person, candidates: Array = []) -> void:
+	UiKit.clear(pick_row)
+	if heir == null:
+		for p in candidates.slice(0, 3):
+			var b := UiKit.button("接著玩：%s" % p.display_name, 220, 50)
+			b.pressed.connect(func(): heir_picked.emit(p.id))
+			pick_row.add_child(b)
 	title_label.text = "這一生：%s" % h.display_name
 	title_label.add_theme_color_override("font_color", Color(UiKit.MSG_COLOR["big"]))
 	text.clear()

@@ -33,7 +33,7 @@ func _init() -> void:
 	await _frames(3)
 	_save("04_person")
 	h.money = 500
-	main.person_panel.inquiry_done.emit(town.inquire("roderick"))
+	main.person_panel.inquiry_done.emit(town.ask_about("roderick"))
 	main.person_panel.refresh()
 	await _frames(3)
 	_save("04_person_inquired")

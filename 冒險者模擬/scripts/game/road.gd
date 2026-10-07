@@ -110,7 +110,7 @@ func _candidates(path: Array) -> Array:
 		var at: String = p.location if on_road else mid
 		var hunting: bool = p.target == h.id and (p.grudges.has(h.id) or world.wanted(h.id))
 		# 仇人、來收你懸賞的人：在路上堵你
-		if (hunting or p.grudges.has(h.id) and p.power() >= me - World.GRUDGE_DARE) and p.rest_left <= 0:
+		if (hunting or p.grudges.has(h.id) and world.grudge_ready(p, h.id) and p.power() >= me - World.GRUDGE_DARE) and p.rest_left <= 0:
 			out.append({"id": "ambush", "chance": RoadData.CHANCE["ambush"] if hunting else RoadData.AMBUSH_IDLE, "who": p.id, "at": at})
 			continue
 		if p.grudges.has(h.id):
@@ -119,8 +119,9 @@ func _candidates(path: Array) -> Array:
 		if p.grateful.has(h.id) and (on_road or p.travel_left > 0) and _free("repay", p):
 			out.append({"id": "repay", "chance": RoadData.CHANCE["repay"], "who": p.id, "at": at})
 			continue
-		# 有懸賞的人、他的手下、攔路的：在自己出沒的路上搶人。你強太多，他們不敢出來
-		if p.role in ["villain", "follower"] and on_road and p.rest_left <= 0 and not p.relations.has(h.id) and not p.grateful.has(h.id):
+		# 有懸賞的人、他的手下、攔路的：在自己出沒的路上搶人。你強太多，他們不敢出來。
+		# 佔地方的壞人只有盜匪會攔路（收過路費的在自己的地方收，盜獵的、走私的、屠夫不搶路人）
+		if p.role in ["villain", "follower"] and p.outlaw in ["", "bandit_leader"] and on_road and p.rest_left <= 0 and not p.relations.has(h.id) and not p.grateful.has(h.id):
 			var shy: bool = me >= p.power() + RoadData.STRONGER_GAP
 			var id := "robbers_shy" if shy else "robbers"
 			if _free(id, p):

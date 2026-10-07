@@ -7,7 +7,7 @@ extends RefCounted
 ## style：跟你打的時候用的招和戰報（EnemyData）。hp：血量（沒寫 = 照境界算，年輕人）。
 ## stats：開局的身體。potential：最多長到哪。growth：年輕時一年大約長幾點（30 歲以後就不長了）。
 ## weapon / items：拿著的武器、身上帶的東西（武器、秘笈）。learned：會的招（換成玩家角色時用得到）。
-## place：開局在哪。haunts：會去的幾個地方（villain、duelist 在這幾個地方之間走）。
+## place：開局在哪。home：住在哪（沒寫 = 霜溪城；不出門的時候回這裡）。haunts：會去的幾個地方（villain、duelist 在這幾個地方之間走）。
 ## school / rank：流派和階位（SchoolData）。role：怎麼過日子（見 Person.role）。follows：follower 跟著誰走（他死了就接手他的人）。boldness：冒險者有多敢（只接強不過自己這麼多的懸賞）。
 ## relations：跟別人的關係（見 Person.relations）。寫一邊就好，另一邊自動補上。
 ## bounty：懸賞 {"reward", "text"}（誰、做了什麼、賞多少）。
@@ -152,7 +152,7 @@ const PEOPLE := {
 		"name": "莉娜", "voice": "cold", "title": "", "pron": "她", "age": 14, "life": [36, 44],
 		"style": "duelist", "stats": {"str": 9, "agi": 11}, "potential": {"str": 17, "agi": 22}, "growth": 1.2,
 		"weapon": "old_sword", "learned": [], "items": [],
-		"place": "frost", "role": "youth",
+		"place": "pasture", "home": "pasture", "role": "youth",
 		"start": ["莉娜咬著嘴唇，把劍舉起來。"],
 	},
 
@@ -160,7 +160,7 @@ const PEOPLE := {
 	"grayson": {
 		"name": "葛雷森", "voice": "cold", "title": "老衛隊長", "pron": "他", "age": 56, "life": [62, 68],
 		"style": "old_captain", "hp": 620, "stats": {"str": 29, "agi": 30}, "potential": {"str": 29, "agi": 30}, "growth": 0.0,
-		"weapon": "nightwatch", "learned": ["deflect", "needle", "triple", "knee", "shed"], "items": ["verdict_2"], "place": "frost",
+		"weapon": "nightwatch", "learned": ["deflect", "needle", "triple", "knee", "shed"], "items": ["verdict_2"], "place": "wheat", "home": "wheat",
 		"role": "settled",
 		"start": ["葛雷森慢慢拔出長劍，劍的護手很寬，磨得發亮：「我年輕的時候，也是這樣一個人去找別人麻煩。」"],
 		"warn": "葛雷森在旅店的角落叫住你。他沒有抬頭，看著杯子裡的酒：「布蘭是我兒子。他做的事，我會去管。」\n他停了一下。「別動他。」",
@@ -205,6 +205,43 @@ const PEOPLE := {
 		"arrive_text": "城門口多了一個幫人看馬的孤兒，叫提姆。",
 	},
 }
+
+## 佔地方的壞人（2026-10-07 決定：人一律是世界上的人，委託板只留野獸和怪物）。
+## 每一種一次只有一個：開局就有，死了過一陣子會有新的人來佔（名字、身體每次不一樣）。都有懸賞。
+## style：EnemyData 的打法（身體、血、招從那裡來）；place：佔在哪；weapon：拿什麼；reward：懸賞多少；
+## toll：向過路的人收多少錢（只有本來就在收錢的人）；bounty：懸賞板上的字（{name} 他的名字）；arrive：有人來佔的傳聞；crimes：做壞事的傳聞
+const OUTLAWS := {
+	"bandit_leader": {"title": "盜匪頭子", "place": "wheat", "weapon": "bandit_blade", "reward": 100, "voice": "rough",
+		"bounty": "往麥田鎮的路上有一夥盜匪攔路搶劫，頭目叫{name}。鎮長懸賞他。",
+		"arrive": "往麥田鎮的路上開始有人攔路搶劫，帶頭的扛著一把大刀。",
+		"crimes": ["{place}又有人被搶了，帶頭的扛著一把大刀。", "麥田鎮的鎮長又往公會加了一筆錢。"]},
+	"deserter": {"title": "逃兵騎士", "place": "bridge", "weapon": "knight_sword", "reward": 150, "voice": "cold", "toll": 30,
+		"bounty": "一個叫{name}的逃兵騎士佔了石橋，向過路的人收過路費。領主的管家懸賞他。",
+		"arrive": "石橋的橋頭有人收起了過路費。收錢的人穿著一身破鐵甲，說是從戰場上回來的。",
+		"crimes": ["有個商人不肯在石橋付錢，被推進了河裡。"]},
+	"poacher": {"title": "盜獵人", "place": "lodge", "weapon": "hunting_knife", "reward": 140, "voice": "cold",
+		"bounty": "獵人小屋附近有人下套子盜獵，叫{name}。獵人公會派人去看過一次，那個人沒回來。",
+		"arrive": "獵人小屋附近的林子裡，多了很多不是獵人下的套子。",
+		"crimes": ["獵人小屋那邊又有一個獵人沒回來。"]},
+	"smuggler": {"title": "走私頭子", "place": "coast", "weapon": "cutlass", "reward": 160, "voice": "rough",
+		"bounty": "北岸漁村的碼頭有一夥走私的，頭目叫{name}，打傷了收稅的人。稅務官懸賞他。",
+		"arrive": "北岸的碼頭，夜裡多了幾條沒掛燈的小船。",
+		"crimes": ["北岸漁村又有一個收稅的被打傷了。"]},
+	"pikeman": {"title": "逃營的長槍兵", "place": "relay", "weapon": "spear", "reward": 240, "voice": "plain", "toll": 40,
+		"bounty": "一個叫{name}的逃營長槍兵佔了舊王家驛站那條路，攔下過路的馬車收錢。驛站的主人懸賞他。",
+		"arrive": "舊王家驛站那條路上，有人拄著長槍攔車收錢。",
+		"crimes": ["舊王家驛站那條路上，又有一輛馬車被攔了下來。"]},
+	"butcher": {"title": "屠夫", "place": "old_wall", "weapon": "cleaver", "reward": 420, "voice": "cold",
+		"bounty": "舊城牆的缺口裡住著一個屠夫，叫{name}。附近一直有人失蹤。城主親自發的懸賞。",
+		"arrive": "舊城牆附近開始有人失蹤。",
+		"crimes": ["舊城牆附近又有人失蹤了。"]},
+}
+## 佔地方的壞人死了，過幾個月會有新的人來佔
+const OUTLAW_BACK := [8, 20]
+## 佔地方的壞人、攔路的小賊的名字
+const OUTLAW_NAMES := [["布魯克", "他"], ["加斯", "他"], ["戴克", "他"], ["萊爾", "他"], ["莫特", "他"], ["佩恩", "他"], ["洛克", "他"],
+	["瓦德", "他"], ["黑爾", "他"], ["克林", "他"], ["雷夫", "他"], ["托爾", "他"], ["維克", "他"], ["葛倫", "他"], ["博爾", "他"],
+	["薩克斯", "他"], ["德倫", "他"], ["哈根", "他"], ["柯特", "他"], ["斯坦", "他"], ["格里姆", "他"], ["巴特", "他"], ["鄧肯", "他"], ["費茲", "他"]]
 
 ## 換人接著玩時，沒有夠年輕的人可以選，就從這裡找一個剛到城裡的年輕人
 ## 世界上的人的孩子

@@ -74,8 +74,6 @@ const SLOT_BASE := 3
 const SLOT_MAX := 8
 ## 名聲：打贏有名的人就變有名（強者榜照這個排，不寫出數字）
 var fame := 0.0
-## 在公會打聽的人：人 id -> 消息斷掉的那個月（世界的月）
-var inquired := {}
 ## 被逐出流派了（不能再回去）
 var expelled := false
 ## 哪一年考過劍庭的選拔（一年一次）
@@ -105,6 +103,12 @@ var travel_left := 0
 var role := ""
 ## 會去的幾個地方（villain、duelist）
 var haunts: Array = []
+## 住在哪（不出門的時候回這裡）。大家不是都住在霜溪城
+var home := MapData.HOME
+## 佔地方的壞人是哪一種（PeopleData.OUTLAWS 的 id；空的不是）
+var outlaw := ""
+## 在自己的地方向過路的人收錢（0 = 不收）
+var toll := 0
 ## follower 跟著誰走（他死了就接手他的人）
 var follows := ""
 ## 跟別人的關係：別人的 id -> 關係（parent 父母、child 孩子、master 師傅、disciple 徒弟、sibling 兄弟、
@@ -247,13 +251,20 @@ func break_through() -> void:
 	hp += max_hp() - old_max
 
 
+## 看得出來的境界：玩家角色是衝破過的瓶頸；世界上的人看現在的身體（老了身體掉下來，境界跟著掉）
+func shown_realm() -> int:
+	if role == "":
+		return realm
+	return mini(realm, GrowthData.realm_of_value(maxi(body("str"), body("agi"))))
+
+
 ## 用比較高的那項算前中後段（看現在的身體）
 func realm_text() -> String:
-	return GrowthData.realm_text(realm, maxi(body("str"), body("agi")))
+	return GrowthData.realm_text(shown_realm(), maxi(body("str"), body("agi")))
 
 
 func realm_color() -> String:
-	return GrowthData.REALM_COLORS[realm]
+	return GrowthData.REALM_COLORS[shown_realm()]
 
 
 func saw_move(who: String, move_id: String) -> void:

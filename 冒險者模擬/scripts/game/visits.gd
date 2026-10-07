@@ -32,7 +32,7 @@ var current := {}
 ## 傳話的先後（越前面越先說）
 const TIDING_ORDER := ["bounty_on_you", "hunted", "heir_grudge", "kin_knows", "bounty_taker", "death", "item_sold"]
 ## 主動找你的先後（每一種擲一次，碰上就是它）
-const APPROACH_ORDER := ["warn", "thanks", "broke", "repay", "ask_help", "invite", "challenge"]
+const APPROACH_ORDER := ["warn", "toll", "thanks", "broke", "repay", "ask_help", "invite", "challenge"]
 ## 跟你有交情的事（這種人會來告訴你消息）
 const FRIENDLY := ["spared", "saved", "buried", "kept", "hunted_with", "warn_heeded", "gift", "pitied", "paid", "duel_won", "duel_lost"]
 
@@ -144,7 +144,7 @@ func _free(kind: String, who: String) -> bool:
 	var now := world.month()
 	if seen.has(kind) and now - seen[kind] < TalkData.VISIT_AGAIN[kind]:
 		return false
-	if kind in ["warn", "thanks", "broke"]:
+	if kind in ["warn", "toll", "thanks", "broke"]:
 		return true
 	if who != "" and seen.has("p:" + who) and now - seen["p:" + who] < TalkData.PERSON_AGAIN:
 		return false
@@ -229,14 +229,22 @@ func _cand_ask_help() -> Array:
 	return out
 
 
-## 冒險者看上一張自己吃不下的懸賞，找你一起去
+## 冒險者看上一張自己吃不下的懸賞，找你一起去。
+## 他要找的是幫得上忙的人（跟他差不多或比他強），而且有理由找你：跟你有過交情（記得你的事）、欠你情、同門，或你在強者榜上
 func _cand_invite() -> Array:
 	var out := []
 	var h := hero
 	if world.wanted(h.id) or h.hp < h.max_hp() * SchoolData.FIT_HP:
 		return out
+	var famous := world.ranking().has(h)
 	for p in _here():
 		if p.role != "hunter" or p.target != "" or world.wanted(p.id):
+			continue
+		if h.power() < p.power() - TalkData.INVITE_GAP:
+			continue
+		var knows: bool = p.grateful.has(h.id) or p.memo_of(h.id).any(func(e): return FRIENDLY.has(e["kind"])) \
+			or (p.school != "" and p.school == h.school and p.rank > 0 and h.rank > 0)
+		if not knows and not famous:
 			continue
 		var best := ""
 		var best_reward := 0
@@ -255,6 +263,20 @@ func _cand_invite() -> Array:
 		if best != "":
 			out.append({"who": p.id, "target": best})
 	return out
+
+
+## 一起去打懸賞，你分幾成：他比你弱就讓你多拿
+func _share(p: Person) -> float:
+	return TalkData.SHARE_MORE if p.power() < hero.power() else 0.5
+
+
+## 在自己的地方收過路費的人（你強他太多，他不敢開口；你接了他的懸賞，就不是來收錢的事了）
+func _cand_toll() -> Array:
+	var h := hero
+	if town.in_city():
+		return []
+	return _here().filter(func(p): return p.toll > 0 and not town.took_bounty(p.id) \
+		and h.power() < p.power() + TalkData.AFRAID_GAP).map(func(p): return {"who": p.id})
 
 
 ## 強者榜上跟你差不多的人，來找你比劍
@@ -292,7 +314,7 @@ func view() -> Dictionary:
 			return _tiding_view()
 		"warn":
 			var custom: String = PeopleData.PEOPLE.get(p.id, {}).get("warn", "")
-			if custom != "":
+			if custom != "" and not c.get("messenger", false):
 				text = world.fmt(custom.replace("{p:who}", "{p:%s}" % p.id).replace("{p:target}", "{p:%s}" % t.id))
 			elif c.get("messenger", false):
 				text = "一個沒見過的人在旅店門口攔住你，說是%s叫他來的。\n%s" % [p.display_name, talk.say(p, "warn", vals, ["*"])]
@@ -317,8 +339,17 @@ func view() -> Dictionary:
 			text = talk.scene(p, TalkData.SCENE) + "\n" + talk.say(p, "ask_help", vals)
 			options = [["yes", "「我去。」"], ["no", "「這不關我的事。」"]]
 		"invite":
+			vals["{share}"] = TalkData.SHARE_TEXT[_share(p) > 0.5]
 			text = talk.scene(p, TalkData.SCENE) + "\n" + talk.say(p, "invite", vals)
 			options = [["yes", "「一起去。」"], ["no", "「你自己去吧。」"]]
+		"toll":
+			var e: Dictionary = EnemyData.ENEMIES.get(p.style, {})
+			vals["{toll}"] = str(p.toll)
+			text = e.get("approach", "{name}擋在路中間。").replace("{name}", p.display_name) + talk.gesture(p) + "\n" + talk.say(p, "toll", vals)
+			if hero.money >= p.toll:
+				options.append(["pay", "給%s %d 銀" % [p.pron, p.toll]])
+			options.append(["refuse", "「我不付。」"])
+			options.append(["fight", "動手"])
 		"challenge":
 			vals["{rank}"] = talk.rank_line(p)
 			text = talk.scene(p, TalkData.SCENE, true) + "\n" + talk.say(p, "challenge", vals)
@@ -508,6 +539,22 @@ func answer(choice: String) -> Dictionary:
 			else:
 				world.remember(p, "invite_declined", {"target": t.id})
 				msgs.append(_m("info", talk.say(p, "invite_no", {}, ["*"])))
+		"toll":
+			match choice:
+				"pay":
+					h.money -= p.toll
+					p.money += p.toll
+					world.remember(p, "paid_toll")
+					msgs.append(_m("info", "你給了%s %d 銀。%s收下錢，讓開了路。" % [p.display_name, p.toll, p.display_name]))
+				"refuse":
+					if world.rng.randf() < GrowthData.win_chance(h.power(), p.power()):
+						world.remember(p, "scared")
+						msgs.append(_m("info", "%s盯著你看了一會兒，往旁邊讓了一步。" % p.display_name))
+					else:
+						msgs.append(_m("bad", "%s沒有讓開。" % p.display_name))
+						fight = "person:" + p.id
+				_:
+					fight = "person:" + p.id
 		"challenge":
 			if choice == "yes":
 				fight = "duel:" + p.id
@@ -547,12 +594,12 @@ func _hunt_with(p: Person, t: Person) -> Array:
 		p.note("跟{p:%s}一起在%s殺了{p:%s}" % [h.id, MapData.place_name(where), t.id])
 		p.hp = maxi(1, p.hp - roundi(p.max_hp() * world.rng.randf_range(0.2, 0.5)))
 		h.hp = maxi(1, h.hp - roundi(h.max_hp() * world.rng.randf_range(0.1, 0.4)))
-		town._claim("guild", "%s的懸賞（一半）" % t.display_name, reward / 2, 0)
+		town._claim("guild", "%s的懸賞（分到的）" % t.display_name, roundi(reward * _share(p)), 0)
 		msgs.append(_m("big", talk.fill(TalkData.HUNT_WIN, p, vals)))
 		if not taken.is_empty():
 			vals["{things}"] = "、".join(taken.map(func(it): return talk.look(it)))
 			msgs.append(_m("info", talk.fill(TalkData.HUNT_WIN_TAKE, p, vals)))
-		msgs.append(_m("info", "你們回公會交差，賞錢對半。"))
+		msgs.append(_m("info", "你們回公會交差，賞錢%s。" % TalkData.SHARE_TEXT[_share(p) > 0.5]))
 		world.remember(p, "hunted_with", {"target": t.id, "place": where})
 		return msgs
 	h.hp = maxi(1, roundi(h.max_hp() * 0.3))

@@ -23,6 +23,9 @@ func _init() -> void:
 		var h := town.hero
 		if h.dead:
 			if main.life_view.visible:
+				# 被人殺了（沒有安排後事）：挑第一個能接手的人
+				if town.heir_id == "":
+					town.choose_heir(town.heir_candidates()[0].id)
 				main._continue_as_heir()
 			await process_frame
 			continue
@@ -78,7 +81,7 @@ func _init() -> void:
 			7:
 				var r := town.world.ranking()
 				if not r.is_empty():
-					tv.add_messages(town.inquire(r[0].id))
+					tv.add_messages(town.ask_about(r[-1].id))
 				for id in h.learned:
 					town.toggle_equip(id)
 			8:

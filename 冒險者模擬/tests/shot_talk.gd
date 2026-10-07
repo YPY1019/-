@@ -26,6 +26,9 @@ func _init() -> void:
 	w.tidings.clear()
 	tv.refresh()
 	_save("t01_town_quiet")
+	tv.tabs.current_tab = 0
+	await _frames(3)
+	_save("t01b_board")
 	tv.tabs.current_tab = tv.tavern_view.get_index()
 	await _frames(3)
 	_save("t02_tavern")

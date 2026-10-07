@@ -79,9 +79,9 @@ const FEAR_FLEE := ["{name}轉身就逃，頭也不回。", "{name}突然掉頭�
 ## 被嚇跑時結束的句子
 const FLED_END := "對手跑了。"
 
-## 委託板上的一般敵人（照危險度排）
-const ORDER := ["wolf", "boar", "bandit_leader", "deserter", "poacher", "smuggler", "pikeman", "bear", "alpha_wolf",
-	"elk", "butcher", "ogre", "croc", "troll"]
+## 委託板上的野獸和怪物，由弱到強（人形的打法給佔地方的壞人用，見 PeopleData.OUTLAWS）
+const ORDER := ["wolf", "boar", "bear", "alpha_wolf",
+	"elk", "ogre", "croc", "troll"]
 ## 有名字、只有一個的強者（懸賞）：身上帶著稀有的武器或高級秘笈，打倒了就不會再出現。照難度排
 const NAMED := ["merc_captain", "raider", "duelist", "black_knight", "old_captain", "rebel_lord"]
 
@@ -439,7 +439,7 @@ const ENEMIES := {
 		"name": "長槍兵",
 		"approach": "驛站門口橫著一輛翻倒的馬車，一個人拄著長槍坐在車上。", "toll": {"cost": 40, "text": "你數了 40 銀給他。長槍兵把槍收了回去，讓你過去。"},
 		"blurb": "",
-		"hp": 230, "str": 16, "agi": 15, "armor": "light", "traits": ["disarmable"], "pron": "他",
+		"hp": 230, "str": 16, "agi": 15, "armor": "light", "traits": ["disarmable"], "kinds": ["polearm"], "pron": "他",
 		"weapon": "長槍", "guard": "槍桿", "move_pool": ["knee", "deflect", "dust", "shed"], "pool_n": 2,
 		"parry": ["{name}把槍桿往身前一橫，架住了你的{my}。"],
 		"fear": ["{name}握槍的手緊了緊，往後退了一步。"],

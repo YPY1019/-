@@ -137,16 +137,23 @@ const SAY := {
 	},
 	# ---------- 邀你一起去打懸賞 ----------
 	"invite": {
-		"rough": ["「{target}的懸賞，我一個人吃不下。一起去，賞錢對半。」"],
-		"cold": ["「{target}。兩個人去，賞錢對半。去不去？」"],
-		"proud": ["「{target}的懸賞我要了。你願意的話，可以跟著來，賞錢分你一半。」"],
-		"plain": ["「我想去接{target}的懸賞，一個人怕不夠。你要不要一起？賞錢對半。」"],
+		"rough": ["「{target}的懸賞，我一個人吃不下。一起去，賞錢{share}。」"],
+		"cold": ["「{target}。兩個人去，賞錢{share}。去不去？」"],
+		"proud": ["「{target}的懸賞我要了。你願意的話，可以跟著來，賞錢{share}。」"],
+		"plain": ["「我想去接{target}的懸賞，一個人怕不夠。你要不要一起？賞錢{share}。」"],
 	},
 	"invite_no": {
 		"rough": ["「隨你。」"],
 		"cold": ["{name}點了一下頭，沒再說什麼。"],
 		"proud": ["「那賞錢我一個人拿。」"],
 		"plain": ["「那我再找找別人。」"],
+	},
+	# ---------- 收過路費 ----------
+	"toll": {
+		"rough": ["「過去可以，{toll} 銀。」"],
+		"cold": ["「{toll} 銀。」{name}用下巴指了指腳邊的木箱。"],
+		"proud": ["「這條路有主人了。{toll} 銀，不二價。」"],
+		"plain": ["「{toll} 銀，誰過都一樣。我也要吃飯。」"],
 	},
 	# ---------- 來告訴你一件事（認識的人） ----------
 	"tell": {
@@ -214,14 +221,15 @@ const MEMO := {
 	"robbed_you": {"me": "{pron}在{place}攔路，搶了你的錢。", "past": "「{place}那次，你的錢袋是我拿的。」", "ref": "在{place}搶了你的錢"},
 	"scared": {"me": "{pron}在{place}攔你，被你嚇跑了。", "past": "「{place}那次，我跑了。這次不會。」", "ref": "在{place}攔你、被你嚇跑"},
 	"stripped": {"me": "{pron}在{place}攔路，被你打倒，你搜光了{pron}身上。", "past": "「{place}那次，你連我身上幾個銅板都拿走了。」", "ref": "在{place}被你打倒、搜光身上"},
+	"paid_toll": {"me": "你在{place}付了{pron}過路費。"},
 }
 
 ## 有人來找你：每回來一次最多幾件（傳話加主動找你）、主動找你的最多幾件
 const PER_RETURN := 2
 const APPROACH_PER_RETURN := 1
 ## 主動找你：條件成立時，每回來一次碰上的機率；同一種事隔幾個月才再有；同一個人隔幾個月才再來
-const VISIT_CHANCE := {"challenge": 0.25, "ask_help": 0.35, "repay": 0.5, "invite": 0.25, "thanks": 1.0, "broke": 0.6, "warn": 1.0}
-const VISIT_AGAIN := {"challenge": 18, "ask_help": 18, "repay": 12, "invite": 18, "thanks": 0, "broke": 24, "warn": 0}
+const VISIT_CHANCE := {"challenge": 0.25, "ask_help": 0.35, "repay": 0.5, "invite": 0.25, "thanks": 1.0, "broke": 0.6, "warn": 1.0, "toll": 1.0}
+const VISIT_AGAIN := {"challenge": 18, "ask_help": 18, "repay": 12, "invite": 18, "thanks": 0, "broke": 24, "warn": 0, "toll": 0}
 const PERSON_AGAIN := 18
 ## 傳話：幾個月沒傳到就不傳了
 const TIDING_STALE := 18
@@ -235,6 +243,10 @@ const THANKS_MONEY := [40, 90]
 const TEAM_BONUS := 1.0
 ## 一起去打輸了，他死在那裡的機率
 const TEAM_DEATH := 0.3
+## 一起去打懸賞：他要找跟他差不多的人（你比他弱不過這麼多）；他比你弱，就讓你拿多一點
+const INVITE_GAP := 0.5
+const SHARE_MORE := 0.6
+const SHARE_TEXT := {false: "對半", true: "你拿六成"}
 
 ## 城裡固定的人（不是世界上會打架的人）：來告訴你事情的
 const TELLERS := {
@@ -253,7 +265,7 @@ const TELLERS := {
 const TIDINGS := {
 	"hunted": "「{about}{ref}在打聽你。」",
 	"bounty_taker": "「{about}{ref}接了你的懸賞，在公會問了很多你的事。」",
-	"kin_knows": "「{victim}的{rel}{about}，知道是你下的手了。」",
+	"kin_knows": "「{victim}的{rel}{about}，知道是你下的手了。{apron}收拾了東西出城去了，走之前說，總有一天會回來找你。」",
 	"heir_grudge": "「{about}{ref}聽說{old}死了，東西都到了你手上。{apron}在打聽你。」",
 	"bounty_on_you": "「牆上多了一張懸賞，畫的是你。」{pron}看了看四周。「說你在{place}殺了{victim}。」",
 	"item_sold": "「你以前的{item}，{seller}拿來賣了。我掛在牆上了。」",

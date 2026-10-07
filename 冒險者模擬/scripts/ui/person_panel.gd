@@ -155,7 +155,8 @@ func _build_info(p: Person) -> void:
 	var me := p.id == town.world.hero_id
 	if p.dead:
 		where = "%d 歲死在%s" % [p.age_at(p.died_at), MapData.place_name(p.location)]
-	elif me:
+	elif me or town.people_here().has(p):
+		# 你自己、跟你在同一個地方的人：就寫地方
 		where = MapData.place_name(p.location)
 	elif town.hero.heard.has(p.id):
 		# 別人：最後聽說他在哪
@@ -208,16 +209,14 @@ func _build_buttons(p: Person, me: bool) -> void:
 			close()
 			travel_requested.emit(place))
 		button_box.add_child(go)
-	# 在公會打聽他的下落
-	var iq := town.inquire_state(p.id)
-	if iq["tracking"]:
-		button_box.add_child(UiKit.label("公會有%s的消息。" % p.pron, 16, 0.7))
-	elif iq["why"] != "-":
-		var ib := UiKit.button("花 %d 銀打聽%s的下落" % [iq["cost"], p.pron], 260)
+	# 在酒館打聽他（不在這裡的人）
+	var iq := town.ask_state(p.id)
+	if iq["why"] != "-" and not town.people_here().has(p):
+		var ib := UiKit.button("在酒館打聽%s（%d 銀）" % [p.pron, iq["cost"]], 260)
 		ib.disabled = not iq["ok"]
 		ib.tooltip_text = iq["why"]
 		ib.pressed.connect(func():
-			inquiry_done.emit(town.inquire(p.id))
+			inquiry_done.emit(town.ask_about(p.id))
 			refresh())
 		button_box.add_child(ib)
 	var rank := town.world.ranking().find(p)

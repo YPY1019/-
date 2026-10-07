@@ -59,6 +59,9 @@ func _ready() -> void:
 	margin.add_child(battle_view)
 	life_view = LifeView.new()
 	life_view.continue_requested.connect(_continue_as_heir)
+	life_view.heir_picked.connect(func(id):
+		town.choose_heir(id)
+		_continue_as_heir())
 	life_view.restart_requested.connect(func(): get_tree().reload_current_scene())
 	margin.add_child(life_view)
 	person_panel = PersonPanel.new(town)
@@ -129,7 +132,7 @@ func _after_time() -> void:
 		await get_tree().create_timer(DEATH_PAUSE).timeout
 		blocker.visible = false
 		var heir := town.world.person(town.heir_id) if town.heir_id != "" else null
-		life_view.show_life(town.world, town.hero, heir)
+		life_view.show_life(town.world, town.hero, heir, town.heir_candidates() if heir == null else [])
 		_show(life_view)
 		return
 	# 已經有對話開著：等它選完（選完會再回到這裡）
@@ -154,9 +157,23 @@ func _after_time() -> void:
 	if _check_jobs:
 		_check_jobs = false
 		if not town.hero.dying():
+			var wanted := town.wanted_here()
 			var jobs := town.jobs_here()
-			if not jobs.is_empty():
+			if not wanted.is_empty():
+				_meet_wanted(wanted[0])
+			elif not jobs.is_empty():
 				_meet_monster(jobs[0])
+
+
+## 找到了你接下懸賞的人
+func _meet_wanted(id: String) -> void:
+	var ev := town.person_event(id)
+	encounter.show_choice(ev["title"], ev["color"], ev["text"], ev["options"], func(c):
+		play_log.write(["【找到懸賞上的人】%s　選了 %s" % [ev["title"], c]])
+		if c == "fight":
+			_start_person(id, "懸賞")
+		else:
+			town_view.add_messages([{"kind": "info", "text": "你沒有驚動%s，先退了回去。" % town.world.person(id).pron}]))
 
 
 func _answer_comer(choice: String) -> void:
@@ -179,6 +196,10 @@ func _answer_visit(choice: String) -> void:
 	if fight.begins_with("duel:"):
 		town_view.add_messages(r["msgs"])
 		_start_duel(fight.substr(5))
+		return
+	if fight.begins_with("person:"):
+		town_view.add_messages(r["msgs"])
+		_start_person(fight.substr(7), "動手")
 		return
 	var w := town.take_wait()
 	if w.is_empty():

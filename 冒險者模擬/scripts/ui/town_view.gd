@@ -454,10 +454,10 @@ func _build_board() -> void:
 		name_row.add_child(name_button)
 		info.add_child(name_row)
 		info.add_child(UiKit.label(bounty["text"], 16, 0.75, true))
-		# 公會知道的：最近有人在哪裡看到他
-		# 在路上就寫要去的地方（你自己在路上時 travel_to 是空的，location 就是要去的地方）
-		var where: String = p.travel_to if p.travel_left > 0 and p.travel_to != "" else p.location
-		var line := "最近有人在%s看到%s・%d 銀" % [MapData.place_name(where), p.pron, bounty["reward"]]
+		# 你知道的：最後聽說他在哪（自己去聽、去打聽，公會不替你盯人）
+		var line := "%d 銀" % bounty["reward"]
+		if town.hero.heard.has(id) and id != town.world.hero_id:
+			line = "聽說在%s・%s" % [MapData.place_name(town.hero.heard[id]["place"]), line]
 		var takers: Array = bounty["takers"].filter(func(t): return t != town.world.hero_id and not town.world.person(t).dead)
 		if not takers.is_empty():
 			line += "・接下的人：" + "、".join(takers.map(func(t): return town.world.who(t)))
@@ -465,21 +465,18 @@ func _build_board() -> void:
 		row.add_child(info)
 		# 懸賞的是你：牆上畫的是你，不能自己接
 		if id != town.world.hero_id:
-			var buttons := UiKit.vbox(4)
-			buttons.add_child(_take_button(town.took_bounty(id), func(): add_messages(town.accept_bounty(id))))
-			buttons.add_child(_inquire_button(id))
-			row.add_child(buttons)
+			row.add_child(_take_button(town.took_bounty(id), func(): add_messages(town.accept_bounty(id))))
 		board_box.add_child(row)
 		board_box.add_child(HSeparator.new())
 
 
-## 強者榜：公會牆上的名單，照實力排，旁邊寫境界（不寫數字）。點名字看人物面板，旁邊可以直接打聽
+## 強者榜：公會牆上的名單，照實力排，旁邊寫境界（不寫數字）。點名字看人物面板
 func _build_ranking() -> void:
 	var head := UiKit.heading("強者榜")
 	board_box.add_child(head)
 	board_box.add_child(UiKit.label("公會牆上釘著一張羊皮紙，寫著北境最能打的人。", 16, 0.7, true))
 	var grid := GridContainer.new()
-	grid.columns = 4
+	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 16)
 	grid.add_theme_constant_override("v_separation", 4)
 	board_box.add_child(grid)
@@ -499,22 +496,7 @@ func _build_ranking() -> void:
 		realm.add_theme_color_override("font_color", Color(p.realm_color()))
 		realm.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		grid.add_child(realm)
-		grid.add_child(_inquire_button(p.id) if not me else Control.new())
 	board_box.add_child(HSeparator.new())
-
-
-## 「花 X 銀打聽」：已經有消息了就寫「有消息」
-func _inquire_button(id: String) -> Control:
-	var st := town.inquire_state(id)
-	if st["tracking"]:
-		var l := UiKit.label("有消息", 15, 0.6)
-		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		return l
-	var b := UiKit.button("花 %d 銀打聽" % st["cost"], 150, 34)
-	b.disabled = not st["ok"]
-	b.tooltip_text = st["why"]
-	b.pressed.connect(func(): add_messages(town.inquire(id)))
-	return b
 
 
 ## 「接下」按鈕；接過了就寫「你接下了」

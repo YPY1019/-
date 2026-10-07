@@ -50,6 +50,14 @@ const WEAPONS := {
 		"look": "一把手斧。", "desc": "北方海上來的人愛用的斧頭。"},
 	"warhammer": {"grade": 2, "name": "戰錘", "noun": "戰錘", "kind": "hammer", "power": 1.5, "cost": 0, "str": 18,
 		"look": "一把戰錘和一面塔盾。", "desc": "很沉的戰錘。"},
+	"hunting_knife": {"grade": 1, "name": "獵刀", "noun": "獵刀", "kind": "blade", "power": 1.2, "cost": 0, "str": 0,
+		"look": "一把刀刃很窄的獵刀，刀柄纏著鹿皮。", "desc": "剝皮用的刀，也拿來殺人。又短又快。"},
+	"cutlass": {"grade": 1, "name": "彎刀", "noun": "彎刀", "kind": "blade", "power": 1.3, "cost": 0, "str": 12,
+		"look": "一把護手包著銅片的彎刀。", "desc": "船上的人愛用的彎刀，在窄的地方也揮得開。"},
+	"spear": {"grade": 1, "name": "長槍", "noun": "長槍", "kind": "polearm", "power": 1.4, "cost": 0, "str": 13,
+		"look": "一把槍桿磨得發亮的長槍。", "desc": "軍隊發的長槍。夠長，近不了身就砍不到他。"},
+	"cleaver": {"grade": 2, "name": "剁肉刀", "noun": "剁肉刀", "kind": "blade", "power": 1.5, "cost": 0, "str": 16,
+		"look": "一把很厚的剁肉刀，刀刃是黑的。", "desc": "又厚又重的剁肉刀。"},
 	"red_fang": {"grade": 3, "name": "紅鬃之牙", "noun": "鋸齒劍", "kind": "sword", "power": 1.7, "cost": 0, "str": 16, "rare": true, "fx": "twin",
 		"look": "暗紅色的劍，刃口有一排鋸齒。",
 		"desc": "傭兵團「紅鬃」歷代隊長傳下來的劍，刃口有一排鋸齒。"},
@@ -95,6 +103,7 @@ const KIND_WORDS := {
 	"blade": {"my_stroke": "刀", "my_tip": "刀尖", "my_edge": "刀鋒", "my_blade": "刀刃", "my_flat": "刀背", "my_hilt": "刀柄"},
 	"axe": {"my_stroke": "斧", "my_tip": "斧角", "my_edge": "斧刃", "my_blade": "斧刃", "my_flat": "斧面", "my_hilt": "斧柄"},
 	"hammer": {"my_stroke": "錘", "my_tip": "錘頭", "my_edge": "錘頭", "my_blade": "錘頭", "my_flat": "錘柄", "my_hilt": "錘柄"},
+	"polearm": {"my_stroke": "槍", "my_tip": "槍尖", "my_edge": "槍頭", "my_blade": "槍頭", "my_flat": "槍桿", "my_hilt": "槍桿"},
 	"fist": {"my_stroke": "拳", "my_tip": "拳頭", "my_edge": "拳頭", "my_blade": "拳頭", "my_flat": "手臂", "my_hilt": "手肘"},
 }
 

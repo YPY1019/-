@@ -260,6 +260,23 @@ func jobs_here() -> Array:
 	return list
 
 
+## 走到這裡，你接了懸賞的人就在這裡
+func wanted_here() -> Array:
+	return people_here().filter(func(p): return took_bounty(p.id)).map(func(p): return p.id)
+
+
+## 找到了懸賞上的人：先看到他，再決定怎麼辦。fight 動手；leave 先離開
+func person_event(id: String) -> Dictionary:
+	var p := world.person(id)
+	var e: Dictionary = EnemyData.ENEMIES.get(p.style, {})
+	var text: String = e.get("approach", "你在%s找到了{name}。" % MapData.place_name(hero.location)) if p.outlaw != "" else "你在%s找到了{name}。" % MapData.place_name(hero.location)
+	text = text.replace("{name}", p.display_name) + talk.gesture(p)
+	if not p.memo_of(hero.id).is_empty():
+		text += "\n" + talk.past_line(p)
+	return {"title": ("%s %s" % [p.title, p.display_name]).strip_edges(), "color": Color(p.realm_color()), "text": text,
+		"options": [["fight", "動手"], ["leave", "先離開"]]}
+
+
 ## 開打：場景照所在的地方寫
 func start_monster(enemy_id: String) -> Battle:
 	_fight_enemy = enemy_id
@@ -460,6 +477,14 @@ func finish_person(battle: Battle) -> Array:
 			hero.hp = r["hp"]
 			world.hero_fled(p)
 		"lose":
+			if world.revenge_lethal(p):
+				# 殺親之仇：他不會放過你
+				var lost := world.hero_killed(p)
+				road = {}
+				msgs.append(_m("epic", "%s站在你面前，%s上的血一滴一滴往下掉。你想撐起來，手臂已經沒有力氣了。" % [p.display_name, WeaponData.get_def(p.weapon).get("noun", "兵器")]))
+				for it in lost:
+					msgs.append(_m("bad", "%s拿走了你的%s。" % [p.display_name, _item_name(it)]))
+				return msgs
 			if world.wanted(hero.id) and p.target == hero.id and not p.grudges.has(hero.id):
 				msgs.append_array(_captured(p))
 			else:
@@ -608,11 +633,11 @@ func toggle_equip(id: String) -> void:
 		hero.equipped.append(id)
 
 
-## 在公會打聽一個人的下落：付錢，之後幾個月都知道他在哪（地圖上標出來）。要在城裡
-func inquire_state(id: String) -> Dictionary:
+## 在酒館打聽一個人：請一輪酒，問問有沒有人最近看過他（2026-10-07 決定：所有人同價）。
+## 有名的人大家都在說，一問就有；沒名的人常常問不到。問到的是最近有人在哪看過他，不一定還在。要在城裡
+func ask_state(id: String) -> Dictionary:
 	var p := world.person(id)
-	var cost := TownData.INQUIRE_COST + (TownData.INQUIRE_PER_REALM * p.realm if p != null else 0)
-	var st := {"ok": false, "why": "", "cost": cost, "tracking": hero.inquired.get(id, -1) >= world.month()}
+	var st := {"ok": false, "why": "", "cost": TownData.ASK_COST}
 	if p == null or p.dead or id == world.hero_id:
 		st["why"] = "-"
 	elif not in_city():
@@ -624,17 +649,20 @@ func inquire_state(id: String) -> Dictionary:
 	return st
 
 
-func inquire(id: String) -> Array:
-	var st := inquire_state(id)
+func ask_about(id: String) -> Array:
+	var st := ask_state(id)
 	if not st["ok"]:
 		return []
 	hero.money -= st["cost"]
-	hero.inquired[id] = world.month() + TownData.INQUIRE_MONTHS
-	world.hear(id)
 	var p := world.person(id)
+	var known: bool = world.ranking().has(p) or world.wanted(p.id) or p.fame >= TownData.ASK_FAMOUS
+	if not known and world.rng.randf() >= TownData.ASK_CHANCE:
+		return [_m("info", "你請酒館裡的人喝了一輪，問起%s。問了一圈，沒人說得出%s在哪。" % [p.display_name, p.pron])]
+	world.hear(id)
 	var where := MapData.place_name(p.travel_to if p.travel_left > 0 else p.location)
-	var line := "往%s的路上" % where if p.travel_left > 0 else "在%s" % where
-	return [_m("info", "公會的人收下 %d 銀，翻了翻簿子：「%s%s。之後有消息，會再告訴你。」" % [st["cost"], p.display_name, line])]
+	var line := "前陣子看到%s往%s去了" % [p.pron, where] if p.travel_left > 0 else "前陣子在%s看過%s" % [where, p.pron]
+	return [_m("info", "你請酒館裡的人喝了一輪，問起%s。有個剛從外地回來的人說，%s。" % [p.display_name, line])]
+
 
 
 ## 接下懸賞（不花時間）
